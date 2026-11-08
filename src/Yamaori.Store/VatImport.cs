@@ -20,7 +20,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
     static readonly TimeSpan MaxGap = TimeSpan.FromHours(3);
     readonly TimeZoneInfo _tz = timeZone ?? TimeZoneInfo.Local;
 
-    public sealed record Result(int Visits, int Encounters, int Resolved, int Events, int Skipped);
+    public sealed record Result(int Visits, int Encounters, int Resolved, int Events, int Skipped, IReadOnlyList<string> SelfNames);
 
     sealed record Row(long Id, int Type, DateTime At, string? NotificationId, string? UserId, string? UserName, string? WorldId, string? WorldName, string? Message, string? Url);
 
@@ -30,7 +30,8 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         var rows = Read(vatPath);
         accountId ??= SingleAccount();
         var covered = LogCoveredRanges();
-        var names = NameIndex(rows);
+        var selfNames = SelfNames(rows);
+        var names = NameIndex(rows, selfNames);
 
         var visits = new List<Visit>();
         var encounters = new List<Encounter>();
@@ -76,7 +77,8 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
                     lastActivity = r.At;
                     break;
                 }
-                case 1 when visit != null && !string.IsNullOrEmpty(r.UserName):
+                // VAT は自分も「会った人」に入れるので、本人の名前は外す
+                case 1 when visit != null && !string.IsNullOrEmpty(r.UserName) && !selfNames.Contains(r.UserName):
                 {
                     var id = Resolve(names, r.UserName, r.At);
                     if (id != null) resolved++;
@@ -116,7 +118,27 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         using var tx = db.Connection.BeginTransaction();
         ProjectionWriter.Replace(db, Source, new Projection(deviceId, null, visits, encounters, events), tx);
         tx.Commit();
-        return new Result(visits.Count, encounters.Count, resolved, events.Count, skipped);
+        return new Result(visits.Count, encounters.Count, resolved, events.Count, skipped, selfNames.Order(StringComparer.Ordinal).ToList());
+    }
+
+    /// <summary>
+    /// 本人の名前を見分ける。VAT は自分も「会った人」に入れるので、その名前が使われていた期間の訪問の半分以上に出てくる名前（20 回以上）を本人とみなす。
+    /// 2021〜2026 の本物の記録では、本人の名前は 70〜100%、いちばんよく会う人でも 17% だった。
+    /// </summary>
+    static HashSet<string> SelfNames(List<Row> rows)
+    {
+        var visitIndex = -1;
+        var seen = new Dictionary<string, (int Count, int First, int Last)>(StringComparer.Ordinal);
+        foreach (var r in rows)
+        {
+            if (r.Type == 0) visitIndex++;
+            else if (r.Type == 1 && visitIndex >= 0 && !string.IsNullOrEmpty(r.UserName))
+            {
+                if (!seen.TryGetValue(r.UserName, out var s)) seen[r.UserName] = (1, visitIndex, visitIndex);
+                else if (s.Last != visitIndex) seen[r.UserName] = (s.Count + 1, s.First, visitIndex);
+            }
+        }
+        return seen.Where(x => x.Value.Count >= 20 && x.Value.Count * 2 >= x.Value.Last - x.Value.First + 1).Select(x => x.Key).ToHashSet(StringComparer.Ordinal);
     }
 
     List<Row> Read(string path)
@@ -156,7 +178,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
     }
 
     /// <summary>名前 → (ID, その名前を見た期間)。DB のログの記録と、VAT の通知（名前と ID の両方がある）から作る。</summary>
-    Dictionary<string, List<(string Id, DateTime From, DateTime To)>> NameIndex(List<Row> rows)
+    Dictionary<string, List<(string Id, DateTime From, DateTime To)>> NameIndex(List<Row> rows, HashSet<string> selfNames)
     {
         var index = new Dictionary<string, List<(string, DateTime, DateTime)>>(StringComparer.Ordinal);
         void Add(string name, string id, DateTime from, DateTime to)
@@ -170,7 +192,8 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         using (var r = cmd.ExecuteReader())
             while (r.Read()) Add(r.GetString(1), r.GetString(0), Database.ParseTime(r.GetString(2)), Database.ParseTime(r.GetString(3)));
         foreach (var row in rows)
-            if (row.UserId != null && row.UserName != null && row.UserId.StartsWith("usr_", StringComparison.Ordinal)) Add(row.UserName, row.UserId, row.At, row.At);
+            if (row.UserId != null && row.UserName != null && row.UserId.StartsWith("usr_", StringComparison.Ordinal) && !selfNames.Contains(row.UserName))
+                Add(row.UserName, row.UserId, row.At, row.At);
         return index;
     }
 

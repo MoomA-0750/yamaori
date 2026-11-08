@@ -69,6 +69,8 @@ tests/               xUnit。実際のログから作った小さな見本（名
 
 ### 5. 取り込み
 
+> 2026-11-09: VAT の取り込み（`yamaori import-vat`）ができた。手元の写しで、2021-06〜2026-01 の訪問 7,648 回・会った人 30,053 件（うち ID まで分かった 8,042 件）・動画と通知 17,663 件を 2 秒で取り込めた。本人の名前 6 つ（その名前の期間の訪問の 70〜100% に出る）は会った人から外した。to-fu の DB へ入れるのは本人の確認のあと。VRCX と CSV はまだ
+
 - VAT の DB: 入った（インスタンスつき）・会った（名前だけ）・動画・招待・フレンド申請。出た時刻は、次に入った時刻か、その訪問で最後に会った人の時刻で閉じ、「推定」と印を付ける
 - VRCX の DB（`%AppData%\VRCX\VRCX.sqlite3`。読むだけ。入っていれば使う）。to-fu には入っていないので、VRCX のソース（vrcx-team/VRCX の `src/services/database/index.js`）の表の定義で見本を作って確かめる。表と取れるもの（2026-11-08 にソースで確かめた）:
   - `gamelog_location`（行ったワールドの ID・名前・インスタンス・時刻・グループ名）、`gamelog_join_leave`（会った人。user_id あり）、`gamelog_video_play`、`gamelog_portal_spawn`、`gamelog_event`、`gamelog_external`: ログと同じ中身。ログがない期間を埋めるのに使う

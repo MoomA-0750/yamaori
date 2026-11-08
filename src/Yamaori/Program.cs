@@ -90,6 +90,7 @@ switch (command)
         using var db = Database.Open(options.DatabasePath);
         var r = new VatImport(db, db.SelfDevice(options.DeviceName)).Import(file, cl["account"]);
         Console.WriteLine($"訪問 {r.Visits}・会った人 {r.Encounters}（うち ID が分かった {r.Resolved}）・出来事 {r.Events}・ログと重なって飛ばした行 {r.Skipped}");
+        Console.WriteLine($"本人とみなして会った人から外した名前: {string.Join("、", r.SelfNames)}");
         return 0;
     }
     case "export":

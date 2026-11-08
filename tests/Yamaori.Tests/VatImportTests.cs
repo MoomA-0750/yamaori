@@ -87,7 +87,8 @@ public sealed class VatImportTests : IDisposable
         var r2 = imp.Import(vat);
         Assert.Equal(1, r1.Visits);
         Assert.Equal(3, r1.Skipped);
-        Assert.Equal(r1, r2);
+        Assert.Equal(r1 with { SelfNames = [] }, r2 with { SelfNames = [] });
+        Assert.Equal(r1.SelfNames, r2.SelfNames);
         Assert.Equal(3L, (long)db.Scalar("SELECT COUNT(*) FROM visits")!); // ログの 2 つと、VAT の「Before」
         Assert.Equal(2L, (long)db.Scalar("SELECT COUNT(*) FROM events WHERE kind = 'notification'")!); // ログと同じ通知は重ならない
         // 名前しかない VAT の会った人も、ログが知っている ID に引き当てる（ここでは飛ばした期間なので確かめない）
@@ -107,6 +108,24 @@ public sealed class VatImportTests : IDisposable
         Assert.Equal(1, r.Resolved);
         var person = new Queries(db, Tokyo).Person("usr_00000000-0000-0000-0000-000000000002")!;
         Assert.Equal(2, person.Person.VisitCount); // ログの訪問と、VAT の訪問
+    }
+
+    [Fact]
+    public void ほとんどの訪問に出てくる名前は本人とみなして外す()
+    {
+        var rows = new List<(int, string, string?, string?, string?, string?, string?, string?)>();
+        for (var i = 0; i < 30; i++)
+        {
+            var t = new DateTime(2022, 1, 1, 0, 0, 0).AddHours(i);
+            rows.Add((0, $"{t:yyyy-MM-dd HH:mm:ss}", null, null, null, $"wrld_a:{i}~region(jp)", "A", null));
+            rows.Add((1, $"{t.AddSeconds(5):yyyy-MM-dd HH:mm:ss}", null, null, "Me", null, null, null));
+            if (i % 5 == 0) rows.Add((1, $"{t.AddSeconds(9):yyyy-MM-dd HH:mm:ss}", null, null, "Friend", null, null, null));
+        }
+        var vat = Vat([.. rows]);
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        var r = new VatImport(db, "d_test", Tokyo).Import(vat);
+        Assert.Equal(["Me"], r.SelfNames);
+        Assert.Equal(6, r.Encounters); // Friend だけ
     }
 
     public void Dispose()
