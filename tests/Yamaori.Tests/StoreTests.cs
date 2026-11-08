@@ -82,6 +82,37 @@ public sealed class StoreTests : IDisposable
         Assert.Equal("Evermore - 彼方", db.Scalar("SELECT name FROM worlds WHERE id = 'wrld_00000000-0000-0000-0000-00000000000b'"));
     }
 
+    [Fact]
+    public void 生のログを少しずつ写し_閉じたら固め_そこから読み直せる()
+    {
+        var bytes = Fixture();
+        var archive = new LogArchive(Path.Combine(_dir, "archive"));
+        File.WriteAllBytes(LogPath, []);
+        for (var cut = 0; cut <= bytes.Length; cut += 501)
+        {
+            File.WriteAllBytes(LogPath, bytes[..cut]);
+            archive.Sync(LogPath, closed: false);
+        }
+        File.WriteAllBytes(LogPath, bytes);
+        archive.Sync(LogPath, closed: false);
+        Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(archive.Dir, FileName)));
+
+        archive.Sync(LogPath, closed: true);
+        Assert.False(File.Exists(Path.Combine(archive.Dir, FileName)));
+        var (name, open, closed) = Assert.Single(archive.List());
+        Assert.Equal(FileName, name);
+        Assert.True(closed);
+
+        using var db = Database.Open(Path.Combine(_dir, "a.sqlite3"));
+        var ingestor = new LogIngestor(db);
+        ingestor.Ingest(LogPath, closed: true, Tokyo);
+        var before = Visits(db);
+        File.Delete(LogPath); // VRChat がログを消しても
+        using (var s = open()) ingestor.Reparse(name, s, closed);
+        Assert.Equal(before, Visits(db));
+        Assert.Equal(2L, Count(db, "visits"));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

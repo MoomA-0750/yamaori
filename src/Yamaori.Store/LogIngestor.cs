@@ -19,24 +19,37 @@ public sealed class LogIngestor(Database db)
     /// <param name="closed">ログが閉じたか（VRChat が終わった、または次のログに移った）。</param>
     public Result Ingest(string path, bool closed, TimeZoneInfo? timeZone = null)
     {
-        var name = Path.GetFileName(path);
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return Ingest(Path.GetFileName(path), path, fs, closed, timeZone);
+    }
+
+    /// <summary>
+    /// 残したログから、そのログの出来事を全部読み直す（読み方を直したあと）。タイムゾーンは前に読んだときのものを使う。
+    /// </summary>
+    public Result Reparse(string name, Stream stream, bool closed, TimeZoneInfo? timeZone = null)
+    {
+        var tz = LoadState(name)?.TimeZone is { } id ? FindTimeZone(id) : timeZone;
+        Delete(name);
+        var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        copy.Position = 0;
+        return Ingest(name, "archive:" + name, copy, closed, tz);
+    }
+
+    Result Ingest(string name, string path, Stream stream, bool closed, TimeZoneInfo? timeZone)
+    {
         var state = LoadState(name);
-        long length;
-        LogReader.Result read;
-        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+        var length = stream.Length;
+        if (state != null && length == state.Length && closed == state.Closed) return new Result(name, [], false);
+        var offset = state?.Offset ?? 0;
+        if (length < offset)
         {
-            length = fs.Length;
-            if (state != null && length == state.Length && closed == state.Closed) return new Result(name, [], false);
-            var offset = state?.Offset ?? 0;
-            if (length < offset)
-            {
-                // 同じ名前で中身が替わった（短くなった）。頭から読み直す
-                Delete(name);
-                state = null;
-                offset = 0;
-            }
-            read = LogReader.Read(new BufferedStream(fs, 1 << 16), offset, closed);
+            // 同じ名前で中身が替わった（短くなった）。頭から読み直す
+            Delete(name);
+            state = null;
+            offset = 0;
         }
+        var read = LogReader.Read(new BufferedStream(stream, 1 << 16), offset, closed);
 
         var tzId = state?.TimeZone ?? (timeZone ?? TimeZoneInfo.Local).Id;
         var tz = FindTimeZone(tzId);
@@ -46,11 +59,11 @@ public sealed class LogIngestor(Database db)
             if (LineParser.Parse(entry) is { } e) newEvents.Add((entry.Offset, e));
 
         using var tx = db.Connection.BeginTransaction();
-        foreach (var (offset, e) in newEvents)
+        foreach (var (at, e) in newEvents)
         {
             using var cmd = db.Command(
                 "INSERT OR IGNORE INTO log_events (log_file, offset, at_local, kind, data) VALUES ($f, $o, $at, $k, $d)", tx,
-                ("$f", name), ("$o", offset), ("$at", Database.Local(e.At)), ("$k", Kind(e)), ("$d", JsonSerializer.Serialize(e, Json)));
+                ("$f", name), ("$o", at), ("$at", Database.Local(e.At)), ("$k", Kind(e)), ("$d", JsonSerializer.Serialize(e, Json)));
             cmd.ExecuteNonQuery();
         }
         using (var cmd = db.Command(

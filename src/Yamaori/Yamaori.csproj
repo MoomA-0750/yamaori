@@ -11,6 +11,9 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- Windows では窓を出さずに常駐する。コマンドのときは呼んだ側のコンソールにつなぐ -->
+    <OutputType Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')">WinExe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>

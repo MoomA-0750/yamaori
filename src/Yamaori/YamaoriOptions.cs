@@ -15,5 +15,10 @@ public sealed class YamaoriOptions
     /// <summary>ログを見る間隔（秒）。</summary>
     public double PollSeconds { get; set; } = 2;
 
+    /// <summary>生のログを写して残すフォルダ。空なら DataDir の logs。</summary>
+    public string? ArchiveDir { get; set; }
+
+    public string ArchivePath => string.IsNullOrEmpty(ArchiveDir) ? Path.Combine(DataDir, "logs") : ArchiveDir;
+
     public string DatabasePath => string.IsNullOrEmpty(Database) ? Path.Combine(DataDir, "yamaori.sqlite3") : Database;
 }

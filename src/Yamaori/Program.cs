@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Yamaori;
 using Yamaori.Store;
 
@@ -9,15 +10,18 @@ using Yamaori.Store;
 // yamaori ingest             ログのフォルダを一度だけ読んで DB に入れ、まとめを出す
 // yamaori summary            DB のまとめを出す
 // yamaori rebuild            DB に残した出来事から、記録を全部組み立て直す
+// yamaori reparse            残した生のログから、出来事を全部読み直す（読み方を直したあと）
 // 共通の引数: --log-dir <フォルダ> --data-dir <フォルダ> --database <ファイル>
+var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
+// Windows では窓を出さない形（WinExe）で作るので、コマンドのときは呼んだ側のコンソールにつなぐ
+if (command != "run") Native.AttachParentConsole();
 // 出力を別のファイルへ向けたときも、日本語が化けないようにする
 Console.OutputEncoding = System.Text.Encoding.UTF8;
-var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
 var rest = command == "run" ? args : args[1..];
 
 var config = new ConfigurationBuilder()
     .AddJsonFile(Path.Combine(new YamaoriOptions().DataDir, "yamaori.json"), optional: true)
-    .AddCommandLine(rest, new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database" })
+    .AddCommandLine(rest, new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database", ["--archive-dir"] = "ArchiveDir" })
     .Build();
 var options = new YamaoriOptions();
 config.Bind(options);
@@ -25,18 +29,24 @@ config.Bind(options);
 switch (command)
 {
     case "run":
-        var builder = Host.CreateApplicationBuilder(rest);
-        builder.Configuration.AddConfiguration(config);
-        builder.Services.Configure<YamaoriOptions>(config);
-        builder.Services.AddSingleton<LogWatcher>();
-        builder.Services.AddHostedService(s => s.GetRequiredService<LogWatcher>());
-        await builder.Build().RunAsync().ConfigureAwait(false);
-        return 0;
+        // 同じ本人のもとで二つ起きないようにする
+        using (var mutex = new Mutex(true, @"Local\Yamaori", out var first))
+        {
+            if (!first) return 1;
+            var builder = Host.CreateApplicationBuilder(rest);
+            builder.Configuration.AddConfiguration(config);
+            builder.Logging.AddProvider(new FileLoggerProvider(Path.Combine(options.DataDir, "yamaori.log")));
+            builder.Services.Configure<YamaoriOptions>(config);
+            builder.Services.AddSingleton<LogWatcher>();
+            builder.Services.AddHostedService(s => s.GetRequiredService<LogWatcher>());
+            await builder.Build().RunAsync().ConfigureAwait(false);
+            return 0;
+        }
     case "ingest":
     {
         using var db = Database.Open(options.DatabasePath);
         var ingestor = new LogIngestor(db);
-        foreach (var (file, r) in LogWatcher.IngestAll(ingestor, options.LogDir))
+        foreach (var (file, r) in LogWatcher.IngestAll(ingestor, new LogArchive(options.ArchivePath), options.LogDir))
             Console.WriteLine($"{file}: {(r.Changed ? $"{r.NewEvents.Count} 件" : "変わりなし")}");
         Summary.Print(db);
         return 0;
@@ -55,8 +65,21 @@ switch (command)
         Summary.Print(db);
         return 0;
     }
+    case "reparse":
+    {
+        using var db = Database.Open(options.DatabasePath);
+        var ingestor = new LogIngestor(db);
+        foreach (var (name, open, closed) in new LogArchive(options.ArchivePath).List())
+        {
+            using var stream = open();
+            var r = ingestor.Reparse(name, stream, closed);
+            Console.WriteLine($"{name}: {r.NewEvents.Count} 件");
+        }
+        Summary.Print(db);
+        return 0;
+    }
     default:
-        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild）");
+        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse）");
         return 2;
 }
 
@@ -94,5 +117,17 @@ static class Summary
             Console.WriteLine($"{label}: {string.Join(" / ", items)}");
         }
         Console.WriteLine($"会った人: {db.Scalar("SELECT COUNT(*) FROM people")} 人");
+    }
+}
+
+static partial class Native
+{
+    [System.Runtime.InteropServices.LibraryImport("kernel32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static partial bool AttachConsole(int processId);
+
+    public static void AttachParentConsole()
+    {
+        if (OperatingSystem.IsWindows()) AttachConsole(-1);
     }
 }
