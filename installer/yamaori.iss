@@ -69,14 +69,20 @@ begin
 end;
 
 // 入れ替える前に、動いている Yamaori を止める
-// 止める指示のあと、プロセスが消え切る（部品のファイルが放される）まで待つ。消え切る前に入れ替えると、使用中で失敗する
+// 止める指示のあと、プロセスが消え切り、部品のファイル（clrjit.dll）が実際に動かせる（名前を変えられる）ようになるまで 20 秒まで待つ。
+// 止めた直後は、Windows（ウイルス対策の検査など）がまだ掴んでいて、入れ替えがアクセス拒否で失敗することがある
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
+  Dll: String;
 begin
   Log('Yamaori を止める');
+  Dll := ExpandConstant('{app}\clrjit.dll');
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-    '-NoProfile -Command "Get-Process Yamaori -ErrorAction SilentlyContinue | Stop-Process -Force; Wait-Process -Name Yamaori -Timeout 15 -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800"',
+    '-NoProfile -Command "Get-Process Yamaori -ErrorAction SilentlyContinue | Stop-Process -Force; ' +
+    'Wait-Process -Name Yamaori -Timeout 15 -ErrorAction SilentlyContinue; ' +
+    '$f = ''' + Dll + '''; for ($i = 0; $i -lt 40; $i++) { if (-not (Test-Path $f)) { break }; ' +
+    'try { Rename-Item $f ''clrjit.dll.yamaori-check'' -ErrorAction Stop; Rename-Item ($f + ''.yamaori-check'') ''clrjit.dll''; break } catch { Start-Sleep -Milliseconds 500 } }"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Log('Yamaori を止めた: ' + IntToStr(ResultCode));
   Result := '';
