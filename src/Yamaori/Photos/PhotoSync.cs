@@ -25,6 +25,13 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
         return dot > remote.LastIndexOf('/') ? remote[..dot] + tag + remote[dot..] : remote + tag;
     }
 
+    static bool SameContent(string a, string b)
+    {
+        using var fa = File.OpenRead(a);
+        using var fb = File.OpenRead(b);
+        return System.Security.Cryptography.SHA256.HashData(fa).AsSpan().SequenceEqual(System.Security.Cryptography.SHA256.HashData(fb));
+    }
+
     static bool SameFile(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
@@ -80,6 +87,13 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
                     // 送り先が手元と同じファイルではないか、送り先にまだ同じ大きさであるか（なければ送り直しに戻す）
                     var local = new FileInfo(p.Path);
                     if (!local.Exists || local.Length != p.Size) continue;
+                    if (p.Mtime != null && Database.Time(local.LastWriteTimeUtc) != p.Mtime) continue; // 目録のあとで書き換わった
+                    // 名前と大きさが同じで中身の違う写真がほかにあれば、どちらが送り先にあるか分からないので消さない
+                    if (catalog.OtherLocations(p.PhotoId, p.Path).Any(o => File.Exists(o) && !SameContent(o, p.Path)))
+                    {
+                        log?.Invoke($"{p.FileName} と同じ名前・大きさで中身の違う写真があるので、手元から消さない");
+                        continue;
+                    }
                     if (p.RemotePath == null) continue;
                     if (target.LocalPath(p.RemotePath) is { } same && SameFile(same, p.Path)) continue;
                     if (await target.SizeAsync(p.RemotePath, cancel).ConfigureAwait(false) != p.Size)

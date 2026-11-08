@@ -34,7 +34,8 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         ImportGuard.CheckOrigin(db, Source, origin, replace);
         accountId ??= ImportGuard.SingleAccount(db);
         var covered = LogCoveredRanges();
-        covered.AddRange(ImportGuard.CoveredBy(db, VrcxImport.Source));
+        var vrcxVisits = ImportGuard.VisitsOf(db, VrcxImport.Source);
+        var inDuplicate = false; // VRCX から入れた訪問と同じ訪問の中（その間の会った人・動画も入れない）
         var selfNames = SelfNames(rows);
         var names = NameIndex(rows, selfNames);
 
@@ -68,6 +69,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
                 if (r.Type == 0) Close(r.At);
                 continue;
             }
+            if (inDuplicate && r.Type != 0) { skipped++; continue; }
             switch (r.Type)
             {
                 case 0 when r.WorldId != null:
@@ -75,6 +77,8 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
                     Close(r.At);
                     var colon = r.WorldId.IndexOf(':', StringComparison.Ordinal);
                     var world = colon > 0 ? r.WorldId[..colon] : r.WorldId;
+                    inDuplicate = ImportGuard.SameVisit(vrcxVisits, world, r.At);
+                    if (inDuplicate) { skipped++; break; }
                     var instance = colon > 0 ? r.WorldId[(colon + 1)..] : "";
                     var info = InstanceInfo.Parse(instance);
                     visit = new Visit(StableId.Of("visit", Source, r.Id), Source, world, r.WorldName, instance, info.Number, info.Access,

@@ -107,11 +107,25 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 名前だけの人を忘れても_同じ名前で_ID_の分かる人は残し_忘れた人へのメモは入れない()
+    {
+        using var db = Database.Open(Path.Combine(_dir, "n.sqlite3"));
+        new ForgetStore(db).Forget("name:Alice", "Alice");
+        void Exec(string sql) { using var cmd = db.Command(sql); cmd.ExecuteNonQuery(); }
+        Exec("INSERT INTO encounters (id, source, device_id, visit_id, user_id, name, joined_at) VALUES ('e1', 'x', 'd', 'v', NULL, 'Alice', '2026-01-01T00:00:00Z')");
+        Exec("INSERT INTO encounters (id, source, device_id, visit_id, user_id, name, joined_at) VALUES ('e2', 'x', 'd', 'v', 'usr_other', 'Alice', '2026-01-01T00:00:00Z')");
+        Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM encounters"));
+        Assert.Equal("e2", db.Scalar("SELECT id FROM encounters"));
+        Exec("INSERT INTO notes (id, target_type, target_id, body, created_at, updated_at) VALUES ('n1', 'person', 'name:Alice', 'x', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')");
+        Assert.Equal(0L, db.Scalar("SELECT COUNT(*) FROM notes"));
+    }
+
+    [Fact]
     public void 表の版を上げる前に写しを取り_新しい版の_DB_は開かない()
     {
         var path = Path.Combine(_dir, "m.sqlite3");
         using (var db = Database.Open(path))
-        using (var cmd = db.Command($"DROP TRIGGER forget_encounters; DROP TRIGGER forget_events; DROP TRIGGER forget_friends; DROP TABLE forgotten_people; PRAGMA user_version = {Database.SchemaVersion - 1};"))
+        using (var cmd = db.Command($"DROP TRIGGER forget_encounters; DROP TRIGGER forget_events; DROP TRIGGER forget_friends; DROP TRIGGER forget_notes; DROP TABLE forgotten_people; PRAGMA user_version = {Database.SchemaVersion - 1};"))
             cmd.ExecuteNonQuery();
         using (Database.Open(path)) { }
         Assert.True(File.Exists(path + $".bak-v{Database.SchemaVersion - 1}"));

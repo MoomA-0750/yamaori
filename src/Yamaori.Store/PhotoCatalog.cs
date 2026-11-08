@@ -151,7 +151,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
 
     // ---- 送る
 
-    public sealed record LocalPhoto(string PhotoId, string Path, string FileName, long Size, DateTime TakenAt, string? RemotePath = null);
+    public sealed record LocalPhoto(string PhotoId, string Path, string FileName, long Size, DateTime TakenAt, string? RemotePath = null, string? Mtime = null);
 
     static string RootsIn(IReadOnlyList<string> roots, List<(string, object?)> args)
     {
@@ -189,12 +189,22 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         var args = new List<(string, object?)> { ("$t", target), ("$before", takenBefore is { } b ? Database.Time(b) : "9999") };
         var inRoots = RootsIn(localRoots, args);
         return ReadLocal($"""
-            SELECT p.id, l.path, p.file_name, p.size, p.taken_at, u.remote_path FROM photos p
+            SELECT p.id, l.path, p.file_name, p.size, p.taken_at, u.remote_path, l.mtime FROM photos p
             JOIN photo_locations l ON l.photo_id = p.id
             JOIN photo_uploads u ON u.photo_id = p.id AND u.target = $t AND u.size = p.size
             WHERE l.root IN ({inRoots}) AND p.taken_at < $before
             ORDER BY p.taken_at
             """, args);
+    }
+
+    /// <summary>同じ写真（名前と大きさが同じ）のほかの置き場所。</summary>
+    public IReadOnlyList<string> OtherLocations(string photoId, string path)
+    {
+        using var cmd = db.Command("SELECT path FROM photo_locations WHERE photo_id = $id AND path <> $p", null, ("$id", photoId), ("$p", path));
+        using var r = cmd.ExecuteReader();
+        var list = new List<string>();
+        while (r.Read()) list.Add(r.GetString(0));
+        return list;
     }
 
     /// <summary>送った記録を消す（送り先から消えていたので、送り直す）。</summary>
@@ -216,7 +226,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         using var r = cmd.ExecuteReader();
         var list = new List<LocalPhoto>();
         while (r.Read()) list.Add(new LocalPhoto(r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt64(3), Database.ParseTime(r.GetString(4)),
-            r.FieldCount > 5 && !r.IsDBNull(5) ? r.GetString(5) : null));
+            r.FieldCount > 5 && !r.IsDBNull(5) ? r.GetString(5) : null, r.FieldCount > 6 && !r.IsDBNull(6) ? r.GetString(6) : null));
         return list;
     }
 }

@@ -119,11 +119,21 @@ public static class Api
             return TypedResults.NoContent();
         }).WithSummary("子の端末から、出どころ 1 つ分の記録を受け取って入れ替える");
 
-        api.MapPost("/sync/notes", (HttpContext ctx, Database db, IReadOnlyList<SyncNote> notes) =>
+        api.MapPost("/sync/notes", Results<Ok<SyncNotesResult>, ProblemHttpResult> (HttpContext ctx, Database db, IReadOnlyList<SyncNote> notes) =>
             {
                 notes = notes.Where(x => x.Body.Length <= MaxNote).Take(10_000).ToList();
-                var only = Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t ? t.DeviceId ?? "" : null;
-                return new { applied = new SyncStore(db).ApplyNotes(notes, only) };
+                string? only = null;
+                if (Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t)
+                {
+                    // まだ端末に結び付いていなければ、メモの端末に結び付ける（記録より先にメモが来ることがある）。
+                    // 結び付かなければ断る（子は送ったことにせず、次の回に送り直す）
+                    var device = notes.Select(n => n.DeviceId).FirstOrDefault(d => d != null);
+                    var parentSelf = device != null && db.Scalar("SELECT is_self FROM devices WHERE id = $d", ("$d", device)) is long self && self != 0;
+                    if (t.DeviceId == null && device != null && !parentSelf) new AuthStore(db).BindTokenDevice(t.Id, device);
+                    only = db.Scalar("SELECT device_id FROM api_tokens WHERE id = $id", ("$id", t.Id)) as string;
+                    if (only == null) return TypedResults.Problem("このトークンは、まだ端末に結び付いていない", statusCode: StatusCodes.Status403Forbidden);
+                }
+                return TypedResults.Ok(new SyncNotesResult(new SyncStore(db).ApplyNotes(notes, only)));
             })
             .WithSummary("子の端末から、メモを受け取る（後から直した方を残す）");
 
@@ -200,6 +210,7 @@ public static class Api
     public sealed record SaveWorldInput(string? Url, string? Text, string? WorldId, string? Name, string? List);
     public sealed record SavedWorld(string WorldId, string List);
     public sealed record FavoriteList(string Name, int Count);
+    public sealed record SyncNotesResult(int Applied);
     public sealed record ForgetInput(string? Label);
     public sealed record ForgetResult(int Removed);
 

@@ -12,7 +12,11 @@ public static class ImportGuard
         var store = new AuthStore(db);
         var key = "import_origin:" + source;
         var before = store.Get(key);
-        var has = db.Scalar("SELECT 1 FROM visits WHERE source = $s LIMIT 1", ("$s", source)) != null;
+        // 訪問がなくても、出来事・メモ・お気に入りがあれば、前の取り込みがある
+        var has = db.Scalar("""
+            SELECT 1 WHERE EXISTS (SELECT 1 FROM visits WHERE source = $s) OR EXISTS (SELECT 1 FROM events WHERE source = $s)
+                OR EXISTS (SELECT 1 FROM notes WHERE source = $s) OR EXISTS (SELECT 1 FROM world_favorites WHERE source = $s)
+            """, ("$s", source)) != null;
         if (before != null && before != origin && has && !replace)
             throw new InvalidOperationException(
                 $"前に取り込んだものと別の DB に見える（前: {before}、今: {origin}）。取り込むと前の {source} の記録と入れ替わる。入れ替えてよければ --replace を付ける");
@@ -25,15 +29,19 @@ public static class ImportGuard
         cmd.ExecuteNonQuery();
     }
 
-    /// <summary>ほかの取り込み（VAT なら VRCX）の訪問の期間。同じ期間を両方から入れて二重にしないため。</summary>
-    public static List<(DateTime From, DateTime To)> CoveredBy(Database db, string otherSource)
+    /// <summary>ほかの取り込み（VAT なら VRCX）の訪問（ワールドと入った時刻）。同じ訪問を両方から入れて二重にしないため。</summary>
+    public static ILookup<string, DateTime> VisitsOf(Database db, string otherSource)
     {
-        using var cmd = db.Command("SELECT joined_at, COALESCE(left_at, joined_at) FROM visits WHERE source = $s", null, ("$s", otherSource));
+        using var cmd = db.Command("SELECT world_id, joined_at FROM visits WHERE source = $s", null, ("$s", otherSource));
         using var r = cmd.ExecuteReader();
-        var list = new List<(DateTime, DateTime)>();
-        while (r.Read()) list.Add((Database.ParseTime(r.GetString(0)), Database.ParseTime(r.GetString(1))));
-        return list;
+        var list = new List<(string, DateTime)>();
+        while (r.Read()) list.Add((r.GetString(0), Database.ParseTime(r.GetString(1))));
+        return list.ToLookup(x => x.Item1, x => x.Item2, StringComparer.Ordinal);
     }
+
+    /// <summary>同じワールドに、入った時刻が 5 分以内の訪問があれば、同じ訪問とみなす。</summary>
+    public static bool SameVisit(ILookup<string, DateTime> others, string world, DateTime joined) =>
+        others[world].Any(t => (t - joined).Duration() <= TimeSpan.FromMinutes(5));
 
     /// <summary>この DB で遊んだアカウントが 1 つだけならそれ（セッションの最後のアカウントだけでなく、訪問に付いたアカウントも数える）。</summary>
     public static string? SingleAccount(Database db)

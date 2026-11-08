@@ -125,4 +125,30 @@ public sealed class HttpScopeTests
             headers: [("Origin", "http://localhost:47899")]);
         Assert.Equal(204, same.Response.StatusCode);
     }
+
+    [Fact]
+    public async Task この_PC_でもログインを求める設定でも_この_PC_から止める口だけは通る()
+    {
+        await using var h = new HttpHost();
+        using (var db = h.OpenDb()) new AuthStore(db).Set("local_requires_login", "true");
+        Assert.Equal(401, (await h.SendAsync("GET", "/api/days", loopback: true)).Response.StatusCode);
+        Assert.Equal(401, (await h.SendAsync("GET", "/api/settings", loopback: true)).Response.StatusCode);
+        Assert.Equal(403, (await h.SendAsync("POST", "/api/settings/shutdown", loopback: true, headers: [("Origin", "http://localhost:3000")])).Response.StatusCode);
+        Assert.Equal(401, (await h.SendAsync("POST", "/api/settings/shutdown")).Response.StatusCode); // 外からは通さない
+        // 最後に本当に止める（試験の後片付けで止まっていてよい）
+        Assert.Equal(202, (await h.SendAsync("POST", "/api/settings/shutdown", loopback: true)).Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task 結び付く前の子の端末のトークンは_メモの端末に結び付き_黙って捨てない()
+    {
+        await using var h = new HttpHost();
+        var t = Bearer(Token(h, TokenScopes.Sync));
+        var notes = """[{"id":"n_c","targetType":"day","targetId":"2026-11-08","body":"child","deviceId":"d_cccccccccccccccc","createdAt":"2026-11-08T00:00:00Z","updatedAt":"2026-11-09T00:00:00Z"}]""";
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/sync/notes", body: notes, headers: t)).Response.StatusCode);
+        using var db = h.OpenDb();
+        Assert.Equal("child", db.Scalar("SELECT body FROM notes WHERE id = 'n_c'"));
+        // 結び付いたので、ほかの端末の記録は入れ替えられない
+        Assert.Equal(403, (await h.SendAsync("POST", "/api/sync/projection", body: Projection("d_dddddddddddddddd"), headers: t)).Response.StatusCode);
+    }
 }

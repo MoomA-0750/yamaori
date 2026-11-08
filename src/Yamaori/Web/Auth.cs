@@ -46,6 +46,9 @@ public static class Auth
                 return;
             }
             // 画面（静的なファイル）は誰にでも出す。中身は API で取るので、ここでは記録は見えない
+            var localAlways = result == AccessResult.NeedLogin && request is { FromLoopback: true, HasProxyHeaders: false, TailscaleLogin: null }
+                && AccessPolicy.IsLocalHost(request.Host) && LocalAlways.Any(a => path.StartsWithSegments(a, StringComparison.OrdinalIgnoreCase));
+            if (localAlways) result = AccessResult.Allow;
             if (!isApi || isOpen)
             {
                 await next(ctx).ConfigureAwait(false);
@@ -54,7 +57,7 @@ public static class Auth
             if (result == AccessResult.Allow)
             {
                 // 本人として通るか（ログイン・この PC・許した Tailscale の人）。トークンだけ・認証なしの公開だけで通るなら、できることを絞る
-                var asUser = AccessPolicy.Decide(request with { HasValidToken = false }, settings with { AllowUnauthenticatedRemote = false }) == AccessResult.Allow;
+                var asUser = localAlways || AccessPolicy.Decide(request with { HasValidToken = false }, settings with { AllowUnauthenticatedRemote = false }) == AccessResult.Allow;
                 var denied = asUser ? null : Forbidden(path, ctx.Request.Method,
                     AccessPolicy.Decide(request with { HasValidToken = false }, settings) == AccessResult.Allow ? null : token);
                 if (denied == null)
@@ -76,6 +79,9 @@ public static class Auth
 
     /// <summary>トークンで通った要求なら、そのトークン（同期の口で端末と照らし合わせる）。</summary>
     public static ApiToken? TokenOf(HttpContext ctx) => ctx.Items[TokenKey] as ApiToken;
+
+    // この PC から直接なら、この PC でもログインを求める設定でも通す口（インストーラーが更新の前に止めるため。ほかのサイトからは Origin で断る）
+    static readonly string[] LocalAlways = ["/api/settings/shutdown"];
 
     // 本人だけ（ログイン・この PC から）が触れる口。トークンや認証なしの公開では触れない（トークンを作り足して居座る、設定を変える、止める、を防ぐ）
     static readonly string[] AdminPaths = ["/api/auth/tokens", "/api/auth/password", "/api/settings"];
@@ -379,8 +385,10 @@ public static class Auth
             if (input.Retention is { } r && r is not ("keep" or "days" or "after_upload")) return TypedResults.BadRequest("retention は keep・days・after_upload");
             if (input.RetentionDays is { } rd && rd is < 1 or > 3650) return TypedResults.BadRequest("残す日数は 1〜3650");
             if (input.IntervalMinutes is { } im && (!double.IsFinite(im) || im < 1 || im > 1440)) return TypedResults.BadRequest("送る間隔は 1〜1440 分");
+            // 種類と送り先は、変えたあとの組み合わせで確かめる（種類だけ変えて、前の送り先が合わなくなるのを防ぐ）
             var kindToCheck = input.Kind ?? o.Value.PhotoUpload.Kind;
-            if (input.Target is { Length: > 0 } tg && CheckTarget(kindToCheck, tg.Trim()) is { } bad) return TypedResults.BadRequest(bad);
+            var targetToCheck = (input.Target ?? o.Value.PhotoUpload.Target).Trim();
+            if (kindToCheck != "none" && targetToCheck.Length > 0 && CheckTarget(kindToCheck, targetToCheck) is { } bad) return TypedResults.BadRequest(bad);
             if (input.PhotoDirs != null)
                 foreach (var pd in input.PhotoDirs.Where(x => x.Trim().Length > 0))
                     if (CheckPhotoDir(pd.Trim(), o.Value.DataDir) is { } badDir) return TypedResults.BadRequest(badDir);

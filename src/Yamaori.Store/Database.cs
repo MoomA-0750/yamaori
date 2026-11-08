@@ -334,11 +334,14 @@ public sealed class Database : IDisposable
             forgotten_at TEXT NOT NULL
         );
         CREATE TRIGGER forget_encounters AFTER INSERT ON encounters
-            WHEN NEW.user_id IN (SELECT key FROM forgotten_people) OR ('name:' || NEW.name) IN (SELECT key FROM forgotten_people)
+            WHEN NEW.user_id IN (SELECT key FROM forgotten_people) OR (NEW.user_id IS NULL AND ('name:' || NEW.name) IN (SELECT key FROM forgotten_people))
             BEGIN DELETE FROM encounters WHERE id = NEW.id; END;
         CREATE TRIGGER forget_events AFTER INSERT ON events
-            WHEN NEW.user_id IN (SELECT key FROM forgotten_people) OR ('name:' || NEW.name) IN (SELECT key FROM forgotten_people)
+            WHEN NEW.user_id IN (SELECT key FROM forgotten_people) OR (NEW.user_id IS NULL AND ('name:' || NEW.name) IN (SELECT key FROM forgotten_people))
             BEGIN DELETE FROM events WHERE id = NEW.id; END;
+        CREATE TRIGGER forget_notes AFTER INSERT ON notes
+            WHEN NEW.target_type = 'person' AND NEW.target_id IN (SELECT key FROM forgotten_people)
+            BEGIN DELETE FROM notes WHERE id = NEW.id; END;
         CREATE TRIGGER forget_friends AFTER INSERT ON friend_snapshots
             WHEN NEW.user_id IN (SELECT key FROM forgotten_people)
             BEGIN DELETE FROM friend_snapshots WHERE account_id = NEW.account_id AND user_id = NEW.user_id; END;

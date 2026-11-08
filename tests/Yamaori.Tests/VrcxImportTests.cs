@@ -136,6 +136,20 @@ public sealed class VrcxImportTests : IDisposable
         Assert.Equal(1, r.Skipped);
     }
 
+    [Fact]
+    public void VAT_の訪問と同じ時間でも_別のワールドの訪問は入れる()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        using (var cmd = db.Command("""
+            INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at, left_at)
+            VALUES ('v_vat', 'vat', 'd_test', 'wrld_other', 'wrld_other:1', '1', 'public', 'jp', '2024-05-01T11:00:00Z', '2024-05-01T13:00:00Z')
+            """)) cmd.ExecuteNonQuery();
+        var r = new VrcxImport(db, "d_test").Import(vrcx);
+        Assert.Equal(2, r.Visits);
+        Assert.Equal(0, r.Skipped);
+    }
+
     static long Count(Database db, string sql) => (long)db.Scalar(sql)!;
 
     public void Dispose()

@@ -92,7 +92,9 @@ public sealed class AuthStore(Database db)
         if (string.IsNullOrEmpty(token)) return false;
         var exp = db.Scalar("SELECT expires_at FROM web_sessions WHERE hash = $h", ("$h", Hash(token))) as string;
         if (exp == null || Database.ParseTime(exp) < DateTime.UtcNow) return false;
-        using var cmd = db.Command("UPDATE web_sessions SET last_seen_at = $now WHERE hash = $h", null, ("$h", Hash(token)), ("$now", Database.Time(DateTime.UtcNow)));
+        // 最後に使った時刻は 1 時間に 1 度だけ書く（要求のたびに DB へ書き込まない）
+        using var cmd = db.Command("UPDATE web_sessions SET last_seen_at = $now WHERE hash = $h AND last_seen_at < $stale", null,
+            ("$h", Hash(token)), ("$now", Database.Time(DateTime.UtcNow)), ("$stale", Database.Time(DateTime.UtcNow.AddHours(-1))));
         cmd.ExecuteNonQuery();
         return true;
     }
@@ -126,11 +128,15 @@ public sealed class AuthStore(Database db)
     {
         if (string.IsNullOrEmpty(secret)) return null;
         var h = Hash(secret);
-        using (var up = db.Command("UPDATE api_tokens SET last_used_at = $now WHERE hash = $h", null, ("$h", h), ("$now", Database.Time(DateTime.UtcNow))))
-            if (up.ExecuteNonQuery() == 0) return null;
-        using var cmd = db.Command("SELECT id, name, created_at, last_used_at, scope, device_id FROM api_tokens WHERE hash = $h", null, ("$h", h));
-        using var r = cmd.ExecuteReader();
-        return r.Read() ? ReadToken(r) : null;
+        ApiToken? token;
+        using (var cmd = db.Command("SELECT id, name, created_at, last_used_at, scope, device_id FROM api_tokens WHERE hash = $h", null, ("$h", h)))
+        using (var r = cmd.ExecuteReader())
+            token = r.Read() ? ReadToken(r) : null;
+        // 使った時刻は 1 時間に 1 度だけ書く（要求のたびに DB へ書き込まない）
+        if (token != null && (token.LastUsedAt == null || token.LastUsedAt < DateTime.UtcNow.AddHours(-1)))
+            using (var up = db.Command("UPDATE api_tokens SET last_used_at = $now WHERE hash = $h", null, ("$h", h), ("$now", Database.Time(DateTime.UtcNow))))
+                up.ExecuteNonQuery();
+        return token;
     }
 
     /// <summary>sync のトークンを端末に結び付ける（まだなら結び付けて true、結び付いた端末と同じなら true）。</summary>

@@ -38,4 +38,12 @@ public sealed class HttpSettingsTests
         var c = await h.SendAsync("PUT", "/api/settings/photos", loopback: true, body: """{"kind":"sftp","target":"sftp://nas.local/photo/VRChat","intervalMinutes":10}""");
         Assert.Equal(200, c.Response.StatusCode);
     }
+
+    [Fact]
+    public async Task 種類だけ変えても_前の送り先と合わなければ断る()
+    {
+        await using var h = new HttpHost(extra: new Dictionary<string, string?> { ["PhotoUpload:Kind"] = "folder", ["PhotoUpload:Target"] = "/srv/nas/VRChat" });
+        Assert.Equal(400, (await h.SendAsync("PUT", "/api/settings/photos", loopback: true, body: """{"kind":"webdav"}""")).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("PUT", "/api/settings/photos", loopback: true, body: """{"kind":"webdav","target":"https://nas.local/dav"}""")).Response.StatusCode);
+    }
 }

@@ -136,6 +136,25 @@ public sealed class PhotoSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task 同じ名前と大きさで中身の違う写真は_手元から消さない()
+    {
+        var name = "VRChat_2026-11-08_02-38-21.263_1920x1080.png";
+        var a = Directory.CreateDirectory(Path.Combine(_dir, "A")).FullName;
+        var b = Directory.CreateDirectory(Path.Combine(_dir, "B")).FullName;
+        File.WriteAllBytes(Path.Combine(a, name), [1, 2, 3]);
+        File.WriteAllBytes(Path.Combine(b, name), [7, 8, 9]);
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        var catalog = new PhotoCatalog(db, "d_test", Tokyo);
+        catalog.Scan(a);
+        catalog.Scan(b);
+        using var target = new FolderTarget(Path.Combine(_dir, "nas"));
+        var r = await new PhotoSync(catalog, target, [a, b], null, Tokyo).RunAsync("after_upload", 30, default);
+        Assert.Equal(0, r.Removed);
+        Assert.True(File.Exists(Path.Combine(a, name)));
+        Assert.True(File.Exists(Path.Combine(b, name)));
+    }
+
+    [Fact]
     public async Task 送り先で大きさが合わなければ記録せず消さない()
     {
         var (db, catalog, local) = Setup("VRChat_2026-11-08_02-38-21.263_1920x1080.png");

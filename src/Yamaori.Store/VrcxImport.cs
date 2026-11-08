@@ -42,7 +42,7 @@ public sealed class VrcxImport(Database db, string deviceId)
         var origin = $"{string.Join(",", accounts.Order(StringComparer.Ordinal))}@{oldest}";
         ImportGuard.CheckOrigin(db, Source, origin, replace);
         var covered = LogCoveredRanges();
-        covered.AddRange(ImportGuard.CoveredBy(db, VatImport.Source));
+        var vatVisits = ImportGuard.VisitsOf(db, VatImport.Source);
         var visits = new List<Visit>();
         var encounters = new List<Encounter>();
         var events = new List<ActivityEvent>();
@@ -59,6 +59,8 @@ public sealed class VrcxImport(Database db, string deviceId)
                 var row = rows[i];
                 var at = row.At!.Value;
                 if (covered.Any(cv => at >= cv.From && at <= cv.To)) { skipped++; continue; }
+                // VAT から入れた同じ訪問（同じワールドに 5 分以内に入った）は入れない
+                if (ImportGuard.SameVisit(vatVisits, row.World!, at)) { skipped++; continue; }
                 DateTime left;
                 string reason;
                 if (row.Ms > 0) { left = at.AddMilliseconds(row.Ms); reason = "left"; }
