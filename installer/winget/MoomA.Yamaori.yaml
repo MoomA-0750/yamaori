@@ -1,0 +1,6 @@
+# winget の定義のひな形（公開するときに、版・URL・ハッシュを入れて winget-pkgs へ出す）
+PackageIdentifier: MoomA.Yamaori
+PackageVersion: 0.1.0
+DefaultLocale: ja-JP
+ManifestType: version
+ManifestVersion: 1.9.0

@@ -1,0 +1,7 @@
+**/bin
+**/obj
+**/node_modules
+src/Yamaori/wwwroot
+.git
+.playwright-mcp
+extension-test

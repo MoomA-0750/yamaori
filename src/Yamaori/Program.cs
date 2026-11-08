@@ -14,6 +14,7 @@ using Yamaori.Store;
 // yamaori export --out <dir> 日記を日ごとの Markdown に書き出す
 // yamaori import-vat --file <VRChatActivityLog.db>  VRChatActivityTools の記録を取り込む
 // yamaori import-vrcx [--file <VRCX.sqlite3>]        VRCX の記録を取り込む
+// yamaori set-password                               パスワードを決める（標準入力から）
 // 共通の引数: --log-dir <フォルダ> --data-dir <フォルダ> --database <ファイル>
 var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
 // Windows では窓を出さない形（WinExe）で作るので、コマンドのときは呼んだ側のコンソールにつなぐ
@@ -108,6 +109,16 @@ switch (command)
         Console.WriteLine($"アカウント: {string.Join("、", r.Accounts)}");
         return 0;
     }
+    case "set-password":
+    {
+        // yamaori set-password  パスワードを標準入力から読んで決める（サーバーやコンテナで、最初に決めるため）
+        var pw = Console.IsInputRedirected ? Console.In.ReadLine() : ReadHidden("新しいパスワード（8 文字以上）: ");
+        if (pw is not { Length: >= 8 }) { Console.Error.WriteLine("パスワードは 8 文字以上"); return 2; }
+        using var db = Database.Open(options.DatabasePath);
+        new AuthStore(db).SetPassword(pw);
+        Console.WriteLine("パスワードを決めた");
+        return 0;
+    }
     case "export":
     {
         // yamaori export --out <フォルダ>  日ごとの Markdown を書き出す
@@ -124,8 +135,23 @@ switch (command)
         return 0;
     }
     default:
-        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・import-vat・import-vrcx）");
+        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・import-vat・import-vrcx・set-password）");
         return 2;
+}
+
+static string ReadHidden(string prompt)
+{
+    Console.Write(prompt);
+    var sb = new System.Text.StringBuilder();
+    while (true)
+    {
+        var k = Console.ReadKey(intercept: true);
+        if (k.Key == ConsoleKey.Enter) break;
+        if (k.Key == ConsoleKey.Backspace) { if (sb.Length > 0) sb.Length--; continue; }
+        sb.Append(k.KeyChar);
+    }
+    Console.WriteLine();
+    return sb.ToString();
 }
 
 static class Summary

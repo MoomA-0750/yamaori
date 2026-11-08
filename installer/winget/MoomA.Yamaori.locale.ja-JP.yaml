@@ -1,0 +1,13 @@
+PackageIdentifier: MoomA.Yamaori
+PackageVersion: 0.1.0
+PackageLocale: ja-JP
+Publisher: MoomA
+PackageName: Yamaori
+License: MIT
+ShortDescription: VRChat で過ごした時間をログから自動で記録し、メモや日記を書き足せる、自分だけの旅の記録
+Tags:
+  - vrchat
+  - diary
+  - log
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0
