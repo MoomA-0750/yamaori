@@ -19,9 +19,12 @@ if (command != "run") Native.AttachParentConsole();
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 var rest = command == "run" ? args : args[1..];
 
+var switches = new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database", ["--archive-dir"] = "ArchiveDir", ["--device-name"] = "DeviceName" };
+// データのフォルダは引数で変えられるので、先にそれを決めてから、そこの yamaori.json を読む（引数の方が強い）
+var dataDir = new ConfigurationBuilder().AddCommandLine(rest, switches).Build()["DataDir"] ?? new YamaoriOptions().DataDir;
 var config = new ConfigurationBuilder()
-    .AddJsonFile(Path.Combine(new YamaoriOptions().DataDir, "yamaori.json"), optional: true)
-    .AddCommandLine(rest, new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database", ["--archive-dir"] = "ArchiveDir", ["--device-name"] = "DeviceName" })
+    .AddJsonFile(Path.Combine(Path.GetFullPath(dataDir), "yamaori.json"), optional: true)
+    .AddCommandLine(rest, switches)
     .Build();
 var options = new YamaoriOptions();
 config.Bind(options);
@@ -30,8 +33,12 @@ switch (command)
 {
     case "run":
         // 同じ本人のもとで二つ起きないようにする
-        using (var mutex = new Mutex(true, @"Local\Yamaori", out var first))
+        using (var mutex = new Mutex(false, @"Local\Yamaori"))
         {
+            // 起こし直しのときは、前のものが止まるのを少し待つ
+            bool first;
+            try { first = mutex.WaitOne(TimeSpan.FromSeconds(15)); }
+            catch (AbandonedMutexException) { first = true; }
             if (!first) return 1;
             await Server.Build(rest, config, options).RunAsync().ConfigureAwait(false);
             return 0;

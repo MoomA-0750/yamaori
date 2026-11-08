@@ -43,7 +43,9 @@ public static class Server
         {
             if (LiveHub.From(file, e) is { } live) hub.Publish(live);
         };
+        Auth.UseAccess(app);
         app.MapOpenApi();
+        Auth.Map(app);
         Api.Map(app);
         return app;
     }

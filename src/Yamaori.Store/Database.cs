@@ -184,6 +184,29 @@ public sealed class Database : IDisposable
         CREATE INDEX notes_target ON notes (target_type, target_id);
         CREATE INDEX notes_updated ON notes (updated_at);
         """,
+        // 4 版目: 認証（パスワード・ログインの Cookie・API のトークン）と設定
+        """
+        CREATE TABLE settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        -- ログインの Cookie。中身そのものは持たず、SHA-256 だけを持つ
+        CREATE TABLE web_sessions (
+            hash TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            user_agent TEXT
+        );
+        -- ほかのアプリ用の API のトークン。中身そのものは持たず、SHA-256 だけを持つ
+        CREATE TABLE api_tokens (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            hash TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            last_used_at TEXT
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
