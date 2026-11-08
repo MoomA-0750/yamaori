@@ -187,11 +187,12 @@
         <label class="stack field">送り先
           <select bind:value={kind}>
             <option value="none">送らない</option>
-            <option value="folder">フォルダ（NAS の共有 \\NAS\… や、割り当てたドライブ）</option>
-            <option value="webdav">WebDAV（https://…）</option>
-            <option value="sftp">SFTP（sftp://ホスト/フォルダ）</option>
+            <option value="folder">フォルダ（NAS の共有など）</option>
+            <option value="webdav">WebDAV</option>
+            <option value="sftp">SFTP</option>
           </select></label>
         {#if kind !== 'none'}
+          <p class="faint">{kind === 'folder' ? 'NAS の共有（\\\\NAS\\photo\\VRChat）や、割り当てたドライブ（Z:\\VRChat）。' : kind === 'webdav' ? 'https:// で始まる WebDAV のアドレス（Synology・QNAP・Nextcloud など）。' : 'sftp://ホスト/フォルダ の形。'}</p>
           <label class="stack field">送り先のアドレス<input type="text" bind:value={target} placeholder={kind === 'folder' ? '\\\\NAS\\photo\\VRChat' : kind === 'webdav' ? 'https://nas.local:5006/photo/VRChat' : 'sftp://nas.local/volume1/photo/VRChat'} /></label>
           {#if kind !== 'folder'}
             <div class="grid2">
