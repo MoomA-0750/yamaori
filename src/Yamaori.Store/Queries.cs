@@ -22,13 +22,18 @@ public sealed record DaySummary(string Date, int VisitCount, int Minutes, int Wo
 
 public sealed record WorldSummary(string Id, string? Name, int VisitCount, int Minutes, DateTime? FirstVisitAt, DateTime? LastVisitAt, int NoteCount);
 
-public sealed record WorldDetail(WorldSummary World, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
+/// <summary>ワールドの詳しい情報（VRCX の取り込みや、拡張機能で入る）。Favorites はお気に入りの一覧の名前。</summary>
+public sealed record WorldInfo(string? AuthorId, string? AuthorName, string? Description, string? ImageUrl, string? ThumbnailUrl,
+    string? ReleaseStatus, int? Capacity, string? DetailsSource, DateTime? DetailsUpdatedAt, IReadOnlyList<string> Favorites);
+
+public sealed record WorldDetail(WorldSummary World, WorldInfo Info, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 
 public sealed record PersonSummary(string UserId, string? Name, DateTime? FirstMetAt, DateTime? LastMetAt, int VisitCount, int NoteCount);
 
 public sealed record NameSpan(string Name, DateTime? FirstSeenAt, DateTime? LastSeenAt);
 
-public sealed record PersonDetail(PersonSummary Person, IReadOnlyList<NameSpan> Names, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
+public sealed record PersonDetail(PersonSummary Person, IReadOnlyList<NameSpan> Names, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes,
+    IReadOnlyList<EventView> Friendship);
 
 public sealed record AccountView(string Id, string? Name, DateTime? FirstSeenAt, DateTime? LastSeenAt, int VisitCount, IReadOnlyList<NameSpan> Names);
 
@@ -175,7 +180,10 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         var w = List($"SELECT {WorldColumns} FROM worlds w WHERE w.id = $id", ReadWorld, ("$id", id));
         if (w.Count == 0) return null;
         // 訪問は新しい方から 100 件（続きは Visits(worldId) で読む。全部の数は World.VisitCount）
-        return new WorldDetail(w[0], Visits(worldId: id, limit: 100).Items, Notes("world", id));
+        var info = List("SELECT author_id, author_name, description, image_url, thumbnail_url, release_status, capacity, details_source, details_updated_at FROM worlds WHERE id = $id",
+            r => new WorldInfo(Str(r, 0), Str(r, 1), Str(r, 2), Str(r, 3), Str(r, 4), Str(r, 5), r.IsDBNull(6) ? null : r.GetInt32(6), Str(r, 7), Time(r, 8),
+                List("SELECT DISTINCT list_name FROM world_favorites WHERE world_id = $id ORDER BY list_name", x => x.GetString(0), ("$id", id))), ("$id", id))[0];
+        return new WorldDetail(w[0], info, Visits(worldId: id, limit: 100).Items, Notes("world", id));
     }
 
     /// <summary>名前だけの人（ID が分からない人。VAT の取り込みなど）の ID の頭。「name:名前」の形にする。</summary>
@@ -226,7 +234,13 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
             : List("SELECT name, first_seen_at, last_seen_at FROM person_names WHERE user_id = $id ORDER BY first_seen_at",
                 r => new NameSpan(r.GetString(0), Time(r, 1), Time(r, 2)), ("$id", userId));
         // 訪問は新しい方から 100 件（続きは Visits(userId) で読む。全部の数は Person.VisitCount）
-        return new PersonDetail(p[0], names, Visits(userId: userId, limit: 100).Items, Notes("person", userId));
+        // フレンドの記録（VRCX の取り込み）と、その人とのフレンド申請の通知
+        var friendship = List("""
+            SELECT id, at, kind, user_id, name, data FROM events
+            WHERE user_id = $id AND (kind = 'friend' OR (kind = 'notification' AND json_extract(data, '$.type') = 'friendRequest'))
+            ORDER BY at
+            """, ReadEvent, ("$id", userId));
+        return new PersonDetail(p[0], names, Visits(userId: userId, limit: 100).Items, Notes("person", userId), friendship);
     }
 
     public IReadOnlyList<AccountView> Accounts()

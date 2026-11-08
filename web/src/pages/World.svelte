@@ -55,6 +55,17 @@
         <span class="faint mono break">{w.id}</span>
       </p>
     </header>
+    {#if data.info.description || data.info.authorName || data.info.thumbnailUrl || data.info.favorites.length}
+      <section class="info card" class:with-thumb={!!data.info.thumbnailUrl}>
+        {#if data.info.thumbnailUrl}<img class="thumb" src={data.info.thumbnailUrl} alt="" loading="lazy" referrerpolicy="no-referrer" />{/if}
+        <div class="stack text">
+          {#if data.info.authorName}<div class="muted">作者 {data.info.authorName}</div>{/if}
+          {#if data.info.favorites.length}<div class="row">{#each data.info.favorites as f (f)}<span class="chip accent">★ {f}</span>{/each}</div>{/if}
+          {#if data.info.description}<p class="desc break">{data.info.description}</p>{/if}
+          {#if data.info.detailsSource}<div class="faint">情報の出どころ: {data.info.detailsSource === 'vrcx' ? 'VRCX' : data.info.detailsSource}{data.info.detailsUpdatedAt ? `（${dateTime(data.info.detailsUpdatedAt)}）` : ''}</div>{/if}
+        </div>
+      </section>
+    {/if}
     <Notes targetType="world" targetId={w.id} notes={data.notes} placeholder="このワールドのことを書く（Markdown が使える）" />
     {#if photos.length}
       <section>
@@ -73,6 +84,12 @@
 {/if}
 
 <style>
+  .info { display: grid; grid-template-columns: 1fr; gap: 1rem; padding: .9rem 1rem; align-items: start; }
+  .info.with-thumb { grid-template-columns: 12rem 1fr; }
+  .info .thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-2); }
+  .info .text { gap: .4rem; }
+  .desc { margin: 0; white-space: pre-line; }
+  @media (max-width: 480px) { .info.with-thumb { grid-template-columns: 1fr; } }
   .more { margin-top: .75rem; }
   .head { gap: .35rem; }
   .head p { margin: 0; }

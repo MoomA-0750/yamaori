@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:47811/"
+      "url": "http://localhost:47812/"
     }
   ],
   "paths": {
@@ -1663,7 +1663,8 @@
           "person",
           "names",
           "visits",
-          "notes"
+          "notes",
+          "friendship"
         ],
         "type": "object",
         "properties": {
@@ -1686,6 +1687,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Note"
+            }
+          },
+          "friendship": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
             }
           }
         }
@@ -2151,6 +2158,7 @@
       "WorldDetail": {
         "required": [
           "world",
+          "info",
           "visits",
           "notes"
         ],
@@ -2158,6 +2166,9 @@
         "properties": {
           "world": {
             "$ref": "#/components/schemas/WorldSummary"
+          },
+          "info": {
+            "$ref": "#/components/schemas/WorldInfo"
           },
           "visits": {
             "type": "array",
@@ -2169,6 +2180,85 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Note"
+            }
+          }
+        }
+      },
+      "WorldInfo": {
+        "required": [
+          "authorId",
+          "authorName",
+          "description",
+          "imageUrl",
+          "thumbnailUrl",
+          "releaseStatus",
+          "capacity",
+          "detailsSource",
+          "detailsUpdatedAt",
+          "favorites"
+        ],
+        "type": "object",
+        "properties": {
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thumbnailUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "releaseStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "capacity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detailsSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "detailsUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "favorites": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }

@@ -1433,6 +1433,7 @@ export interface components {
             names: components["schemas"]["NameSpan"][];
             visits: components["schemas"]["VisitSummary"][];
             notes: components["schemas"]["Note"][];
+            friendship: components["schemas"]["EventView"][];
         };
         PersonSummary: {
             userId: string;
@@ -1544,8 +1545,23 @@ export interface components {
         };
         WorldDetail: {
             world: components["schemas"]["WorldSummary"];
+            info: components["schemas"]["WorldInfo"];
             visits: components["schemas"]["VisitSummary"][];
             notes: components["schemas"]["Note"][];
+        };
+        WorldInfo: {
+            authorId: null | string;
+            authorName: null | string;
+            description: null | string;
+            imageUrl: null | string;
+            thumbnailUrl: null | string;
+            releaseStatus: null | string;
+            /** Format: int32 */
+            capacity: null | number;
+            detailsSource: null | string;
+            /** Format: date-time */
+            detailsUpdatedAt: null | string;
+            favorites: string[];
         };
         WorldSummary: {
             id: string;

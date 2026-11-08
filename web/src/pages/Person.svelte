@@ -7,6 +7,20 @@
   import Loading from '../components/Loading.svelte'
 
   let { id }: { id: string } = $props()
+
+  function friendLabel(e: import('../api').EventView): string {
+    const d = e.data
+    if (e.kind === 'notification') return d.direction === 'accepted' ? 'フレンド申請を承諾した' : d.direction === 'sent' ? 'フレンド申請を送った' : 'フレンド申請が届いた'
+    switch (d.type) {
+      case 'Friend': return 'フレンドになった'
+      case 'Unfriend': return 'フレンドでなくなった'
+      case 'FriendRequest': return 'フレンド申請を送った'
+      case 'CancelFriendRequest': return 'フレンド申請を取り消した'
+      case 'DisplayName': return `名前を変えた（${d.previous_name ?? ''} → ${e.name ?? ''}）`
+      case 'TrustLevel': return `ランクが変わった（${d.previous_trust_level ?? ''} → ${d.trust_level ?? ''}）`
+      default: return d.type ?? ''
+    }
+  }
   let data = $state<PersonDetail | null>(null)
   let error = $state('')
 
@@ -56,6 +70,17 @@
         <ol class="names card">
           {#each data.names as n (n.name + n.firstSeenAt)}
             <li><span class="break">{n.name}</span> <span class="faint nowrap">{n.firstSeenAt ? day(localDate(n.firstSeenAt)) : ''} – {n.lastSeenAt ? day(localDate(n.lastSeenAt)) : ''}</span></li>
+          {/each}
+        </ol>
+      </section>
+    {/if}
+
+    {#if data.friendship.length}
+      <section>
+        <h2 class="section-title">フレンドの記録</h2>
+        <ol class="names card">
+          {#each data.friendship as e (e.id)}
+            <li><span>{friendLabel(e)}</span> <span class="faint nowrap">{dateTime(e.at)}</span></li>
           {/each}
         </ol>
       </section>

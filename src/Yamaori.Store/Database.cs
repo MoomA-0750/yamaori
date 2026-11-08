@@ -236,6 +236,27 @@ public sealed class Database : IDisposable
         CREATE INDEX photo_locations_photo ON photo_locations (photo_id);
         CREATE INDEX photo_locations_root ON photo_locations (root);
         """,
+        // 6 版目: ワールドの詳しい情報（VRCX の取り込み、あとで拡張機能）と、ワールドのお気に入り。取り込んだメモの出どころ
+        """
+        ALTER TABLE worlds ADD COLUMN author_id TEXT;
+        ALTER TABLE worlds ADD COLUMN author_name TEXT;
+        ALTER TABLE worlds ADD COLUMN description TEXT;
+        ALTER TABLE worlds ADD COLUMN image_url TEXT;
+        ALTER TABLE worlds ADD COLUMN thumbnail_url TEXT;
+        ALTER TABLE worlds ADD COLUMN release_status TEXT;
+        ALTER TABLE worlds ADD COLUMN capacity INTEGER;
+        ALTER TABLE worlds ADD COLUMN tags TEXT;              -- JSON の配列
+        ALTER TABLE worlds ADD COLUMN details_source TEXT;    -- vrcx・extension
+        ALTER TABLE worlds ADD COLUMN details_updated_at TEXT;
+        CREATE TABLE world_favorites (
+            world_id TEXT NOT NULL,
+            list_name TEXT NOT NULL,         -- お気に入りの一覧の名前（VRCX のグループの名前など）
+            source TEXT NOT NULL,            -- vrcx・extension・yamaori
+            added_at TEXT,
+            PRIMARY KEY (world_id, list_name, source)
+        );
+        ALTER TABLE notes ADD COLUMN source TEXT;   -- 取り込んだメモの出どころ（vrcx など）。Yamaori で書いたものは NULL
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
