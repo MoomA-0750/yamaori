@@ -36,7 +36,10 @@ public sealed class FileLoggerProvider(string path) : ILoggerProvider
     sealed class FileLogger(FileLoggerProvider owner, string category) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+        // ASP.NET の内部（要求 1 つごとの行など）は多いので、警告以上だけ書く
+        public bool IsEnabled(LogLevel logLevel) =>
+            logLevel >= (category.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) || category.StartsWith("ModelContextProtocol", StringComparison.Ordinal)
+                ? LogLevel.Warning : LogLevel.Information);
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
