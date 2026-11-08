@@ -84,6 +84,30 @@ public static class Api
             q.DeleteNote(id) ? TypedResults.NoContent() : TypedResults.NotFound())
             .WithSummary("メモを消す");
 
+        // ---- 拡張機能から
+
+        api.MapPut("/worlds/{id}/details", Results<NoContent, BadRequest<string>> (Database db, string id, WorldDetailsInput input) =>
+        {
+            if (!id.StartsWith("wrld_", StringComparison.Ordinal)) return TypedResults.BadRequest("ワールドの ID は wrld_…");
+            new ExtensionStore(db).SaveWorld(id, input);
+            return TypedResults.NoContent();
+        }).WithSummary("ワールドの詳しい情報を入れる（拡張機能が vrchat.com のページから取ったもの）");
+
+        api.MapGet("/worlds/missing-details", (Database db, int? limit) => new ExtensionStore(db).MissingWorlds(limit ?? 20))
+            .WithSummary("詳しい情報のないワールド（行った回数の多い順。拡張機能がまとめて取るときに使う）");
+
+        api.MapPost("/friends/snapshot", Results<Ok<FriendSnapshotResult>, BadRequest<string>> (Database db, FriendSnapshotInput input) =>
+        {
+            var account = input.AccountId;
+            if (account == null)
+            {
+                var accounts = new Queries(db).Accounts();
+                if (accounts.Count != 1) return TypedResults.BadRequest("アカウントが 1 つに決まらないので accountId を渡す");
+                account = accounts[0].Id;
+            }
+            return TypedResults.Ok(new ExtensionStore(db).SaveFriends(account, input.Friends ?? []));
+        }).WithSummary("フレンドの一覧を入れ、前に入れた一覧と比べて増えた・減った・名前を変えた人を記録する（拡張機能から）");
+
         // ---- 写真
 
         api.MapGet("/photos", (PhotoCatalog photos, DateTime? from, DateTime? to, string? world, string? visit, int? limit, int? offset) =>
@@ -127,6 +151,7 @@ public static class Api
             .WithSummary("今の出来事を SSE で流す（入った・出た・人が来た・動画・スクショ・通知）");
     }
 
+    public sealed record FriendSnapshotInput(string? AccountId, IReadOnlyList<FriendInput>? Friends);
     public sealed record DayView(string Date, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 
     static async IAsyncEnumerable<SseItem<LiveEvent>> Stream(LiveHub hub, CancellationTokenSource linked, [EnumeratorCancellation] CancellationToken enumeration = default)

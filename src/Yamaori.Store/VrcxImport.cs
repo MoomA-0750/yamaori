@@ -161,12 +161,13 @@ public sealed class VrcxImport(Database db, string deviceId)
             if (r.Id == null) continue;
             // 拡張機能で取った情報（より新しく詳しい）があれば上書きしない
             using var cmd = db.Command("""
-                INSERT INTO worlds (id, name, author_id, author_name, description, image_url, thumbnail_url, release_status, details_source, details_updated_at)
-                VALUES ($id, $n, $a, $an, $d, $i, $t, $s, 'vrcx', $u)
+                INSERT INTO worlds (id, name, author_id, author_name, description, image_url, thumbnail_url, release_status, categories, details_source, details_updated_at)
+                VALUES ($id, $n, $a, $an, $d, $i, $t, $s, $cat, 'vrcx', $u)
                 ON CONFLICT (id) DO UPDATE SET name = COALESCE(worlds.name, $n),
-                    author_id = $a, author_name = $an, description = $d, image_url = $i, thumbnail_url = $t, release_status = $s, details_source = 'vrcx', details_updated_at = $u
+                    author_id = $a, author_name = $an, description = $d, image_url = $i, thumbnail_url = $t, release_status = $s, categories = $cat, details_source = 'vrcx', details_updated_at = $u
                 WHERE worlds.details_source IS NULL OR worlds.details_source = 'vrcx'
                 """, tx,
+                ("$cat", System.Text.Json.JsonSerializer.Serialize(WorldClassifier.Classify(r.Description))),
                 ("$id", r.Id), ("$n", r.Name), ("$a", r.Author), ("$an", r.AuthorName), ("$d", r.Description), ("$i", r.Image), ("$t", r.Thumb), ("$s", r.Status),
                 ("$u", r.Updated is { } u && Utc(u) is { } ut ? Database.Time(ut) : null));
             n += cmd.ExecuteNonQuery();

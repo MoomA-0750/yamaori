@@ -42,9 +42,10 @@ public static class AccessPolicy
     public static AccessResult Decide(AccessRequest r, AccessSettings s)
     {
         // 書き換える要求は、ほかのサイトから来たら断る（ログインの Cookie を悪用させない）
-        var writes = r.Method is not ("GET" or "HEAD" or "OPTIONS");
         // （tailscale serve 越しでは scheme と番号がずれるので、ホストの名前で比べる）
-        if (writes && r.Origin != null && !SameHost(r.Origin, r.ExpectedHost))
+        // 正しいトークンを持つ要求は見ない。トークンはブラウザが勝手に付けないので、なりすまし（CSRF）にならない（拡張機能が使う）
+        var writes = r.Method is not ("GET" or "HEAD" or "OPTIONS");
+        if (writes && !r.HasValidToken && r.Origin != null && !SameHost(r.Origin, r.ExpectedHost))
             return AccessResult.BadOrigin;
 
         var authenticated = r.HasValidSession || r.HasValidToken;

@@ -24,7 +24,8 @@ public sealed record WorldSummary(string Id, string? Name, int VisitCount, int M
 
 /// <summary>ワールドの詳しい情報（VRCX の取り込みや、拡張機能で入る）。Favorites はお気に入りの一覧の名前。</summary>
 public sealed record WorldInfo(string? AuthorId, string? AuthorName, string? Description, string? ImageUrl, string? ThumbnailUrl,
-    string? ReleaseStatus, int? Capacity, string? DetailsSource, DateTime? DetailsUpdatedAt, IReadOnlyList<string> Favorites);
+    string? ReleaseStatus, int? Capacity, string? DetailsSource, DateTime? DetailsUpdatedAt, IReadOnlyList<string> Favorites,
+    IReadOnlyList<string> Categories, IReadOnlyList<string> Tags, IReadOnlyList<string> Platforms, int? VisitsTotal, int? FavoritesTotal);
 
 public sealed record WorldDetail(WorldSummary World, WorldInfo Info, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 
@@ -180,9 +181,13 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         var w = List($"SELECT {WorldColumns} FROM worlds w WHERE w.id = $id", ReadWorld, ("$id", id));
         if (w.Count == 0) return null;
         // 訪問は新しい方から 100 件（続きは Visits(worldId) で読む。全部の数は World.VisitCount）
-        var info = List("SELECT author_id, author_name, description, image_url, thumbnail_url, release_status, capacity, details_source, details_updated_at FROM worlds WHERE id = $id",
+        var info = List("""
+            SELECT author_id, author_name, description, image_url, thumbnail_url, release_status, capacity, details_source, details_updated_at,
+                   categories, tags, platforms, visits_total, favorites_total FROM worlds WHERE id = $id
+            """,
             r => new WorldInfo(Str(r, 0), Str(r, 1), Str(r, 2), Str(r, 3), Str(r, 4), Str(r, 5), r.IsDBNull(6) ? null : r.GetInt32(6), Str(r, 7), Time(r, 8),
-                List("SELECT DISTINCT list_name FROM world_favorites WHERE world_id = $id ORDER BY list_name", x => x.GetString(0), ("$id", id))), ("$id", id))[0];
+                List("SELECT DISTINCT list_name FROM world_favorites WHERE world_id = $id ORDER BY list_name", x => x.GetString(0), ("$id", id)),
+                JsonList(Str(r, 9)), JsonList(Str(r, 10)), JsonList(Str(r, 11)), r.IsDBNull(12) ? null : r.GetInt32(12), r.IsDBNull(13) ? null : r.GetInt32(13)), ("$id", id))[0];
         return new WorldDetail(w[0], info, Visits(worldId: id, limit: 100).Items, Notes("world", id));
     }
 
@@ -240,7 +245,19 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
             WHERE user_id = $id AND (kind = 'friend' OR (kind = 'notification' AND json_extract(data, '$.type') = 'friendRequest'))
             ORDER BY at
             """, ReadEvent, ("$id", userId));
-        return new PersonDetail(p[0], names, Visits(userId: userId, limit: 100).Items, Notes("person", userId), friendship);
+        // フレンドの記録（VRCX）で名前を変えたと分かっていれば、それも名前の移り変わりに入れ、新しい方を見出しの名前にする
+        var renamed = friendship.Where(e => e.Kind == "friend" && e.Data.GetValueOrDefault("type") == "DisplayName" && e.Name != null).ToList();
+        var person = p[0];
+        if (renamed.Count > 0)
+        {
+            var spans = names.ToList();
+            foreach (var e in renamed)
+                if (spans.All(n => n.Name != e.Name)) spans.Add(new NameSpan(e.Name!, e.At, e.At));
+            names = spans.OrderBy(n => n.FirstSeenAt).ToList();
+            var latest = renamed[^1];
+            if (person.LastMetAt == null || latest.At > person.LastMetAt) person = person with { Name = latest.Name };
+        }
+        return new PersonDetail(person, names, Visits(userId: userId, limit: 100).Items, Notes("person", userId), friendship);
     }
 
     public IReadOnlyList<AccountView> Accounts()
@@ -322,5 +339,6 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     }
 
     static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+    static IReadOnlyList<string> JsonList(string? json) => json == null ? [] : JsonSerializer.Deserialize<List<string>>(json) ?? [];
     static DateTime? Time(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : Database.ParseTime(r.GetString(i));
 }

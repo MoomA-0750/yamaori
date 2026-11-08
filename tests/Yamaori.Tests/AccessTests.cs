@@ -78,6 +78,14 @@ public class AccessTests
     }
 
     [Fact]
+    public void 正しいトークンを持つ書き換えは_Origin_が違っても通す_拡張機能()
+    {
+        var r = Local("PUT") with { Origin = "chrome-extension://abcdef", HasValidToken = true };
+        Assert.Equal(AccessResult.Allow, AccessPolicy.Decide(r, Settings()));
+        Assert.Equal(AccessResult.BadOrigin, AccessPolicy.Decide(r with { HasValidToken = false }, Settings()));
+    }
+
+    [Fact]
     public void tailscale_serve_越しの書き換えは_ホストの名前が合えば通す()
     {
         var r = ViaTailscale("me@example.com") with { Method = "PUT", Origin = "https://to-fu.tail1234.ts.net" };

@@ -257,6 +257,25 @@ public sealed class Database : IDisposable
         );
         ALTER TABLE notes ADD COLUMN source TEXT;   -- 取り込んだメモの出どころ（vrcx など）。Yamaori で書いたものは NULL
         """,
+        // 7 版目: 拡張機能から。ワールドの対応機種・タグ・人数の上限など、フレンドの一覧の写し（前回と比べて増減を出す）
+        """
+        ALTER TABLE worlds ADD COLUMN platforms TEXT;         -- JSON の配列（standalonewindows・android・ios）
+        ALTER TABLE worlds ADD COLUMN visits_total INTEGER;   -- vrchat.com に出ている訪問数
+        ALTER TABLE worlds ADD COLUMN favorites_total INTEGER;
+        ALTER TABLE worlds ADD COLUMN categories TEXT;        -- JSON の配列。説明文の言葉から決まりで付ける分類（Essential Assets など）
+        CREATE TABLE friend_snapshots (
+            account_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            display_name TEXT,
+            seen_at TEXT NOT NULL,
+            PRIMARY KEY (account_id, user_id)
+        );
+        CREATE TABLE friend_snapshot_meta (
+            account_id TEXT PRIMARY KEY,
+            taken_at TEXT NOT NULL,
+            count INTEGER NOT NULL
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
