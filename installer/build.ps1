@@ -17,4 +17,5 @@ foreach ($c in @((Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
 if (-not $iscc) { throw "Inno Setup 6 が見つからない（winget install JRSoftware.InnoSetup）" }
 & $iscc "/DAppVersion=$Version" "/DPublishDir=..\$publish" installer\yamaori.iss
 if ($LASTEXITCODE -ne 0) { throw "インストーラーを作れなかった" }
-Get-FileHash "artifacts\Yamaori-Setup-$Version.exe" -Algorithm SHA256
+# winget の定義に入れるハッシュ（Get-FileHash が使えない環境もあるので certutil で）
+certutil -hashfile "artifacts\Yamaori-Setup-$Version.exe" SHA256
