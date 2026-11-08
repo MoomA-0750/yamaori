@@ -76,10 +76,10 @@ public class LogTests
         Assert.Equal("log_end", b.LeftReason);
         Assert.Equal(new DateTime(2026, 11, 7, 17, 45, 15, DateTimeKind.Utc), b.LeftAt);
 
-        Assert.Equal("log_end", p.Session.EndReason);
-        Assert.Equal("usr_00000000-0000-0000-0000-000000000001", p.Session.SelfId);
-        Assert.True(p.Session.Vr);
-        Assert.Equal("Meta Quest 3", p.Session.Hmd);
+        Assert.Equal("log_end", p.Session!.EndReason);
+        Assert.Equal("usr_00000000-0000-0000-0000-000000000001", p.Session!.SelfId);
+        Assert.True(p.Session!.Vr);
+        Assert.Equal("Meta Quest 3", p.Session!.Hmd);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class LogTests
     {
         var p = ProjectAll(closed: false);
         Assert.Null(p.Visits[^1].LeftAt);
-        Assert.Null(p.Session.EndedAt);
+        Assert.Null(p.Session!.EndedAt);
         Assert.Null(p.Encounters.Single(e => e.Name == "Carol").LeftAt);
     }
 

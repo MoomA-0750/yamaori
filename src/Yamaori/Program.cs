@@ -12,6 +12,7 @@ using Yamaori.Store;
 // yamaori rebuild            DB に残した出来事から、記録を全部組み立て直す
 // yamaori reparse            残した生のログから、出来事を全部読み直す（読み方を直したあと）
 // yamaori export --out <dir> 日記を日ごとの Markdown に書き出す
+// yamaori import-vat --file <VRChatActivityLog.db>  VRChatActivityTools の記録を取り込む
 // 共通の引数: --log-dir <フォルダ> --data-dir <フォルダ> --database <ファイル>
 var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
 // Windows では窓を出さない形（WinExe）で作るので、コマンドのときは呼んだ側のコンソールにつなぐ
@@ -80,6 +81,17 @@ switch (command)
         Summary.Print(db);
         return 0;
     }
+    case "import-vat":
+    {
+        // yamaori import-vat --file <VRChatActivityLog.db> [--account usr_…]  VRChatActivityTools の記録を読むだけで取り込む
+        var cl = new ConfigurationBuilder().AddCommandLine(rest).Build();
+        var file = cl["file"];
+        if (file == null || !File.Exists(file)) { Console.Error.WriteLine("--file に VRChatActivityLog.db を渡す"); return 2; }
+        using var db = Database.Open(options.DatabasePath);
+        var r = new VatImport(db, db.SelfDevice(options.DeviceName)).Import(file, cl["account"]);
+        Console.WriteLine($"訪問 {r.Visits}・会った人 {r.Encounters}（うち ID が分かった {r.Resolved}）・出来事 {r.Events}・ログと重なって飛ばした行 {r.Skipped}");
+        return 0;
+    }
     case "export":
     {
         // yamaori export --out <フォルダ>  日ごとの Markdown を書き出す
@@ -96,7 +108,7 @@ switch (command)
         return 0;
     }
     default:
-        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export）");
+        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・import-vat）");
         return 2;
 }
 

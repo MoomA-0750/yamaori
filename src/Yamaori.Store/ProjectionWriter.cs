@@ -21,8 +21,8 @@ public static class ProjectionWriter
         Exec("DELETE FROM encounters WHERE source = $s", ("$s", source));
         Exec("DELETE FROM events WHERE source = $s", ("$s", source));
 
-        var s = p.Session;
-        Exec("""
+        // 取り込み（VAT など）には、VRChat を起こしてから閉じるまでの記録がない
+        if (p.Session is { } s) Exec("""
             INSERT INTO sessions (device_id, log_file, started_at, ended_at, end_reason, self_id, self_name, vr, hmd) VALUES ($dev, $f, $st, $en, $r, $sid, $sn, $vr, $hmd)
             ON CONFLICT (device_id, log_file) DO UPDATE SET started_at = $st, ended_at = $en, end_reason = $r, self_id = $sid, self_name = $sn, vr = $vr, hmd = $hmd
             """,

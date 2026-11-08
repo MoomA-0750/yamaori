@@ -77,7 +77,7 @@ public sealed record ActivityEvent(
 /// <summary>ログ 1 本から組み立てた記録の全部。</summary>
 public sealed record Projection(
     string DeviceId,
-    LogSession Session,
+    LogSession? Session,
     IReadOnlyList<Visit> Visits,
     IReadOnlyList<Encounter> Encounters,
     IReadOnlyList<ActivityEvent> Events);
