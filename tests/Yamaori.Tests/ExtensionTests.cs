@@ -57,6 +57,28 @@ public sealed class ExtensionTests : IDisposable
         Assert.Equal(3, new Queries(db).Events(kind: "friend").Total);
     }
 
+    [Theory]
+    [InlineData("https://api.vrchat.cloud/api/1/image/file_ab/41/256", true)]
+    [InlineData("https://assets.vrchat.com/a.png", true)]
+    [InlineData("http://api.vrchat.cloud/api/1/image/file_ab/41/256", false)]
+    [InlineData("https://evil.example/track.png", false)]
+    [InlineData("https://vrchat.cloud.evil.example/a.png", false)]
+    [InlineData("javascript:alert(1)", false)]
+    public void 画像は_VRChat_の置き場のものだけ受け取る(string url, bool kept)
+    {
+        Assert.Equal(kept ? url : null, ExtensionStore.VrchatImage(url));
+    }
+
+    [Fact]
+    public void 長すぎる値は切る()
+    {
+        var w = ExtensionStore.Clean(new WorldDetailsInput(new string('a', 1000), null, null, new string('d', 10000), null, null, null, null,
+            Enumerable.Range(0, 500).Select(i => "t" + i).ToList(), null, null, null));
+        Assert.Equal(200, w.Name!.Length);
+        Assert.Equal(4000, w.Description!.Length);
+        Assert.Equal(100, w.Tags!.Count);
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

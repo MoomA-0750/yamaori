@@ -78,3 +78,14 @@ export const notificationLabel = (type?: string | null, direction?: string | nul
   `${notificationTypes[type ?? ''] ?? type ?? ''}${direction ? `（${directions[direction] ?? direction}）` : ''}`
 
 export const worldName = (v: { worldName?: string | null; worldId: string }) => v.worldName || v.worldId
+
+/** リンクにしてよいアドレスなら返す（http・https だけ。javascript: などはリンクにしない）。 */
+export function safeHref(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const u = new URL(url)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null
+  } catch {
+    return null
+  }
+}

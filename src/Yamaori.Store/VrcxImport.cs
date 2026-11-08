@@ -168,7 +168,7 @@ public sealed class VrcxImport(Database db, string deviceId)
                 WHERE worlds.details_source IS NULL OR worlds.details_source = 'vrcx'
                 """, tx,
                 ("$cat", System.Text.Json.JsonSerializer.Serialize(WorldClassifier.Classify(r.Description))),
-                ("$id", r.Id), ("$n", r.Name), ("$a", r.Author), ("$an", r.AuthorName), ("$d", r.Description), ("$i", r.Image), ("$t", r.Thumb), ("$s", r.Status),
+                ("$id", r.Id), ("$n", r.Name), ("$a", r.Author), ("$an", r.AuthorName), ("$d", r.Description), ("$i", ExtensionStore.VrchatImage(r.Image)), ("$t", ExtensionStore.VrchatImage(r.Thumb)), ("$s", r.Status),
                 ("$u", r.Updated is { } u && Utc(u) is { } ut ? Database.Time(ut) : null));
             n += cmd.ExecuteNonQuery();
         }

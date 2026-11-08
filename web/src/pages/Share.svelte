@@ -4,12 +4,17 @@
 
   // スマホの共有から来た（/?title=…&text=…&url=…）。中の wrld_… を保存の一覧に入れる
   let { params, onClose }: { params: URLSearchParams; onClose: () => void } = $props()
-  let status = $state<'saving' | 'saved' | 'none' | 'error'>('saving')
+  // 開いただけでは保存しない（リンクを踏ませて勝手に保存させない）。中身を見せて、押したら保存する
+  let status = $state<'ready' | 'saving' | 'saved' | 'none' | 'error'>('ready')
   let worldId = $state('')
   let error = $state('')
   const title = $derived(params.get('title') ?? '')
 
+  const shared = $derived([params.get('url'), params.get('text')].filter(Boolean).join(' '))
+  const found = $derived(/wrld_[0-9a-f-]{36}/i.exec(shared)?.[0] ?? '')
+
   async function save() {
+    status = 'saving'
     try {
       const r = await api.saveWorld({ url: params.get('url'), text: params.get('text'), name: title || null })
       worldId = r.worldId
@@ -19,12 +24,21 @@
       error = (e as Error).message
     }
   }
-  save()
 </script>
 
 <div class="stack wrap">
   <div class="card box stack">
-    {#if status === 'saving'}
+    {#if status === 'ready'}
+      {#if found}
+        <h1>ワールドを保存しますか</h1>
+        <p class="muted break">{title || found}</p>
+        <p class="faint mono break">{found}</p>
+        <div class="row"><button class="primary" onclick={save}>保存する</button><button onclick={onClose}>やめる</button></div>
+      {:else}
+        <h1>ワールドが見つかりません</h1>
+        <p class="muted">共有した中に、vrchat.com のワールドのアドレス（wrld_…）がありませんでした。</p>
+      {/if}
+    {:else if status === 'saving'}
       <p>保存しています…</p>
     {:else if status === 'saved'}
       <h1>保存しました</h1>
@@ -41,7 +55,7 @@
       <h1>保存できませんでした</h1>
       <p class="error">{error}</p>
     {/if}
-    {#if status !== 'saving'}<div><button onclick={onClose}>Yamaori を開く</button></div>{/if}
+    {#if status !== 'saving' && !(status === 'ready' && found)}<div><button onclick={onClose}>Yamaori を開く</button></div>{/if}
   </div>
 </div>
 

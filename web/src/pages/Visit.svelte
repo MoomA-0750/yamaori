@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { api, type VisitDetail } from '../api'
-  import { accessLabel, between, dateTime, day, leftLabel, localDate, notificationLabel, time, worldName } from '../format'
+  import { accessLabel, between, dateTime, day, leftLabel, localDate, notificationLabel, safeHref, time, worldName } from '../format'
   import { href } from '../router.svelte'
   import { live } from '../live.svelte'
   import Notes from '../components/Notes.svelte'
@@ -86,7 +86,8 @@
         <h2 class="section-title">流れた動画 <span class="faint">{videos.length}</span></h2>
         <ul class="list card">
           {#each videos as e (e.id)}
-            <li><span class="faint nowrap">{time(e.at)}</span> <a class="break link" href={e.data.url} target="_blank" rel="noopener noreferrer">{e.data.url}</a></li>
+            <li><span class="faint nowrap">{time(e.at)}</span>
+              {#if safeHref(e.data.url)}<a class="break link" href={safeHref(e.data.url)} target="_blank" rel="noopener noreferrer">{e.data.url}</a>{:else}<span class="break">{e.data.url}</span>{/if}</li>
           {/each}
         </ul>
       </section>

@@ -15,7 +15,10 @@
     refresh()
   })
 
-  const isWorld = (x) => x && typeof x === 'object' && typeof x.id === 'string' && x.id.startsWith('wrld_')
+  // ページから来たものは信じ切らない（形と数を確かめる）
+  const WORLD_ID = /^wrld_[\w-]{1,64}$/
+  const USER_ID = /^usr_[\w-]{1,64}$/
+  const isWorld = (x) => x && typeof x === 'object' && typeof x.id === 'string' && WORLD_ID.test(x.id)
 
   window.addEventListener('message', (ev) => {
     if (ev.source !== window || ev.data?.source !== 'yamaori-hook') return
@@ -23,11 +26,11 @@
     const path = new URL(url, location.origin).pathname
     const fresh = []
     if (/\/api\/1\/worlds\/wrld_/.test(path) && isWorld(data)) fresh.push(data)
-    else if (/\/api\/1\/worlds$/.test(path) && Array.isArray(data)) fresh.push(...data.filter(isWorld))
+    else if (/\/api\/1\/worlds$/.test(path) && Array.isArray(data)) fresh.push(...data.slice(0, 200).filter(isWorld))
     else if (/\/api\/1\/auth\/user\/friends$/.test(path) && Array.isArray(data)) {
-      for (const u of data) if (u?.id) friendNames.set(u.id, u.displayName)
-    } else if (/\/api\/1\/auth\/user$/.test(path) && data?.id && Array.isArray(data.friends)) {
-      self = { id: data.id, friends: data.friends }
+      for (const u of data.slice(0, 1000)) if (typeof u?.id === 'string' && USER_ID.test(u.id) && friendNames.size < 10000) friendNames.set(u.id, String(u.displayName ?? '').slice(0, 100))
+    } else if (/\/api\/1\/auth\/user$/.test(path) && USER_ID.test(String(data?.id)) && Array.isArray(data.friends)) {
+      self = { id: data.id, friends: data.friends.filter((f) => typeof f === 'string' && USER_ID.test(f)).slice(0, 10000) }
       ready.then(maybeSendFriends)
     }
     if (fresh.length) {

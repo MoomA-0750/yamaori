@@ -26,6 +26,7 @@ public sealed class ExtensionStore(Database db)
 
     public void SaveWorld(string worldId, WorldDetailsInput w)
     {
+        w = Clean(w);
         var categories = WorldClassifier.Classify(w.Description, w.Tags);
         using var cmd = db.Command("""
             INSERT INTO worlds (id, name, author_id, author_name, description, image_url, thumbnail_url, release_status, capacity, tags, platforms,
@@ -41,6 +42,30 @@ public sealed class ExtensionStore(Database db)
             ("$cat", JsonSerializer.Serialize(categories, Json)), ("$now", Database.Time(DateTime.UtcNow)));
         cmd.ExecuteNonQuery();
     }
+
+    /// <summary>
+    /// 外から来た値を整える。画像は VRChat の置き場（https の vrchat.cloud・vrchat.com）のものだけ受け取り
+    /// （ほかのアドレスだと、画面を開いたときにそこへ見に行き、開いた時刻を知らせてしまう）、文字と数の長さを絞る。
+    /// </summary>
+    public static WorldDetailsInput Clean(WorldDetailsInput w) => w with
+    {
+        Name = Cut(w.Name, 200),
+        AuthorId = Cut(w.AuthorId, 100),
+        AuthorName = Cut(w.AuthorName, 200),
+        Description = Cut(w.Description, 4000),
+        ImageUrl = VrchatImage(w.ImageUrl),
+        ThumbnailUrl = VrchatImage(w.ThumbnailUrl),
+        ReleaseStatus = Cut(w.ReleaseStatus, 50),
+        Tags = w.Tags?.Take(100).Select(t => Cut(t, 100)!).ToList(),
+        Platforms = w.Platforms?.Take(20).Select(t => Cut(t, 50)!).ToList(),
+    };
+
+    static string? Cut(string? s, int max) => s == null ? null : s.Length <= max ? s : s[..max];
+
+    public static string? VrchatImage(string? url) =>
+        url is { Length: <= 1000 } && Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps
+        && (u.Host is "vrchat.cloud" or "vrchat.com" || u.Host.EndsWith(".vrchat.cloud", StringComparison.OrdinalIgnoreCase) || u.Host.EndsWith(".vrchat.com", StringComparison.OrdinalIgnoreCase))
+            ? url : null;
 
     /// <summary>詳しい情報のないワールド（行った回数の多い順。まとめて取るときに使う）。</summary>
     public IReadOnlyList<MissingWorld> MissingWorlds(int limit = 20)

@@ -28,6 +28,8 @@ async function saveWorlds(worlds) {
 const waiting = new Map() // tabId → resolve
 const captured = new Map() // tabId → これまでに届いたワールド
 
+chrome.tabs.onRemoved.addListener((tabId) => captured.delete(tabId))
+
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'saveWorlds') {
     saveWorlds(msg.worlds).then((saved) => reply({ ok: true, saved })).catch((e) => reply({ ok: false, error: e.message }))
@@ -38,7 +40,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true
   }
   if (msg.type === 'captured' && sender.tab) {
-    captured.set(sender.tab.id, [...(captured.get(sender.tab.id) ?? []), ...msg.worlds])
+    // タブごとに新しい 50 件まで、覚えるタブも 20 まで（ページから大量に送られても膨らまない）
+    const prev = captured.get(sender.tab.id) ?? []
+    captured.delete(sender.tab.id) // 入れ直して、新しいタブを後ろにする
+    captured.set(sender.tab.id, [...prev, ...msg.worlds].slice(-50))
+    while (captured.size > 20) captured.delete(captured.keys().next().value)
     waiting.get(sender.tab.id)?.(msg.worlds)
     return false
   }
