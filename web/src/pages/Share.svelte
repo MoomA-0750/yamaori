@@ -3,7 +3,7 @@
   import { href } from '../router.svelte'
 
   // スマホの共有から来た（/?title=…&text=…&url=…）。中の wrld_… を保存の一覧に入れる
-  let { params }: { params: URLSearchParams } = $props()
+  let { params, onClose }: { params: URLSearchParams; onClose: () => void } = $props()
   let status = $state<'saving' | 'saved' | 'none' | 'error'>('saving')
   let worldId = $state('')
   let error = $state('')
@@ -31,8 +31,8 @@
       <p class="muted break">{title || worldId}</p>
       <p class="faint">詳しい情報（説明・人数の上限など）は、PC の拡張機能か「まとめて取る」で埋まります。</p>
       <div class="row">
-        <a class="chip accent" href={href.world(worldId)}>このワールドを開く</a>
-        <a class="chip" href={href.worlds() + '?list=*'}>保存したワールド</a>
+        <a class="chip accent" href={href.world(worldId)}>このワールドを開く →</a>
+        <a class="chip accent" href={href.worlds() + '?list=*'}>保存したワールド →</a>
       </div>
     {:else if status === 'none'}
       <h1>ワールドが見つかりません</h1>
@@ -41,6 +41,7 @@
       <h1>保存できませんでした</h1>
       <p class="error">{error}</p>
     {/if}
+    {#if status !== 'saving'}<div><button onclick={onClose}>Yamaori を開く</button></div>{/if}
   </div>
 </div>
 

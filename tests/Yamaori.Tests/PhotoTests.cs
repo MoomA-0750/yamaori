@@ -49,8 +49,14 @@ public sealed class PhotoTests : IDisposable
         Assert.Equal("file_name", m.TakenSource);
         Assert.Equal(new DateTime(2021, 6, 27, 14, 10, 56, 500, DateTimeKind.Utc), m.TakenAt);
         Assert.Null(m.WorldId);
-        var jpg = PhotoMetaReader.Read(new MemoryStream([1, 2, 3]), "VRChat_1920x1080_2021-06-27_23-10-56.jpg", new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), Tokyo);
-        Assert.Equal("file_time", jpg.TakenSource); // 古い形のファイル名は読まず、ファイルの時刻で
+        var old = PhotoMetaReader.Read(new MemoryStream([1, 2, 3]), "VRChat_1920x1080_2021-06-27_23-10-56.123.jpg", new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), Tokyo);
+        Assert.Equal(("file_name", new DateTime(2021, 6, 27, 14, 10, 56, 123, DateTimeKind.Utc), 1920), (old.TakenSource, old.TakenAt, old.Width));
+        var quest = PhotoMetaReader.Read(new MemoryStream([1, 2, 3]), "com.oculus.vrshell-20240904-031319.jpg", DateTime.UtcNow, Tokyo);
+        Assert.Equal(("file_name", new DateTime(2024, 9, 3, 18, 13, 19, DateTimeKind.Utc)), (quest.TakenSource, quest.TakenAt));
+        var vd = PhotoMetaReader.Read(new MemoryStream([1, 2, 3]), "VirtualDesktop.Android-20220101-001344.jpg", DateTime.UtcNow, Tokyo);
+        Assert.Equal(new DateTime(2021, 12, 31, 15, 13, 44, DateTimeKind.Utc), vd.TakenAt);
+        var other = PhotoMetaReader.Read(new MemoryStream([1, 2, 3]), "IMG_0001.jpg", new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), Tokyo);
+        Assert.Equal("file_time", other.TakenSource); // 時刻の読めない名前は、ファイルの時刻で
     }
 
     [Fact]

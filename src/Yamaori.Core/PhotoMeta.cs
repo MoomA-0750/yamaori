@@ -13,7 +13,7 @@ public sealed record PhotoMeta(
 /// VRChat の写真のメタデータを読む。画像そのものは読まない（頭の 1 MB だけ見る）。
 /// <list type="bullet">
 /// <item>XMP（VRChat 2025.3.1 以降）: xmp:CreateDate（時差つき）、vrc:WorldID・vrc:WorldDisplayName・vrc:AuthorID、xmp:Author</item>
-/// <item>なければファイル名（VRChat_2026-11-03_02-14-20.083_7680x4320.png、ローカル時刻）</item>
+/// <item>なければファイル名（VRChat_2026-11-03_02-14-20.083_7680x4320.png、古い VRChat_1920x1080_2021-06-27_23-10-56.123.png、Quest などの …-20240904-031319.jpg。ローカル時刻）</item>
 /// <item>なければファイルの更新時刻</item>
 /// </list>
 /// 大きさは PNG の IHDR、なければファイル名の「_幅x高さ」。
@@ -22,6 +22,12 @@ public static partial class PhotoMetaReader
 {
     [GeneratedRegex(@"VRChat_(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d(?:\.\d{1,3})?)(?:_(\d+)x(\d+))?")]
     private static partial Regex FileNamePattern();
+    // 古い VRChat（VRChat_1920x1080_2021-06-27_23-10-56.123.png）
+    [GeneratedRegex(@"VRChat_(\d+)x(\d+)_(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d(?:\.\d{1,3})?)")]
+    private static partial Regex OldVrchatPattern();
+    // Quest の本体・Virtual Desktop など（com.oculus.vrshell-20240904-031319.jpg、Screenshot_20240904_031319.png）
+    [GeneratedRegex(@"(?<!\d)(20\d{6})[-_](\d{6})(?!\d)")]
+    private static partial Regex CompactPattern();
 
     public static readonly string[] Extensions = [".png", ".jpg", ".jpeg", ".webp"];
 
@@ -47,11 +53,24 @@ public static partial class PhotoMetaReader
                 ? System.Net.WebUtility.HtmlDecode(m.Groups[1].Value.Trim()) : null;
 
         var (w, h) = PngSize(head, n);
+        // ファイル名の時刻（ローカル）と大きさ。新しい VRChat・古い VRChat・Quest などの形を順に見る
+        string? stamp = null, stampFormat = null;
         var fm = FileNamePattern().Match(fileName);
-        if (w == null && fm.Success && fm.Groups[2].Success)
+        var om = OldVrchatPattern().Match(fileName);
+        var cm = CompactPattern().Match(fileName);
+        if (fm.Success)
         {
-            w = int.Parse(fm.Groups[2].Value, CultureInfo.InvariantCulture);
-            h = int.Parse(fm.Groups[3].Value, CultureInfo.InvariantCulture);
+            stamp = fm.Groups[1].Value; stampFormat = "yyyy-MM-dd_HH-mm-ss";
+            if (w == null && fm.Groups[2].Success) { w = int.Parse(fm.Groups[2].Value, CultureInfo.InvariantCulture); h = int.Parse(fm.Groups[3].Value, CultureInfo.InvariantCulture); }
+        }
+        else if (om.Success)
+        {
+            stamp = om.Groups[3].Value; stampFormat = "yyyy-MM-dd_HH-mm-ss";
+            if (w == null) { w = int.Parse(om.Groups[1].Value, CultureInfo.InvariantCulture); h = int.Parse(om.Groups[2].Value, CultureInfo.InvariantCulture); }
+        }
+        else if (cm.Success)
+        {
+            stamp = cm.Groups[1].Value + cm.Groups[2].Value; stampFormat = "yyyyMMddHHmmss";
         }
 
         DateTime taken;
@@ -61,9 +80,9 @@ public static partial class PhotoMetaReader
             taken = dto.UtcDateTime;
             source = "xmp";
         }
-        else if (fm.Success && DateTime.TryParseExact(fm.Groups[1].Value.Split('.')[0], "yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
+        else if (stamp != null && DateTime.TryParseExact(stamp.Split('.')[0], stampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
         {
-            var ms = fm.Groups[1].Value.Contains('.', StringComparison.Ordinal) ? int.Parse(fm.Groups[1].Value.Split('.')[1].PadRight(3, '0'), CultureInfo.InvariantCulture) : 0;
+            var ms = stamp.Contains('.', StringComparison.Ordinal) ? int.Parse(stamp.Split('.')[1].PadRight(3, '0'), CultureInfo.InvariantCulture) : 0;
             taken = Log.LogProjector.ToUtc(local.AddMilliseconds(ms), timeZone);
             source = "file_name";
         }

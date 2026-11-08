@@ -60,7 +60,7 @@
     {#if auth?.allowed}
       <nav class="tabs" aria-label="画面">
         {#each tabs as t (t.key)}
-          <a href={t.href} aria-current={t.pages.includes(router.route.page) ? 'page' : undefined}>{t.label}</a>
+          <a href={t.href} aria-current={!sharing && t.pages.includes(router.route.page) ? 'page' : undefined}>{t.label}</a>
         {/each}
       </nav>
     {/if}
@@ -85,8 +85,7 @@
     <Login {auth} onDone={check} />
   {:else}
     {#if sharing}
-      <Share params={shared} />
-      <p class="center"><button class="ghost" onclick={() => (sharing = false)}>Yamaori を開く</button></p>
+      <Share params={shared} onClose={() => (sharing = false)} />
     {:else}
     {#key router.route}
       {#if router.route.page === 'days'}<Days />
