@@ -1,0 +1,54 @@
+2026.11.08 02:36:44 Debug      -  Using server environment: Release, bf0942f7
+
+2026.11.08 02:36:44 Debug      -  VRCFlowCommandLine resolved --profile=0
+
+2026.11.08 02:36:47 Debug      -  <b>[SteamVR]</b> Initialized. Connected to oculus(oculus_virtualdesktop) : Meta Quest 3 : SERIAL0000 :: rift
+    Connected controller: (OpenVR Controller(Meta Quest 3 (Left Controller)) - Left)
+
+2026.11.08 02:36:49 Debug      -  [Authentication - ÎÎÍÏÎÏÌÎÏÎÍÌÌÏÌÌÍÎÌÏÏÏÎ] Preforming post login checks for 自分。 (usr_00000000-0000-0000-0000-000000000001)
+
+2026.11.08 02:36:51 Debug      -  Received Notification: <Notification from username:, sender user id: to usr_00000000-0000-0000-0000-000000000001 of type: group, id: not_00000000-0000-0000-0000-0000000000a1, created at: 11/07/2026 14:11:03 UTC, details: {{}}, type:group, m seen:False, message: "お知らせの一行目
+二行目">
+
+2026.11.08 02:36:52 Debug      -  [Behaviour] Destination fetching: wrld_00000000-0000-0000-0000-00000000000a:87271~private(usr_00000000-0000-0000-0000-000000000001)~region(jp)
+
+2026.11.08 02:36:53 Debug      -  [Behaviour] Entering Room: Cushion Room
+
+2026.11.08 02:36:53 Debug      -  [Behaviour] Joining wrld_00000000-0000-0000-0000-00000000000a:87271~private(usr_00000000-0000-0000-0000-000000000001)~region(jp)
+
+2026.11.08 02:36:53 Debug      -  [Behaviour] Joining or Creating Room: Cushion Room
+
+2026.11.08 02:37:03 Debug      -  [Behaviour] Switching 自分。 to avatar Salt
+
+2026.11.08 02:37:03 Debug      -  [Behaviour] Switching Alice to avatar Fox
+
+2026.11.08 02:37:04 Debug      -  [Video Playback] Attempting to resolve URL 'https://youtu.be/example'
+
+2026.11.08 02:37:05 Debug      -  [Behaviour] OnPlayerJoined 自分。 (usr_00000000-0000-0000-0000-000000000001)
+
+2026.11.08 02:37:05 Debug      -  [Behaviour] OnPlayerJoined Alice (usr_00000000-0000-0000-0000-000000000002)
+
+2026.11.08 02:38:00 Debug      -  [Behaviour] OnPlayerLeft Alice (usr_00000000-0000-0000-0000-000000000002)
+
+2026.11.08 02:39:00 Debug      -  [Behaviour] OnPlayerJoined Alice (usr_00000000-0000-0000-0000-000000000002)
+
+2026.11.08 02:40:00 Debug      -  Received Notification: <Notification from username:Bob 7ad1, sender user id:usr_00000000-0000-0000-0000-000000000003 to usr_00000000-0000-0000-0000-000000000001 of type: friendRequest, id: frq_00000000-0000-0000-0000-0000000000b1, created at: 11/07/2026 17:39:58 UTC, details: {{}}, type:friendRequest, m seen:False, message: "">
+
+2026.11.08 02:40:47 Debug      -  [Behaviour] Destination fetching: wrld_00000000-0000-0000-0000-00000000000b:53261~group(grp_00000000-0000-0000-0000-000000000001)~groupAccessType(public)~region(us)
+
+2026.11.08 02:40:48 Debug      -  [Behaviour] OnLeftRoom
+
+2026.11.08 02:40:48 Debug      -  [Behaviour] OnPlayerLeft 自分。 (usr_00000000-0000-0000-0000-000000000001)
+
+2026.11.08 02:40:53 Debug      -  [Behaviour] Joining wrld_00000000-0000-0000-0000-00000000000b:53261~group(grp_00000000-0000-0000-0000-000000000001)~groupAccessType(public)~region(us)
+
+2026.11.08 02:40:53 Debug      -  [Behaviour] Entering Room: Evermore - 彼方
+
+2026.11.08 02:41:46 Debug      -  [Behaviour] OnPlayerJoined Carol (usr_00000000-0000-0000-0000-000000000004)
+
+2026.11.08 02:41:50 Debug      -  [VRC Camera] Took screenshot to: C:\Users\me\Pictures\VRChat\2026-11\VRChat_2026-11-08_02-41-50.123_1920x1080.png
+
+2026.11.08 02:42:00 Debug      -  Received Notification: <Notification from username:Bob 7ad1, sender user id:usr_00000000-0000-0000-0000-000000000003 to  of type: friendRequest, id: frq_00000000-0000-0000-0000-0000000000b1, created at: 11/07/2026 17:39:58 UTC, details: {{}}, type:friendRequest, m seen:False, message: "">
+
+2026.11.08 02:45:15 Debug      -  [Behaviour] Destroying Carol
+

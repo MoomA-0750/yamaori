@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Yamaori.Core/Yamaori.Core.csproj" />
+    <Project Path="src/Yamaori.Store/Yamaori.Store.csproj" />
+    <Project Path="src/Yamaori/Yamaori.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Yamaori.Tests/Yamaori.Tests.csproj" />
+  </Folder>
+</Solution>
