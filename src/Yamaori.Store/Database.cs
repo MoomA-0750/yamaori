@@ -276,6 +276,17 @@ public sealed class Database : IDisposable
             count INTEGER NOT NULL
         );
         """,
+        // 8 版目: 写真を送った記録（送り先ごと）。手元を消してよいかは、ここに同じ大きさで届いた記録があるかで決める
+        """
+        CREATE TABLE photo_uploads (
+            photo_id TEXT NOT NULL,
+            target TEXT NOT NULL,            -- 送り先（種類とアドレス）
+            remote_path TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            uploaded_at TEXT NOT NULL,
+            PRIMARY KEY (photo_id, target)
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

@@ -223,6 +223,74 @@ public static class Auth
 
     public sealed record SettingsResult(SettingsView Settings, bool RestartRequired);
 
+    public sealed record PhotoSettingsView(IReadOnlyList<string> PhotoDirs, IReadOnlyList<string> EffectivePhotoDirs, string Kind, string Target,
+        string? Username, bool PasswordSet, string Retention, int RetentionDays, double IntervalMinutes);
+    public sealed record PhotoSettingsInput(IReadOnlyList<string>? PhotoDirs, string? Kind, string? Target, string? Username, string? Password,
+        string? Retention, int? RetentionDays, double? IntervalMinutes);
+    public sealed record ConnectionTest(bool Ok, string Message);
+
+    static PhotoSettingsView PhotoView(YamaoriOptions o) => new(o.PhotoDirs, o.EffectivePhotoDirs, o.PhotoUpload.Kind, o.PhotoUpload.Target,
+        o.PhotoUpload.Username, !string.IsNullOrEmpty(o.PhotoUpload.Password), o.PhotoUpload.Retention, o.PhotoUpload.RetentionDays, o.PhotoUpload.IntervalMinutes);
+
+    /// <summary>写真の設定（見張るフォルダ・送り先・手元の残し方）。yamaori.json に書き、起こし直すと効く。</summary>
+    public static void MapPhotoSettings(WebApplication app)
+    {
+        var g = app.MapGroup("/api/settings/photos");
+        g.MapGet("/", (IOptions<YamaoriOptions> o) => PhotoView(o.Value)).WithSummary("写真の設定");
+
+        g.MapPut("/", Results<Ok<PhotoSettingsView>, BadRequest<string>> (IOptions<YamaoriOptions> o, PhotoSettingsInput input) =>
+        {
+            if (input.Kind is { } k && k is not ("none" or "folder" or "webdav" or "sftp")) return TypedResults.BadRequest("kind は none・folder・webdav・sftp");
+            if (input.Retention is { } r && r is not ("keep" or "days" or "after_upload")) return TypedResults.BadRequest("retention は keep・days・after_upload");
+            var path = Path.Combine(o.Value.DataDir, "yamaori.json");
+            JsonObject json;
+            try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
+            catch (JsonException) { json = []; }
+            if (input.PhotoDirs != null) json["PhotoDirs"] = new JsonArray(input.PhotoDirs.Where(d => d.Trim().Length > 0).Select(d => (JsonNode)d.Trim()).ToArray());
+            var up = json["PhotoUpload"] as JsonObject ?? [];
+            if (input.Kind != null) up["Kind"] = input.Kind;
+            if (input.Target != null) up["Target"] = input.Target.Trim();
+            if (input.Username != null) up["Username"] = input.Username;
+            if (input.Password is { Length: > 0 } pw) up["Password"] = Photos.Secrets.Protect(pw);
+            if (input.Retention != null) up["Retention"] = input.Retention;
+            if (input.RetentionDays is { } d) up["RetentionDays"] = Math.Max(1, d);
+            if (input.IntervalMinutes is { } m) up["IntervalMinutes"] = Math.Max(1, m);
+            json["PhotoUpload"] = up;
+            Directory.CreateDirectory(o.Value.DataDir);
+            File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            // 書いた内容を読み直して返す（効くのは起こし直したあと）
+            var next = new YamaoriOptions();
+            new ConfigurationBuilder().AddJsonFile(path, optional: true).Build().Bind(next);
+            next.DataDir = o.Value.DataDir;
+            next.LogDir = o.Value.LogDir;
+            return TypedResults.Ok(PhotoView(next));
+        }).WithSummary("写真の設定を変える（起こし直すと効く。パスワードは暗号化して置く）");
+
+        g.MapPost("/test", async (IOptions<YamaoriOptions> o, PhotoSettingsInput input, CancellationToken cancel) =>
+        {
+            var opt = new PhotoUploadOptions
+            {
+                Kind = input.Kind ?? o.Value.PhotoUpload.Kind,
+                Target = input.Target ?? o.Value.PhotoUpload.Target,
+                Username = input.Username ?? o.Value.PhotoUpload.Username,
+                Password = input.Password is { Length: > 0 } pw ? Photos.Secrets.Protect(pw) : o.Value.PhotoUpload.Password,
+            };
+            using var target = Photos.PhotoSync.Create(opt);
+            if (target == null) return new ConnectionTest(false, "送り先が決まっていない");
+            try
+            {
+                // ないはずのファイルの大きさを訊く（つながって、答えが返るか）
+                await target.SizeAsync("yamaori-connection-test/none.png", cancel).ConfigureAwait(false);
+                if (opt.Kind == "folder" && !Directory.Exists(opt.Target)) return new ConnectionTest(false, $"フォルダが見つからない: {opt.Target}");
+                return new ConnectionTest(true, "つながった");
+            }
+            catch (Exception ex)
+            {
+                return new ConnectionTest(false, ex.Message);
+            }
+        }).WithSummary("写真の送り先に試しにつなぐ");
+    }
+
     static SettingsView View(AuthStore store, YamaoriOptions o) =>
         new(o.Listen, o.Port, store.GetList("tailscale_logins"), store.GetBool("local_requires_login"), store.GetBool("allow_unauthenticated_remote"), store.PasswordSet, o.DeviceName);
 

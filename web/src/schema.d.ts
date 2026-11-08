@@ -374,6 +374,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 写真の設定 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoSettingsView"];
+                    };
+                };
+            };
+        };
+        /** 写真の設定を変える（起こし直すと効く。パスワードは暗号化して置く） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PhotoSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoSettingsView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/photos/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 写真の送り先に試しにつなぐ */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PhotoSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConnectionTest"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -1452,6 +1561,10 @@ export interface components {
             tailscaleLogin: null | string;
             listen: string;
         };
+        ConnectionTest: {
+            ok: boolean;
+            message: string;
+        };
         DaySummary: {
             date: string;
             /** Format: int32 */
@@ -1606,6 +1719,31 @@ export interface components {
             visitCount: number;
             /** Format: int32 */
             noteCount: number;
+        };
+        PhotoSettingsInput: {
+            photoDirs: null | string[];
+            kind: null | string;
+            target: null | string;
+            username: null | string;
+            password: null | string;
+            retention: null | string;
+            /** Format: int32 */
+            retentionDays: null | number;
+            /** Format: double */
+            intervalMinutes: null | number;
+        };
+        PhotoSettingsView: {
+            photoDirs: string[];
+            effectivePhotoDirs: string[];
+            kind: string;
+            target: string;
+            username: null | string;
+            passwordSet: boolean;
+            retention: string;
+            /** Format: int32 */
+            retentionDays: number;
+            /** Format: double */
+            intervalMinutes: number;
         };
         PhotoView: {
             id: string;

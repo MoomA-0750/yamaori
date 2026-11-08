@@ -18,6 +18,7 @@ export type AuthState = S['AuthState']
 export type SettingsView = S['SettingsView']
 export type ApiToken = S['ApiToken']
 export type PhotoView = S['PhotoView']
+export type PhotoSettingsView = S['PhotoSettingsView']
 export type Page<T> = { items: T[]; total: number }
 export type TargetType = 'visit' | 'world' | 'person' | 'day'
 
@@ -88,5 +89,8 @@ export const api = {
   deleteToken: (id: string) => call<void>('DELETE', `/api/auth/tokens/${id}`),
   settings: () => call<SettingsView>('GET', '/api/settings/'),
   saveSettings: (s: Partial<S['SettingsInput']>) => call<S['SettingsResult']>('PUT', '/api/settings/', s),
+  photoSettings: () => call<PhotoSettingsView>('GET', '/api/settings/photos/'),
+  savePhotoSettings: (s: Partial<S['PhotoSettingsInput']>) => call<PhotoSettingsView>('PUT', '/api/settings/photos/', s),
+  testPhotoTarget: (s: Partial<S['PhotoSettingsInput']>) => call<S['ConnectionTest']>('POST', '/api/settings/photos/test', s),
   restart: () => call<void>('POST', '/api/settings/restart'),
 }

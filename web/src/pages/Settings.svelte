@@ -90,6 +90,39 @@
     tokens = await api.tokens()
   }
 
+  // 写真
+  let photo = $state<import('../api').PhotoSettingsView | null>(null)
+  let photoDirs = $state('')
+  let kind = $state('none')
+  let target = $state('')
+  let username = $state('')
+  let password = $state('')
+  let retention = $state('keep')
+  let retentionDays = $state(30)
+  let photoMsg = $state('')
+  let testMsg = $state('')
+  let confirmDelete = $state(false)
+  api.photoSettings().then((p) => {
+    photo = p
+    photoDirs = p.photoDirs.join('\n'); kind = p.kind; target = p.target; username = p.username ?? ''
+    retention = p.retention; retentionDays = p.retentionDays
+  }).catch(() => {})
+  const photoInput = () => ({ photoDirs: photoDirs.split('\n').map((x) => x.trim()).filter(Boolean), kind, target, username: username || null, password: password || null, retention, retentionDays })
+  async function savePhoto() {
+    photoMsg = ''
+    if (retention !== 'keep' && kind !== 'none' && !confirmDelete) { photoMsg = '手元の写真を消す設定にするには、下の確かめに印を付けてください'; return }
+    try {
+      photo = await api.savePhotoSettings(photoInput())
+      password = ''
+      photoMsg = '保存しました。起こし直すと効きます。'
+      restartNeeded = true
+    } catch (e) { photoMsg = (e as Error).message }
+  }
+  async function testTarget() {
+    testMsg = 'つないでいます…'
+    try { const r = await api.testPhotoTarget(photoInput()); testMsg = r.ok ? 'つながりました' : `つながりません: ${r.message}` } catch (e) { testMsg = (e as Error).message }
+  }
+
   async function logout() {
     await api.logout()
     onLogout()
@@ -145,6 +178,43 @@
       </div>
       {#if savedMsg}<p class="ok">{savedMsg}</p>{/if}
     </section>
+
+    {#if photo}
+      <section class="card pad stack">
+        <h2>写真</h2>
+        <label class="stack field">見張るフォルダ（1 行に 1 つ。空なら VRChat の写真のフォルダ）
+          <textarea rows="2" bind:value={photoDirs} placeholder={photo.effectivePhotoDirs.join('\n')}></textarea></label>
+        <label class="stack field">送り先
+          <select bind:value={kind}>
+            <option value="none">送らない</option>
+            <option value="folder">フォルダ（NAS の共有 \\NAS\… や、割り当てたドライブ）</option>
+            <option value="webdav">WebDAV（https://…）</option>
+            <option value="sftp">SFTP（sftp://ホスト/フォルダ）</option>
+          </select></label>
+        {#if kind !== 'none'}
+          <label class="stack field">送り先のアドレス<input type="text" bind:value={target} placeholder={kind === 'folder' ? '\\\\NAS\\photo\\VRChat' : kind === 'webdav' ? 'https://nas.local:5006/photo/VRChat' : 'sftp://nas.local/volume1/photo/VRChat'} /></label>
+          {#if kind !== 'folder'}
+            <div class="grid2">
+              <label class="stack field">ユーザー名<input type="text" bind:value={username} autocomplete="off" /></label>
+              <label class="stack field">パスワード{photo.passwordSet ? '（決めてあります。変えるときだけ入れる）' : ''}<input type="password" bind:value={password} autocomplete="new-password" /></label>
+            </div>
+          {/if}
+          <div class="row"><button onclick={testTarget}>試しにつなぐ</button><span class="faint">{testMsg}</span></div>
+          <fieldset class="stack choices">
+            <legend class="faint">送ったあと、この PC の写真を</legend>
+            <label class="choice"><input type="radio" bind:group={retention} value="keep" /><span>全部残す（既定）</span></label>
+            <label class="choice"><input type="radio" bind:group={retention} value="days" /><span class="inline">撮ってから <input class="days" type="number" min="1" bind:value={retentionDays} /> 日たったら消す</span></label>
+            <label class="choice"><input type="radio" bind:group={retention} value="after_upload" /><span>送ったら消す</span></label>
+          </fieldset>
+          {#if retention !== 'keep'}
+            <label class="check"><input type="checkbox" bind:checked={confirmDelete} /> 送り先に同じ大きさで届いたと確かめた写真だけを、この PC から消すことを分かった上で決める</label>
+          {/if}
+          <p class="faint">送り先には「年-月/ファイル名」で置きます。10 分ごとに送ります。消す前に縮小を作るので、消したあとも Yamaori で見られます。</p>
+        {/if}
+        <div class="row"><button class="primary" onclick={savePhoto}>保存</button>{#if restartNeeded}<button onclick={restart} disabled={restarting}>{restarting ? '起こし直しています…' : 'Yamaori を起こし直す'}</button>{/if}</div>
+        {#if photoMsg}<p class="muted">{photoMsg}</p>{/if}
+      </section>
+    {/if}
 
     <section class="card pad stack">
       <h2>パスワード</h2>
@@ -223,6 +293,8 @@
   .danger-zone p { margin: .5rem 0; }
   .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
   .grow { flex: 1; min-width: 10rem; width: auto; }
+  .choice > span.inline { display: inline; }
+  .days { width: 4.5rem; display: inline-block; min-height: 2rem; padding: .2rem .4rem; }
   .secret { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .7rem .9rem; }
   .secret p { margin: 0 0 .3rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

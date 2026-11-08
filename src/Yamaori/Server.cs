@@ -63,6 +63,7 @@ public static class Server
         });
         app.MapOpenApi();
         Auth.Map(app);
+        Auth.MapPhotoSettings(app);
         Api.Map(app);
         app.MapMcp("/mcp");
         return app;

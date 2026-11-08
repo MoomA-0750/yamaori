@@ -257,6 +257,94 @@
         }
       }
     },
+    "/api/settings/photos": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の設定",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の設定を変える（起こし直すと効く。パスワードは暗号化して置く）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/photos/test": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の送り先に試しにつなぐ",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/status": {
       "get": {
         "tags": [
@@ -1368,6 +1456,21 @@
           }
         }
       },
+      "ConnectionTest": {
+        "required": [
+          "ok",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "DaySummary": {
         "required": [
           "date",
@@ -1964,6 +2067,128 @@
           "noteCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "PhotoSettingsInput": {
+        "required": [
+          "photoDirs",
+          "kind",
+          "target",
+          "username",
+          "password",
+          "retention",
+          "retentionDays",
+          "intervalMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "photoDirs": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "target": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "retention": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "retentionDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "intervalMinutes": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "PhotoSettingsView": {
+        "required": [
+          "photoDirs",
+          "effectivePhotoDirs",
+          "kind",
+          "target",
+          "username",
+          "passwordSet",
+          "retention",
+          "retentionDays",
+          "intervalMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "photoDirs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "effectivePhotoDirs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kind": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "passwordSet": {
+            "type": "boolean"
+          },
+          "retention": {
+            "type": "string"
+          },
+          "retentionDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "intervalMinutes": {
+            "type": "number",
+            "format": "double"
           }
         }
       },

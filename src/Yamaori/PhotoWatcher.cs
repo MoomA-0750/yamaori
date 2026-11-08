@@ -8,7 +8,7 @@ namespace Yamaori;
 /// 写真のフォルダを見張って目録に入れる。決まった間隔で全部を読み直し（変わっていないものは中を読まない）、
 /// この PC のフォルダは新しいファイルができたら少し待ってすぐ入れる（VRChat が書き終えるのを待つ）。
 /// </summary>
-public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState state, LiveHub hub, ILogger<PhotoWatcher> logger) : BackgroundService
+public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState state, LiveHub hub, Thumbnails thumbs, ILogger<PhotoWatcher> logger) : BackgroundService
 {
     readonly SemaphoreSlim _wake = new(0);
 
@@ -34,9 +34,15 @@ public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState 
         }
         try
         {
+            var lastUpload = DateTime.MinValue;
             while (!stoppingToken.IsCancellationRequested)
             {
                 ScanAll(o, dirs, stoppingToken);
+                if (o.PhotoUpload.Kind != "none" && DateTime.UtcNow - lastUpload >= TimeSpan.FromMinutes(o.PhotoUpload.IntervalMinutes))
+                {
+                    lastUpload = DateTime.UtcNow;
+                    await UploadAsync(o, dirs, stoppingToken).ConfigureAwait(false);
+                }
                 var woke = await _wake.WaitAsync(TimeSpan.FromMinutes(o.PhotoScanMinutes), stoppingToken).ConfigureAwait(false);
                 if (woke)
                 {
@@ -50,6 +56,24 @@ public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState 
         finally
         {
             foreach (var w in watchers) w.Dispose();
+        }
+    }
+
+    async Task UploadAsync(YamaoriOptions o, IReadOnlyList<string> dirs, CancellationToken cancel)
+    {
+        using var target = Photos.PhotoSync.Create(o.PhotoUpload);
+        if (target == null) return;
+        using var db = Database.Open(o.DatabasePath);
+        var sync = new Photos.PhotoSync(new PhotoCatalog(db, state.DeviceId), target, dirs, thumbs);
+        try
+        {
+            var r = await sync.RunAsync(o.PhotoUpload.Retention, o.PhotoUpload.RetentionDays, cancel, m => logger.LogWarning("{Message}", m)).ConfigureAwait(false);
+            if (r.Uploaded + r.AlreadyThere + r.Failed + r.Removed > 0)
+                logger.LogInformation("写真を送った {Uploaded}・もうあった {Already}・送れなかった {Failed}・手元から消した {Removed}", r.Uploaded, r.AlreadyThere, r.Failed, r.Removed);
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException or Renci.SshNet.Common.SshException or System.Net.Sockets.SocketException)
+        {
+            logger.LogWarning("写真の送り先 {Target} につながらなかった: {Message}", target.Key, ex.Message);
         }
     }
 

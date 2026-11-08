@@ -148,4 +148,67 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
     }
 
     static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+
+    // ---- 送る
+
+    public sealed record LocalPhoto(string PhotoId, string Path, string FileName, long Size, DateTime TakenAt);
+
+    static string RootsIn(IReadOnlyList<string> roots, List<(string, object?)> args)
+    {
+        for (var i = 0; i < roots.Count; i++) args.Add(($"$r{i}", Path.GetFullPath(roots[i])));
+        return string.Join(", ", roots.Select((_, i) => $"$r{i}"));
+    }
+
+    /// <summary>手元のフォルダにあって、まだその送り先へ送っていない写真（古い順）。</summary>
+    public IReadOnlyList<LocalPhoto> PendingUploads(IReadOnlyList<string> localRoots, string target, int limit = 200)
+    {
+        var args = new List<(string, object?)> { ("$t", target), ("$limit", limit) };
+        var inRoots = RootsIn(localRoots, args);
+        return ReadLocal($"""
+            SELECT p.id, l.path, p.file_name, p.size, p.taken_at FROM photos p JOIN photo_locations l ON l.photo_id = p.id
+            WHERE l.root IN ({inRoots}) AND NOT EXISTS (SELECT 1 FROM photo_uploads u WHERE u.photo_id = p.id AND u.target = $t)
+            GROUP BY p.id ORDER BY p.taken_at LIMIT $limit
+            """, args);
+    }
+
+    public void RecordUpload(string photoId, string target, string remotePath, long size)
+    {
+        using var cmd = db.Command("""
+            INSERT INTO photo_uploads (photo_id, target, remote_path, size, uploaded_at) VALUES ($p, $t, $r, $s, $now)
+            ON CONFLICT (photo_id, target) DO UPDATE SET remote_path = $r, size = $s, uploaded_at = $now
+            """, null, ("$p", photoId), ("$t", target), ("$r", remotePath), ("$s", size), ("$now", Database.Time(DateTime.UtcNow)));
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// 手元から消してよい写真: その送り先へ同じ大きさで送った記録があり、手元のフォルダにあるもの。
+    /// takenBefore を渡すと、それより前に撮ったものだけ（N 日残す）。
+    /// </summary>
+    public IReadOnlyList<LocalPhoto> RemovableLocal(IReadOnlyList<string> localRoots, string target, DateTime? takenBefore)
+    {
+        var args = new List<(string, object?)> { ("$t", target), ("$before", takenBefore is { } b ? Database.Time(b) : "9999") };
+        var inRoots = RootsIn(localRoots, args);
+        return ReadLocal($"""
+            SELECT p.id, l.path, p.file_name, p.size, p.taken_at FROM photos p
+            JOIN photo_locations l ON l.photo_id = p.id
+            JOIN photo_uploads u ON u.photo_id = p.id AND u.target = $t AND u.size = p.size
+            WHERE l.root IN ({inRoots}) AND p.taken_at < $before
+            ORDER BY p.taken_at
+            """, args);
+    }
+
+    public void RemoveLocation(string path)
+    {
+        using var cmd = db.Command("DELETE FROM photo_locations WHERE path = $p", null, ("$p", path));
+        cmd.ExecuteNonQuery();
+    }
+
+    List<LocalPhoto> ReadLocal(string sql, List<(string, object?)> args)
+    {
+        using var cmd = db.Command(sql, null, [.. args]);
+        using var r = cmd.ExecuteReader();
+        var list = new List<LocalPhoto>();
+        while (r.Read()) list.Add(new LocalPhoto(r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt64(3), Database.ParseTime(r.GetString(4))));
+        return list;
+    }
 }

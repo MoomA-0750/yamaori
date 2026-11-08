@@ -40,6 +40,9 @@ public sealed class YamaoriOptions
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "VRChat");
     }
 
+    /// <summary>写真を NAS などへ送る設定。</summary>
+    public PhotoUploadOptions PhotoUpload { get; set; } = new();
+
     /// <summary>WebUI と API の番号。</summary>
     public int Port { get; set; } = 47800;
 
@@ -57,4 +60,27 @@ public sealed class YamaoriOptions
     public string ArchivePath => string.IsNullOrEmpty(ArchiveDir) ? Path.Combine(DataDir, "logs") : ArchiveDir;
 
     public string DatabasePath => string.IsNullOrEmpty(Database) ? Path.Combine(DataDir, "yamaori.sqlite3") : Database;
+}
+
+/// <summary>写真を送る設定。</summary>
+public sealed class PhotoUploadOptions
+{
+    /// <summary>none（送らない。既定）・folder（SMB の共有・割り当てたドライブ）・webdav・sftp。</summary>
+    public string Kind { get; set; } = "none";
+
+    /// <summary>送り先（フォルダの道、https://… の WebDAV、sftp://host/path）。</summary>
+    public string Target { get; set; } = "";
+
+    public string? Username { get; set; }
+
+    /// <summary>暗号化したパスワード（Secrets.Protect の形）。</summary>
+    public string? Password { get; set; }
+
+    /// <summary>送ったあと手元を: keep（全部残す。既定）・days（RetentionDays 日たったら消す）・after_upload（送ったら消す）。</summary>
+    public string Retention { get; set; } = "keep";
+
+    public int RetentionDays { get; set; } = 30;
+
+    /// <summary>送る間隔（分）。</summary>
+    public double IntervalMinutes { get; set; } = 10;
 }
