@@ -58,6 +58,16 @@ switch (command)
         Summary.Print(db);
         return 0;
     }
+    case "backup":
+    {
+        // yamaori backup [--out <ファイル>]  記録の DB の写しを作る（動いている間でもよい）。既定はデータのフォルダの backups
+        var outFile = new ConfigurationBuilder().AddCommandLine(rest).Build()["out"]
+            ?? Path.Combine(options.DataDir, "backups", $"yamaori-{DateTime.Now:yyyyMMdd-HHmmss}.sqlite3");
+        using var db = Database.Open(options.DatabasePath);
+        db.Backup(outFile);
+        Console.WriteLine($"写しを作った: {outFile}（戻すときは Yamaori を止めて、yamaori.sqlite3 をこれに置き換える）");
+        return 0;
+    }
     case "summary":
     {
         using var db = Database.Open(options.DatabasePath);

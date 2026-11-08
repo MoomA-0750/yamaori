@@ -83,6 +83,33 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 表の版を上げる前に写しを取り_新しい版の_DB_は開かない()
+    {
+        var path = Path.Combine(_dir, "m.sqlite3");
+        using (var db = Database.Open(path))
+        using (var cmd = db.Command($"ALTER TABLE api_tokens DROP COLUMN scope; ALTER TABLE api_tokens DROP COLUMN device_id; PRAGMA user_version = {Database.SchemaVersion - 1};"))
+            cmd.ExecuteNonQuery();
+        using (Database.Open(path)) { }
+        Assert.True(File.Exists(path + $".bak-v{Database.SchemaVersion - 1}"));
+
+        using (var db = Database.Open(path))
+        using (var cmd = db.Command("PRAGMA user_version = 999")) cmd.ExecuteNonQuery();
+        Assert.Throws<InvalidOperationException>(() => Database.Open(path));
+    }
+
+    [Fact]
+    public void 動いている間でも_DB_の写しを作れる()
+    {
+        File.WriteAllBytes(LogPath, Fixture());
+        using var db = Database.Open(Path.Combine(_dir, "b.sqlite3"));
+        new LogIngestor(db, "d_test").Ingest(LogPath, closed: true, Tokyo);
+        var copy = Path.Combine(_dir, "backups", "copy.sqlite3");
+        db.Backup(copy);
+        using var c = Database.Open(copy);
+        Assert.Equal(Visits(db), Visits(c));
+    }
+
+    [Fact]
     public void 読んだときのタイムゾーンが見つからなければ_組み立て直さずに止める()
     {
         File.WriteAllBytes(LogPath, Fixture());

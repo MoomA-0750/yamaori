@@ -23,13 +23,24 @@ public sealed class Database : IDisposable
         // メモは Yamaori にしかないので、電源が落ちても書き終えた分は残す（synchronous=FULL）
         Exec(c, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=OFF; PRAGMA busy_timeout=5000;");
         var db = new Database(c);
-        db.Migrate();
+        try { db.Migrate(path); }
+        catch { db.Dispose(); throw; }
         return db;
     }
 
-    void Migrate()
+    /// <summary>この版の Yamaori が知っている表の版。</summary>
+    public static int SchemaVersion => Migrations.Length;
+
+    void Migrate(string path)
     {
         var version = Convert.ToInt32(Scalar("PRAGMA user_version"), CultureInfo.InvariantCulture);
+        // 新しい版の Yamaori で作り替えた DB を、古い版で開かない（知らない表の形のまま書き込むと壊れる）
+        if (version > Migrations.Length)
+            throw new InvalidOperationException(
+                $"DB（{path}）は新しい版の Yamaori で作り替えてある（表の版 {version}、この Yamaori は {Migrations.Length} まで）。新しい版を入れ直すか、更新の前に取った写し（{Path.GetFileName(path)}.bak-v{Migrations.Length}）に戻す");
+        // 表の版を上げる前に写しを取る（更新して困ったら、前の版の Yamaori とこの写しに戻せる）
+        if (version > 0 && version < Migrations.Length && path != ":memory:")
+            Backup(path + $".bak-v{version}");
         for (var v = version; v < Migrations.Length; v++)
         {
             using var tx = Connection.BeginTransaction();
@@ -37,6 +48,18 @@ public sealed class Database : IDisposable
             Exec(Connection, $"PRAGMA user_version={v + 1}", tx);
             tx.Commit();
         }
+    }
+
+    /// <summary>今の DB の写しを作る（動いている間でもよい。WAL の分も含めて 1 つのファイルにする）。</summary>
+    public void Backup(string target)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(target));
+        if (dir != null) Directory.CreateDirectory(dir);
+        if (File.Exists(target)) File.Delete(target);
+        using var cmd = Connection.CreateCommand();
+        cmd.CommandText = "VACUUM INTO $t";
+        cmd.Parameters.AddWithValue("$t", target);
+        cmd.ExecuteNonQuery();
     }
 
     /// <summary>表の版ごとの SQL。足すときは末尾に足し、前のものは変えない（公開前の 2026-11-08 に、端末を入れるため 1 版目だけ書き換えた）。</summary>
