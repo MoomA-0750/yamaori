@@ -92,7 +92,9 @@ switch (command)
         var file = cl["file"];
         if (file == null || !File.Exists(file)) { Console.Error.WriteLine("--file に VRChatActivityLog.db を渡す"); return 2; }
         using var db = Database.Open(options.DatabasePath);
-        var r = new VatImport(db, db.SelfDevice(options.DeviceName)).Import(file, cl["account"]);
+        VatImport.Result r;
+        try { r = new VatImport(db, db.SelfDevice(options.DeviceName)).Import(file, cl["account"], replace: cl["replace"] != null || rest.Contains("--replace")); }
+        catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 3; }
         Console.WriteLine($"訪問 {r.Visits}・会った人 {r.Encounters}（うち ID が分かった {r.Resolved}）・出来事 {r.Events}・ログと重なって飛ばした行 {r.Skipped}");
         Console.WriteLine($"本人とみなして会った人から外した名前: {string.Join("、", r.SelfNames)}");
         return 0;
@@ -104,7 +106,9 @@ switch (command)
         var file = cl["file"] ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCX", "VRCX.sqlite3");
         if (!File.Exists(file)) { Console.Error.WriteLine($"VRCX の DB が見つからない: {file}（--file で渡す）"); return 2; }
         using var db = Database.Open(options.DatabasePath);
-        var r = new VrcxImport(db, db.SelfDevice(options.DeviceName)).Import(file);
+        VrcxImport.Result r;
+        try { r = new VrcxImport(db, db.SelfDevice(options.DeviceName)).Import(file, replace: rest.Contains("--replace")); }
+        catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 3; }
         Console.WriteLine($"訪問 {r.Visits}・会った人 {r.Encounters}・出来事 {r.Events}（うちフレンドの記録 {r.FriendEvents}）・ワールドの情報 {r.Worlds}・お気に入り {r.Favorites}・メモ {r.Notes}・ログと重なって飛ばした訪問 {r.Skipped}");
         Console.WriteLine($"アカウント: {string.Join("、", r.Accounts)}");
         return 0;

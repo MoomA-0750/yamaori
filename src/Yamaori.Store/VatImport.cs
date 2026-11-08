@@ -25,11 +25,16 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
     sealed record Row(long Id, int Type, DateTime At, string? NotificationId, string? UserId, string? UserName, string? WorldId, string? WorldName, string? Message, string? Url);
 
     /// <param name="accountId">どのアカウントの記録か（VAT は持たない）。null なら、DB のアカウントが 1 つだけのときそれを使う。</param>
-    public Result Import(string vatPath, string? accountId = null)
+    /// <param name="replace">前に取り込んだものと別の DB でも、入れ替えて取り込む。</param>
+    public Result Import(string vatPath, string? accountId = null, bool replace = false)
     {
         var rows = Read(vatPath);
-        accountId ??= SingleAccount();
+        // DB の見分け: いちばん古い行（VAT は書き足していくので、続きの DB でも同じ）
+        var origin = rows.Count == 0 ? "empty" : rows.MinBy(r => r.Id) is { } first ? $"{first.Id}@{Database.Time(first.At)}" : "empty";
+        ImportGuard.CheckOrigin(db, Source, origin, replace);
+        accountId ??= ImportGuard.SingleAccount(db);
         var covered = LogCoveredRanges();
+        covered.AddRange(ImportGuard.CoveredBy(db, VrcxImport.Source));
         var selfNames = SelfNames(rows);
         var names = NameIndex(rows, selfNames);
 
@@ -117,6 +122,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
 
         using var tx = db.Connection.BeginTransaction();
         ProjectionWriter.Replace(db, Source, new Projection(deviceId, null, visits, encounters, events), tx);
+        ImportGuard.RememberOrigin(db, Source, origin, tx);
         // 起動の記録のないアカウントにも名前を付ける（本人の名前のうち、最後に使っていたもの）
         if (accountId != null && LastSelfName(rows, selfNames) is { } selfName)
         {
@@ -166,15 +172,6 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
             list.Add(new Row(r.GetInt64(0), r.GetInt32(1), LogProjector.ToUtc(local, _tz), S(3), S(4), S(5), S(6), S(7), S(8), S(9)));
         }
         return list;
-    }
-
-    string? SingleAccount()
-    {
-        using var cmd = db.Command("SELECT id FROM accounts");
-        using var r = cmd.ExecuteReader();
-        var ids = new List<string>();
-        while (r.Read()) ids.Add(r.GetString(0));
-        return ids.Count == 1 ? ids[0] : null;
     }
 
     /// <summary>この端末のログの記録がある期間（VRChat を起こしてから閉じるまで）。</summary>

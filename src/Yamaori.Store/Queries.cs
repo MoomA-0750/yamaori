@@ -322,7 +322,8 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
 
     public Note? UpdateNote(string id, string body)
     {
-        using var cmd = db.Command("UPDATE notes SET body = $b, updated_at = $now WHERE id = $id", null, ("$id", id), ("$b", body), ("$now", Database.Time(DateTime.UtcNow)));
+        // 取り込んだメモ（VRCX）を直したら、本人のメモにする（次の取り込みで上書きしない）
+        using var cmd = db.Command("UPDATE notes SET body = $b, updated_at = $now, source = NULL WHERE id = $id", null, ("$id", id), ("$b", body), ("$now", Database.Time(DateTime.UtcNow)));
         return cmd.ExecuteNonQuery() == 0 ? null : Note(id);
     }
 

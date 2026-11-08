@@ -23,7 +23,8 @@ public sealed class VrcxImport(Database db, string deviceId)
 
     public sealed record Result(int Visits, int Encounters, int Events, int FriendEvents, int Worlds, int Favorites, int Notes, int Skipped, IReadOnlyList<string> Accounts);
 
-    public Result Import(string vrcxPath)
+    /// <param name="replace">前に取り込んだものと別の DB でも、入れ替えて取り込む。</param>
+    public Result Import(string vrcxPath, bool replace = false)
     {
         using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = vrcxPath, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         c.Open();
@@ -36,7 +37,12 @@ public sealed class VrcxImport(Database db, string deviceId)
         var selfIds = accounts.ToHashSet(StringComparer.Ordinal);
         var account = accounts.Count == 1 ? accounts[0] : null;
 
+        // DB の見分け: アカウントと、いちばん古い訪問（VRCX は書き足していくので、続きの DB でも同じ）
+        var oldest = tables.Contains("gamelog_location") ? Rows(c, "SELECT MIN(created_at) FROM gamelog_location", r => Str(r, 0)).FirstOrDefault() : null;
+        var origin = $"{string.Join(",", accounts.Order(StringComparer.Ordinal))}@{oldest}";
+        ImportGuard.CheckOrigin(db, Source, origin, replace);
         var covered = LogCoveredRanges();
+        covered.AddRange(ImportGuard.CoveredBy(db, VatImport.Source));
         var visits = new List<Visit>();
         var encounters = new List<Encounter>();
         var events = new List<ActivityEvent>();
@@ -144,6 +150,7 @@ public sealed class VrcxImport(Database db, string deviceId)
 
         using var tx = db.Connection.BeginTransaction();
         ProjectionWriter.Replace(db, Source, new Projection(deviceId, null, visits, encounters, events), tx);
+        ImportGuard.RememberOrigin(db, Source, origin, tx);
         var worlds = ImportWorlds(c, tables, tx);
         var favorites = ImportFavorites(c, tables, tx);
         var notes = ImportMemos(c, tables, tx);
@@ -200,7 +207,7 @@ public sealed class VrcxImport(Database db, string deviceId)
             var time = at is { } a && Utc(a) is { } t ? Database.Time(t) : Database.Time(DateTime.UtcNow);
             using var cmd = db.Command("""
                 INSERT INTO notes (id, target_type, target_id, body, device_id, created_at, updated_at, source) VALUES ($id, $t, $i, $b, NULL, $at, $at, 'vrcx')
-                ON CONFLICT (id) DO UPDATE SET body = $b, updated_at = $at
+                ON CONFLICT (id) DO UPDATE SET body = $b, updated_at = $at WHERE notes.source = 'vrcx'
                 """, tx, ("$id", StableId.Of("note", Source, type, target)), ("$t", type), ("$i", target), ("$b", body), ("$at", time));
             n += cmd.ExecuteNonQuery();
         }

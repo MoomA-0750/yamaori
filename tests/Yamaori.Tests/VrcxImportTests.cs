@@ -88,6 +88,54 @@ public sealed class VrcxImportTests : IDisposable
         Assert.Equal(1L, Count(db, "SELECT COUNT(*) FROM notes")  - 1); // 入れ直してもメモは増えない（2 件のまま）
     }
 
+    [Fact]
+    public void 取り込んだメモを_Yamaori_で直したら_次の取り込みで戻さない()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        var imp = new VrcxImport(db, "d_test");
+        imp.Import(vrcx);
+        var q = new Queries(db, TimeZoneInfo.Utc);
+        var note = q.Notes("world", "wrld_fav").Single();
+        q.UpdateNote(note.Id, "Yamaori で直した");
+        imp.Import(vrcx);
+        Assert.Equal("Yamaori で直した", q.Note(note.Id)!.Body);
+    }
+
+    [Fact]
+    public void 別の_VRCX_の_DB_は_入れ替えてよいと言われるまで取り込まない()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        var imp = new VrcxImport(db, "d_test");
+        imp.Import(vrcx);
+        using (var c = new SqliteConnection($"Data Source={vrcx};Pooling=false"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "INSERT INTO gamelog_location (created_at, location, world_id, world_name, time) VALUES ('2023-01-01T00:00:00.000Z', 'wrld_c:1~region(jp)', 'wrld_c', 'C', 60000)";
+            cmd.ExecuteNonQuery();
+        }
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        Assert.Throws<InvalidOperationException>(() => imp.Import(vrcx));
+        Assert.Equal(2L, Count(db, "SELECT COUNT(*) FROM visits"));
+        Assert.Equal(3, imp.Import(vrcx, replace: true).Visits);
+    }
+
+    [Fact]
+    public void VAT_で取り込んだ期間は_VRCX_から二重に入れない()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        using (var cmd = db.Command("""
+            INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at, left_at)
+            VALUES ('v_vat', 'vat', 'd_test', 'wrld_a', 'wrld_a:100', '100', 'public', 'jp', '2024-05-01T11:59:00Z', '2024-05-01T12:29:00Z')
+            """)) cmd.ExecuteNonQuery();
+        var r = new VrcxImport(db, "d_test").Import(vrcx);
+        Assert.Equal(1, r.Visits);
+        Assert.Equal(1, r.Skipped);
+    }
+
     static long Count(Database db, string sql) => (long)db.Scalar(sql)!;
 
     public void Dispose()
