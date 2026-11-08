@@ -85,6 +85,8 @@ tests/               xUnit。実際のログから作った小さな見本（名
 
 ### 6. ブラウザの拡張機能
 
+> 2026-11-09: できた（`extension/`、Yamaori Clipper）。Yamaori の受け口（ワールドの情報・情報のないワールド・フレンドの一覧の差）と、説明文の言葉による分類も。偽の vrchat.com を相手に、押して保存・フレンドの自動の記録・まとめて取るを、拡張機能を入れた Chromium で確かめた（`extension-test/`）。本物の vrchat.com ではまだ試していない（本人のログインが要る）
+
 - 既定: 本人がボタンを押したときだけ、今のページ（ワールド、一覧）の情報を Yamaori の API へ送る（Chrome と Firefox、Manifest V3）
 - 本人が有効にしたときだけ: vrchat.com のワールドのページ・一覧のページが受け取ったデータを自動で読んで送る
 - 説明文の言葉から Essential Assets などを決まりで付ける

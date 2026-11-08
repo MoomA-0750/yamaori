@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><link rel="stylesheet" href="ui.css"><title>まとめて取る - Yamaori Clipper</title>
+<style>body { max-width: 640px; margin: 0 auto; padding: 24px 16px; } ol { padding-left: 1.4rem; } li { margin: .15rem 0; }</style></head>
+<body>
+  <h1>情報のないワールドをまとめて取る</h1>
+  <p class="muted">Yamaori が知っている、情報のないワールドのページを、裏のタブで 1 つずつ開いて取り、閉じます。このタブを閉じるか「止める」で止まります。</p>
+  <div class="card">
+    <p id="status">準備しています…</p>
+    <div class="row"><button id="start" class="primary" disabled>始める</button><button id="stop" disabled>止める</button></div>
+  </div>
+  <ol id="log"></ol>
+  <script type="module" src="bulk.js"></script>
+</body></html>

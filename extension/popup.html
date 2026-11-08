@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><link rel="stylesheet" href="ui.css"><title>Yamaori Clipper</title>
+<style>body { width: 300px; padding: 12px; } .stack { display: flex; flex-direction: column; gap: .5rem; }</style></head>
+<body>
+  <h1>Yamaori Clipper</h1>
+  <p id="conn" class="muted">Yamaori を確かめています…</p>
+  <div class="stack">
+    <button id="save" class="primary" disabled>このページのワールドを保存</button>
+    <button id="friends" disabled>フレンドの一覧を記録</button>
+    <button id="bulk" hidden>情報のないワールドをまとめて取る…</button>
+    <button id="options">設定</button>
+  </div>
+  <p id="msg" class="muted"></p>
+  <script type="module" src="popup.js"></script>
+</body></html>

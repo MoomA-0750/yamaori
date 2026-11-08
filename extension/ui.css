@@ -1,0 +1,19 @@
+:root { --bg: #f6f2ea; --surface: #fffdf8; --ink: #2a2723; --ink-2: #5f5a52; --line: #e2d9c8; --accent: #b5562d; --accent-soft: #f3dfd2; --danger: #b3261e; --ok: #2f8a5b; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #17161a; --surface: #211f24; --ink: #ece7df; --ink-2: #b9b2a6; --line: #36323a; --accent: #e08a5f; --accent-soft: #3d2a22; --danger: #f2a49e; --ok: #5cc18c; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 system-ui, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif; }
+h1 { font-size: 1.15rem; margin: 0 0 .5rem; }
+h2 { font-size: 1rem; margin: 1rem 0 .4rem; }
+p { margin: .3rem 0; }
+.muted { color: var(--ink-2); font-size: .88rem; }
+button { font: inherit; color: inherit; border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: .45rem .9rem; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=password], input[type=number] { font: inherit; color: inherit; width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: .45rem .6rem; }
+label.field { display: flex; flex-direction: column; gap: .25rem; margin: .5rem 0; }
+label.check { display: flex; gap: .5rem; align-items: flex-start; margin: .6rem 0; }
+label.check input { margin-top: .3rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: .9rem 1rem; }
+.row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.ok { color: var(--ok); } .err { color: var(--danger); }
+.warn { border-left: 3px solid var(--accent); padding-left: .6rem; color: var(--ink-2); font-size: .88rem; }

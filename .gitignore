@@ -8,3 +8,4 @@ node_modules/
 src/Yamaori/wwwroot/
 web/dist/
 .playwright-mcp/
+extension-test/*.pem

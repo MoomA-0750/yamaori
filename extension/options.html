@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><link rel="stylesheet" href="ui.css"><title>Yamaori Clipper の設定</title>
+<style>body { max-width: 640px; margin: 0 auto; padding: 24px 16px; }</style></head>
+<body>
+  <h1>Yamaori Clipper の設定</h1>
+  <div class="card">
+    <label class="field">Yamaori のアドレス<input id="yamaoriUrl" type="text" placeholder="http://localhost:47800"></label>
+    <label class="field">トークン（Yamaori の設定の「ほかのアプリ用のトークン」で作る）<input id="token" type="password" autocomplete="off"></label>
+    <div class="row"><button id="test">つながるか試す</button><span id="testMsg" class="muted"></span></div>
+  </div>
+
+  <h2>取り方</h2>
+  <div class="card">
+    <p>既定では、ページの「Yamaori に保存」のボタンか、この拡張機能のボタンを押したときだけ送ります。</p>
+    <p class="warn">VRChat の利用規約は、VRChat が出していない道具でデータを取ることを禁じています（13.2(j)）。下の 2 つは、その文面に当たりうる取り方です。使うかどうかは自分で決めてください。この拡張機能は、どの取り方でも vrchat.com へ自分から通信はしません（ページが受け取ったものを横から見るだけです）。</p>
+    <label class="check"><input id="autoWorlds" type="checkbox"><span><b>開いたページのワールドを自動で保存する</b><br><span class="muted">ワールドのページや、お気に入り・検索の一覧を開くたびに送ります。</span></span></label>
+    <label class="check"><input id="autoFriends" type="checkbox"><span><b>フレンドの一覧を自動で記録する</b><br><span class="muted">vrchat.com を開いたとき（10 分に 1 回まで）、フレンドの一覧を送り、増えた・減った・名前を変えた人を記録します。時刻は「前に送ったときから今回までの間」と粗くなります。</span></span></label>
+    <label class="check"><input id="bulkOpen" type="checkbox"><span><b>情報のないワールドをまとめて取る</b><br><span class="muted">Yamaori が知っている、情報のないワールドのページを、押したときだけ裏のタブで 1 つずつ開いて取り、閉じます。ページを開くこと自体を拡張機能がするので、いちばん自動に寄ります。</span></span></label>
+    <div class="row">
+      <label class="field" style="flex:1">1 件ごとの間隔（秒、10 以上）<input id="bulkIntervalSec" type="number" min="10"></label>
+      <label class="field" style="flex:1">1 日の上限（件）<input id="bulkDailyLimit" type="number" min="1" max="500"></label>
+    </div>
+  </div>
+  <p><button id="saveBtn" class="primary">保存</button> <span id="saved" class="muted"></span></p>
+  <script type="module" src="options.js"></script>
+</body></html>
