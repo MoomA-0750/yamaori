@@ -165,12 +165,22 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     static WorldSummary ReadWorld(SqliteDataReader r) => new(r.GetString(0), Str(r, 1), r.GetInt32(2), (int)Math.Round(r.GetDouble(3)), Time(r, 4), Time(r, 5), r.GetInt32(6));
 
     /// <summary>ワールドの一覧。sort は last（最後に行った順）・visits（回数）・minutes（いた時間）・name。</summary>
-    public Page<WorldSummary> Worlds(string? q = null, string sort = "last", int limit = 50, int offset = 0)
+    public Page<WorldSummary> Worlds(string? q = null, string sort = "last", int limit = 50, int offset = 0, string? list = null)
     {
-        var w = q != null ? "WHERE w.name LIKE $q OR w.id = $exact" : "";
-        var args = new List<(string, object?)> { ("$q", $"%{q}%"), ("$exact", q) };
+        var where = new List<string>();
+        if (q != null) where.Add("(w.name LIKE $q OR w.id = $exact)");
+        // list: お気に入り・保存の一覧の名前（"*" ならどれかに入っているもの）
+        if (list == "*") where.Add("w.id IN (SELECT world_id FROM world_favorites)");
+        else if (list != null) where.Add("w.id IN (SELECT world_id FROM world_favorites WHERE list_name = $list)");
+        var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+        var args = new List<(string, object?)> { ("$q", $"%{q}%"), ("$exact", q), ("$list", list) };
         var total = Convert.ToInt32(db.Scalar($"SELECT COUNT(*) FROM worlds w {w}", [.. args]), CultureInfo.InvariantCulture);
-        var order = sort switch { "visits" => "3 DESC", "minutes" => "4 DESC", "name" => "2 COLLATE NOCASE", _ => "6 DESC" };
+        var order = sort switch
+        {
+            "visits" => "3 DESC", "minutes" => "4 DESC", "name" => "2 COLLATE NOCASE",
+            "saved" => "(SELECT MAX(added_at) FROM world_favorites f WHERE f.world_id = w.id) DESC",
+            _ => "6 DESC",
+        };
         args.Add(("$limit", Math.Clamp(limit, 1, 500)));
         args.Add(("$offset", Math.Max(0, offset)));
         return new Page<WorldSummary>(List($"SELECT {WorldColumns} FROM worlds w {w} ORDER BY {order} LIMIT $limit OFFSET $offset", ReadWorld, [.. args]), total);
@@ -320,6 +330,27 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     {
         using var cmd = db.Command("DELETE FROM notes WHERE id = $id", null, ("$id", id));
         return cmd.ExecuteNonQuery() > 0;
+    }
+
+    /// <summary>お気に入り・保存の一覧の名前と数。</summary>
+    public IReadOnlyList<(string Name, int Count)> FavoriteLists() =>
+        List("SELECT list_name, COUNT(DISTINCT world_id) FROM world_favorites GROUP BY list_name ORDER BY list_name", r => (r.GetString(0), r.GetInt32(1)));
+
+    /// <summary>
+    /// ワールドを保存の一覧に入れる（スマホの共有・ショートカット・拡張機能から）。text から wrld_… を探す。入れたワールドの ID、見つからなければ null。
+    /// </summary>
+    public string? SaveWorld(string text, string? name = null, string list = "保存")
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(text ?? "", @"wrld_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+        if (!m.Success) return null;
+        var id = m.Value.ToLowerInvariant();
+        using (var cmd = db.Command("INSERT INTO worlds (id, name) VALUES ($id, $n) ON CONFLICT (id) DO UPDATE SET name = COALESCE(worlds.name, $n)", null,
+            ("$id", id), ("$n", string.IsNullOrWhiteSpace(name) ? null : name.Trim())))
+            cmd.ExecuteNonQuery();
+        using (var cmd = db.Command("INSERT OR IGNORE INTO world_favorites (world_id, list_name, source, added_at) VALUES ($id, $l, 'yamaori', $now)", null,
+            ("$id", id), ("$l", list), ("$now", Database.Time(DateTime.UtcNow))))
+            cmd.ExecuteNonQuery();
+        return id;
     }
 
     /// <summary>メモの付け先があるか（日は日付の形か）。</summary>

@@ -12,7 +12,8 @@ export type Route =
   | { page: 'settings' }
 
 function parse(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent)
+  // 「#/worlds?list=*」のような ? 以降は、それぞれの画面が自分で読む
+  const parts = hash.replace(/^#\/?/, '').split('?')[0].split('/').map(decodeURIComponent)
   switch (parts[0]) {
     case 'day': return parts[1] ? { page: 'day', date: parts[1] } : { page: 'days' }
     case 'visit': return parts[1] ? { page: 'visit', id: parts[1] } : { page: 'days' }

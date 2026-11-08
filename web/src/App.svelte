@@ -12,9 +12,16 @@
   import Person from './pages/Person.svelte'
   import Settings from './pages/Settings.svelte'
   import Photos from './pages/Photos.svelte'
+  import Share from './pages/Share.svelte'
   import Login from './pages/Login.svelte'
 
   let auth = $state<AuthState | null>(null)
+  // スマホの共有から来たとき（/?url=… など）。保存したら、アドレスから外す
+  const shared = new URLSearchParams(location.search)
+  let sharing = $state(shared.has('url') || shared.has('text'))
+  if (shared.has('url') || shared.has('text')) history.replaceState(null, '', location.pathname + location.hash)
+  // 共有の画面からほかの画面へ移ったら、共有の画面を閉じる
+  window.addEventListener('hashchange', () => (sharing = false))
   let checked = $state(false)
 
   async function check() {
@@ -77,6 +84,10 @@
   {:else if !auth.allowed}
     <Login {auth} onDone={check} />
   {:else}
+    {#if sharing}
+      <Share params={shared} />
+      <p class="center"><button class="ghost" onclick={() => (sharing = false)}>Yamaori を開く</button></p>
+    {:else}
     {#key router.route}
       {#if router.route.page === 'days'}<Days />
       {:else if router.route.page === 'day'}<Day date={router.route.date} />
@@ -89,6 +100,7 @@
       {:else if router.route.page === 'settings'}<Settings {auth} onLogout={check} />
       {/if}
     {/key}
+    {/if}
   {/if}
 </main>
 

@@ -18,6 +18,7 @@ dotnet run --project src/Yamaori       # 常駐して見張る。http://localhos
 
 - コマンド: `ingest`（ログを一度読んで DB に入れる）・`summary`・`rebuild`（DB の出来事から組み立て直す）・`reparse`（残した生のログから読み直す）・`export --out <dir>`（日記を日ごとの Markdown に）・`import-vat --file <db>`・`import-vrcx [--file <db>]`
 - ブラウザの拡張機能は [extension/](extension/)
+- スマホからワールドを保存する: WebUI をホーム画面に置くと（Android の Chrome。https か localhost のとき）、共有の行き先に Yamaori が出る。vrchat.com のワールドのページを共有すると「保存」の一覧に入る。iPhone は「ショートカット」で、共有シートから「URL の内容を取得」（POST `/api/worlds/save`、本文 `{"url": 共有された URL}`、ヘッダー `Authorization: Bearer <トークン>`）を作る
 - 引数: `--log-dir`・`--data-dir`・`--database`・`--archive-dir`・`--device-name`・`--port`・`--listen`（`local`・`lan`・`tailscale`）。データのフォルダの `yamaori.json` でも決められる
 - API の定義は `/openapi/v1.json`、今の出来事は `/api/stream`（SSE）、AI のエージェント向けは `/mcp`（例: `claude mcp add --transport http yamaori http://localhost:47800/mcp`）
 - Windows で開発中の版を入れる: `scripts/install-dev.ps1`（ログオン時に起こす。`-Uninstall` で外す）

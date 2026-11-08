@@ -43,8 +43,17 @@ public static class Api
             q.Events(kind, Utc(from), Utc(to), limit ?? 100, offset ?? 0))
             .WithSummary("出来事の一覧（動画・通知・スクショ・アバター）");
 
-        api.MapGet("/worlds", (Queries queries, string? q, string? sort, int? limit, int? offset) => queries.Worlds(q, sort ?? "last", limit ?? 50, offset ?? 0))
-            .WithSummary("ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name）");
+        api.MapGet("/worlds", (Queries queries, string? q, string? sort, int? limit, int? offset, string? list) => queries.Worlds(q, sort ?? "last", limit ?? 50, offset ?? 0, list))
+            .WithSummary("ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name・saved、list でお気に入り・保存の一覧に絞る。* はどれか）");
+
+        api.MapGet("/worlds/lists", (Queries queries) => queries.FavoriteLists().Select(x => new FavoriteList(x.Name, x.Count)))
+            .WithSummary("お気に入り・保存の一覧の名前と数");
+
+        api.MapPost("/worlds/save", Results<Ok<SavedWorld>, BadRequest<string>> (Queries queries, SaveWorldInput input) =>
+            queries.SaveWorld(string.Join(" ", new[] { input.Url, input.Text, input.WorldId }.Where(x => x != null)), input.Name, input.List ?? "保存") is { } id
+                ? TypedResults.Ok(new SavedWorld(id, input.List ?? "保存"))
+                : TypedResults.BadRequest("ワールドの ID（wrld_…）が見つからない"))
+            .WithSummary("ワールドを保存の一覧に入れる（スマホの共有・ショートカットから。url・text・worldId のどれかに wrld_… があればよい）");
 
         api.MapGet("/worlds/{id}", Results<Ok<WorldDetail>, NotFound> (Queries q, string id) =>
             q.World(id) is { } w ? TypedResults.Ok(w) : TypedResults.NotFound())
@@ -163,6 +172,9 @@ public static class Api
             .WithSummary("今の出来事を SSE で流す（入った・出た・人が来た・動画・スクショ・通知）");
     }
 
+    public sealed record SaveWorldInput(string? Url, string? Text, string? WorldId, string? Name, string? List);
+    public sealed record SavedWorld(string WorldId, string List);
+    public sealed record FavoriteList(string Name, int Count);
     public sealed record FriendSnapshotInput(string? AccountId, IReadOnlyList<FriendInput>? Friends);
     public sealed record DayView(string Date, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 

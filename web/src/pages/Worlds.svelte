@@ -6,13 +6,17 @@
 
   let query = $state('')
   let sort = $state('last')
+  // ?list=* などで来たら、その一覧に絞る
+  let list = $state(new URLSearchParams(location.hash.split('?')[1] ?? '').get('list') ?? '')
+  let lists = $state<{ name: string; count: number }[]>([])
+  api.worldLists().then((l) => (lists = l)).catch(() => {})
   let page = $state<Page<WorldSummary> | null>(null)
   let error = $state('')
   let limit = $state(50)
 
   $effect(() => {
-    const q = query, s = sort, l = limit
-    const t = setTimeout(() => api.worlds({ q: q || undefined, sort: s, limit: l }).then((p) => (page = p)).catch((e) => (error = (e as Error).message)), q ? 200 : 0)
+    const q = query, s = sort, l = limit, li = list
+    const t = setTimeout(() => api.worlds({ q: q || undefined, sort: s, limit: l, list: li || undefined }).then((p) => (page = p)).catch((e) => (error = (e as Error).message)), q ? 200 : 0)
     return () => clearTimeout(t)
   })
 </script>
@@ -26,6 +30,12 @@
       <option value="visits">行った回数</option>
       <option value="minutes">いた時間</option>
       <option value="name">名前</option>
+      <option value="saved">保存した順</option>
+    </select>
+    <select bind:value={list} aria-label="どのワールドを出すか">
+      <option value="">全部</option>
+      <option value="*">保存・お気に入り</option>
+      {#each lists as l (l.name)}<option value={l.name}>★ {l.name}（{l.count}）</option>{/each}
     </select>
   </div>
   {#if !page}
@@ -38,8 +48,12 @@
           <a class="item card" href={href.world(w.id)}>
             <div class="name break">{w.name ?? w.id}</div>
             <div class="row faint nums">
-              <span>{w.visitCount} 回</span>
-              <span>{minutes(w.minutes)}</span>
+              {#if w.visitCount}
+                <span>{w.visitCount} 回</span>
+                <span>{minutes(w.minutes)}</span>
+              {:else}
+                <span>まだ行っていない</span>
+              {/if}
               {#if w.lastVisitAt}<span>最後 {day(localDate(w.lastVisitAt))}</span>{/if}
               {#if w.noteCount}<span class="chip accent">メモ {w.noteCount}</span>{/if}
             </div>
@@ -54,7 +68,7 @@
 </div>
 
 <style>
-  .tools { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+  .tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; }
   .tools select { width: auto; }
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
   .item { display: block; padding: .75rem 1rem; }
