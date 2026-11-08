@@ -67,8 +67,8 @@
           {#if data.info.platforms.length || data.info.capacity || data.info.visitsTotal}
             <div class="faint">
               {#if data.info.platforms.length}{data.info.platforms.map(platformLabel).join('・')}{/if}
-              {#if data.info.capacity} · {data.info.capacity} 人まで{/if}
-              {#if data.info.visitsTotal} · vrchat.com の訪問 {data.info.visitsTotal.toLocaleString()}{/if}
+              {#if data.info.capacity} · <span class="nowrap">{data.info.capacity} 人まで</span>{/if}
+              {#if data.info.visitsTotal} · <span class="nowrap">vrchat.com 全体の訪問 {data.info.visitsTotal.toLocaleString()}</span>{/if}
             </div>
           {/if}
           {#if data.info.description}<p class="desc break">{data.info.description}</p>{/if}
