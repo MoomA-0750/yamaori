@@ -70,6 +70,8 @@ tests/               xUnit。実際のログから作った小さな見本（名
 - vrchat.com のワールドのページ・一覧のページが受け取ったデータを読み、Yamaori の API へ送る（Chrome と Firefox、Manifest V3）
 - まとめて開く機能（本人が押したときだけ、最大 20 件、間隔を空ける）
 - 説明文の言葉から Essential Assets などを決まりで付ける
+- フレンドの一覧の差: 本人が vrchat.com のフレンドの一覧を開いたとき、ページが受け取った一覧を前回と比べ、増えた人・減った人を記録する。時刻は「前に開いたときから今回までの間」と粗い。VRCX を入れずに、自分が送った申請が承諾されたことやフレンドの増減を残すため。拡張機能から API は叩かない
+- 規約との関係（2026-11-08 に利用規約を読んだ。下の「規約との関係」）: 拡張機能がデータを取る部分は、ログを読むより一段グレーに寄る。どこまで入れるか、既定で何を有効にするかは本人が決める（決めることの 4）
 
 ### 7. サーバーの役
 
@@ -88,3 +90,27 @@ tests/               xUnit。実際のログから作った小さな見本（名
 1. **開発の環境**: .NET 10 の SDK を、この Linux の PC（`~/.dotnet`）と to-fu に入れた。段階 1〜3 は Linux で書いて試し、to-fu では実際のログで動かして確かめる
 2. **WebUI**: 軽く、直しやすさも保つ。Svelte 5＋TypeScript＋Vite で作る。API を先に固めるので、合わなければ作り直せる
 3. **写真**: 大半は NAS に移している。段階 4 で NAS の写真も読む
+
+## 決めること
+
+4. **拡張機能でどこまで取るか**（段階 6 までに）: 上の「規約との関係」の 2〜4 のどれを入れ、どれを既定で有効にするか
+
+## 規約との関係
+
+VRChat の利用規約（Effective Date: October 23, 2026、https://hello.vrchat.com/legal ）で、Yamaori に関わる条文。
+
+- 13.2(j): VRChat が出していない「engine, software tool, agent, device, or mechanism」で、Platform に「access, search, or otherwise use」すること、または「to extract data」ことを禁じる（robot・spider・crawler・scraper・その他の自動の手段を含む）。量や、通信を増やすかどうかの区別はない
+- 13.2(i): 「harvest, or mine User Content」、「access or use the Platform in a manner inconsistent with individual human usage」を禁じる
+- 13.2(g)(iii): 「attempting to collect personal information about another User or third party without consent」を禁じる
+- 12: スクリーンショットと動画を撮って共有することは認めている
+- コミュニティガイドライン 5.8: VRChat のログイン情報を求めるサービスを作ってはいけない
+
+文面から読める、グレーの度合いの順（法的な判断ではない）:
+
+1. 自分の PC のログと写真を読む: VRChat 自身がログの場所を案内し、写真に XMP を入れている。Platform に触れない。いちばん強い
+2. 拡張機能で、本人が押したときに今のページの情報を保存する: スクリーンショットの許可に近いが、「extract data」に当たると読める余地はある
+3. 拡張機能が、本人の開いたページのデータを自動で読む（ワールドの情報の 1・2、フレンドの一覧の差）: 通信は増えないが、13.2(j) の「software tool … to extract data」に文面上は当たる。フレンドの一覧は、ほかの人の情報なので 13.2(g)(iii) にも近い
+4. 拡張機能がタブをまとめて開く（ワールドの情報の 3）: 自動の手段に近づく
+5. API を叩く: 13.2(j) に当たる。Yamaori は作らない（VRCX の DB を読むだけにする）
+
+なお、会った人の名前と ID をログから記録すること自体も、13.2(g)(iii) の「ほかの人の情報を集める」に文面上は近い。VRChatActivityTools・VRCX も同じことをしており、記録は本人の手元だけに置く、という立場で扱う。
