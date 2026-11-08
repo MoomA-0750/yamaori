@@ -39,6 +39,11 @@ public sealed class LogWatcher(IOptions<YamaoriOptions> options, ILogger<LogWatc
             {
                 logger.LogWarning(ex, "ログを読めなかった");
             }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // DB が長く使われている（取り込みの途中など）ときも、見張りは止めずに次の回で読み直す
+                logger.LogError(ex, "ログの読み込みで失敗した。次の回で読み直す");
+            }
             first = false;
             await Task.Delay(TimeSpan.FromSeconds(o.PollSeconds), stoppingToken).ConfigureAwait(false);
         }

@@ -37,11 +37,19 @@ public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState 
             var lastUpload = DateTime.MinValue;
             while (!stoppingToken.IsCancellationRequested)
             {
-                ScanAll(o, dirs, stoppingToken);
-                if (o.PhotoUpload.Kind != "none" && DateTime.UtcNow - lastUpload >= TimeSpan.FromMinutes(o.PhotoUpload.IntervalMinutes))
+                try
                 {
-                    lastUpload = DateTime.UtcNow;
-                    await UploadAsync(o, dirs, stoppingToken).ConfigureAwait(false);
+                    ScanAll(o, dirs, stoppingToken);
+                    if (o.PhotoUpload.Kind != "none" && DateTime.UtcNow - lastUpload >= TimeSpan.FromMinutes(o.PhotoUpload.IntervalMinutes))
+                    {
+                        lastUpload = DateTime.UtcNow;
+                        await UploadAsync(o, dirs, stoppingToken).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // DB が長く使われているときなども、見張りは止めずに次の回でやり直す
+                    logger.LogError(ex, "写真の目録か送り出しで失敗した。次の回でやり直す");
                 }
                 // 次に読み直す時刻か、次に送る時刻の早い方まで待つ
                 var wait = TimeSpan.FromMinutes(o.PhotoScanMinutes);

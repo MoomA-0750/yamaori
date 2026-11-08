@@ -83,6 +83,19 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 読んだときのタイムゾーンが見つからなければ_組み立て直さずに止める()
+    {
+        File.WriteAllBytes(LogPath, Fixture());
+        using var db = Database.Open(Path.Combine(_dir, "tz.sqlite3"));
+        var ingestor = new LogIngestor(db, "d_test");
+        ingestor.Ingest(LogPath, closed: true, Tokyo);
+        var before = Visits(db);
+        using (var cmd = db.Command("UPDATE log_files SET time_zone = 'Nowhere/Zone'")) cmd.ExecuteNonQuery();
+        Assert.Throws<InvalidOperationException>(() => ingestor.Rebuild(FileName));
+        Assert.Equal(before, Visits(db));
+    }
+
+    [Fact]
     public void 残すフォルダがログのフォルダと同じでも_元のログを消さない()
     {
         var bytes = Fixture();

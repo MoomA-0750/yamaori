@@ -137,9 +137,15 @@ public sealed class LogIngestor(Database db, string deviceId)
         return json.GetProperty("kind").GetString() ?? e.GetType().Name;
     }
 
+    /// <summary>
+    /// ログを読んだときのタイムゾーンを引く（Windows と IANA の名前は互いに引き直す）。
+    /// 見つからなければ止める（今の PC のタイムゾーンで黙って読み直すと、記録の時刻が何時間もずれる）。
+    /// </summary>
     static TimeZoneInfo FindTimeZone(string id)
     {
-        try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
-        catch (TimeZoneNotFoundException) { return TimeZoneInfo.Local; }
+        if (TimeZoneInfo.TryFindSystemTimeZoneById(id, out var tz)) return tz;
+        if (TimeZoneInfo.TryConvertWindowsIdToIanaId(id, out var iana) && TimeZoneInfo.TryFindSystemTimeZoneById(iana, out tz)) return tz;
+        if (TimeZoneInfo.TryConvertIanaIdToWindowsId(id, out var win) && TimeZoneInfo.TryFindSystemTimeZoneById(win, out tz)) return tz;
+        throw new InvalidOperationException($"ログを読んだときのタイムゾーン {id} が、この PC で見つからない。読み直すと時刻がずれるので止めた");
     }
 }

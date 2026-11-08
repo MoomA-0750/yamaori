@@ -19,8 +19,9 @@ public sealed class Database : IDisposable
         if (dir != null) Directory.CreateDirectory(dir);
         var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
         c.Open();
-        // 常駐の見張りと Web の要求が別々の接続で同時に使うので、書き込みが重なったら少し待つ
-        Exec(c, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=OFF; PRAGMA busy_timeout=5000;");
+        // 常駐の見張りと Web の要求が別々の接続で同時に使うので、書き込みが重なったら少し待つ。
+        // メモは Yamaori にしかないので、電源が落ちても書き終えた分は残す（synchronous=FULL）
+        Exec(c, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=OFF; PRAGMA busy_timeout=5000;");
         var db = new Database(c);
         db.Migrate();
         return db;

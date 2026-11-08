@@ -33,6 +33,10 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
             {
                 logger.LogWarning("親 {Parent} へ送れなかった（次の回に送る）: {Message}", o.ParentUrl, ex.Message);
             }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "親へ送る支度で失敗した（次の回に送る）");
+            }
             try { await Task.Delay(TimeSpan.FromMinutes(Math.Max(1, o.SyncMinutes)), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
         }
     }
