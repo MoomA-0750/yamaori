@@ -42,11 +42,10 @@
       {#each page.items as p (p.userId)}
         <li>
           <a href={href.person(p.userId)} class="item">
-            <span class="name break">{p.name ?? p.userId}</span>
+            <span class="name break">{p.name ?? p.userId}{#if p.userId.startsWith('name:')} <span class="chip small">名前だけ</span>{/if}</span>
             <span class="row faint nums">
               <span>{p.visitCount} 回</span>
               {#if p.lastMetAt}<span>{day(localDate(p.lastMetAt))}</span>{/if}
-              {#if p.userId.startsWith('name:')}<span class="chip">名前だけ</span>{/if}
               {#if p.noteCount}<span class="chip accent">メモ</span>{/if}
             </span>
           </a>
@@ -60,6 +59,7 @@
 </div>
 
 <style>
+  .small { font-size: .7rem; padding: 0 .45rem; vertical-align: .1em; }
   .tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; }
   .note { margin: 0; }
   .tools select { width: auto; }
