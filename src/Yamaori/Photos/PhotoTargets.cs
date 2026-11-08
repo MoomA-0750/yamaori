@@ -17,6 +17,9 @@ public interface IPhotoTarget : IDisposable
     Task UploadAsync(string localPath, string remotePath, CancellationToken cancel);
 }
 
+/// <summary>送り先そのものを信用できないので、この回は全部やめる（1 枚ごとに試し直さない）。</summary>
+public sealed class TargetRefusedException(string message) : IOException(message);
+
 /// <summary>フォルダ（SMB の共有 \\NAS\…、割り当てたドライブ、ほかのディスク）。</summary>
 public sealed class FolderTarget(string root) : IPhotoTarget
 {
@@ -84,27 +87,47 @@ public sealed class WebDavTarget : IPhotoTarget
     public void Dispose() => _http.Dispose();
 }
 
-/// <summary>SFTP（NAS の SSH）。target は sftp://host[:port]/path。</summary>
+/// <summary>
+/// SFTP（NAS の SSH）。target は sftp://host[:port]/path。
+/// 相手の鍵は、最初につないだときのものを覚え（knownHostKey が空なら受け入れて SeenHostKey に入れる）、
+/// 覚えた鍵と違えばつながない（家の中で相手のふりをされても、パスワードを渡さない）。
+/// </summary>
 public sealed class SftpTarget : IPhotoTarget
 {
     readonly SftpClient _client;
     readonly string _root;
     readonly string _key;
+    string? _rejected;
 
-    public SftpTarget(string target, string? user, string? password)
+    public SftpTarget(string target, string? user, string? password, string? knownHostKey = null)
     {
         var u = new Uri(target);
         _root = u.AbsolutePath.TrimEnd('/');
         _key = $"sftp://{user}@{u.Host}:{(u.Port > 0 ? u.Port : 22)}{_root}";
         _client = new SftpClient(u.Host, u.Port > 0 ? u.Port : 22, user ?? "", password ?? "");
+        _client.HostKeyReceived += (_, e) =>
+        {
+            var fp = "SHA256:" + e.FingerPrintSHA256;
+            if (string.IsNullOrEmpty(knownHostKey)) { SeenHostKey = fp; e.CanTrust = true; }
+            else if (fp == knownHostKey) e.CanTrust = true;
+            else { _rejected = fp; e.CanTrust = false; }
+        };
     }
+
+    /// <summary>初めてつないだときに受け入れた相手の鍵（覚えておく）。</summary>
+    public string? SeenHostKey { get; private set; }
 
     public string Key => _key;
     public string? LocalPath(string remotePath) => null;
 
     void Connect()
     {
-        if (!_client.IsConnected) _client.Connect();
+        if (_client.IsConnected) return;
+        try { _client.Connect(); }
+        catch (Renci.SshNet.Common.SshException) when (_rejected != null)
+        {
+            throw new TargetRefusedException($"送り先の鍵が、覚えている鍵と違う（今の鍵 {_rejected}）。送り先の鍵を変えたのなら、写真の設定を保存し直すと今の鍵を覚え直す");
+        }
     }
 
     public Task<long?> SizeAsync(string remotePath, CancellationToken cancel)
@@ -117,8 +140,14 @@ public sealed class SftpTarget : IPhotoTarget
     public Task UploadAsync(string localPath, string remotePath, CancellationToken cancel)
     {
         Connect();
+        // 送り先のフォルダ（途中も含めて）が無ければ作る
         var dir = $"{_root}/{remotePath[..remotePath.LastIndexOf('/')]}";
-        if (!_client.Exists(dir)) _client.CreateDirectory(dir);
+        var path = "";
+        foreach (var part in dir.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            path += "/" + part;
+            if (!_client.Exists(path)) _client.CreateDirectory(path);
+        }
         using var src = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         _client.UploadFile(src, $"{_root}/{remotePath}", canOverride: true);
         return Task.CompletedTask;

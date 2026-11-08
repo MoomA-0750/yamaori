@@ -37,7 +37,8 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
                 if (target.LocalPath(remote) is { } local)
                     catalog.Add(local, local[..^remote.Length].TrimEnd('/', '\\'));
             }
-            catch (Exception ex) when (ex is IOException or HttpRequestException or UnauthorizedAccessException or Renci.SshNet.Common.SshException)
+            catch (Exception ex) when (ex is IOException or HttpRequestException or UnauthorizedAccessException or Renci.SshNet.Common.SshException
+                                       && ex is not TargetRefusedException)
             {
                 failed++;
                 log?.Invoke($"{p.FileName} を送れなかった: {ex.Message}");
@@ -72,11 +73,30 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
         return new Result(uploaded, already, failed, removed);
     }
 
-    public static IPhotoTarget? Create(PhotoUploadOptions o) => o.Kind switch
+    /// <summary>SFTP の相手の鍵を覚えておく設定の名前の頭（写真の設定を保存し直すと消す）。</summary>
+    public const string HostKeyPrefix = "sftp_hostkey:";
+
+    public static IPhotoTarget? Create(PhotoUploadOptions o, AuthStore? store = null) => o.Kind switch
     {
         "folder" when o.Target.Length > 0 => new FolderTarget(o.Target),
         "webdav" when o.Target.Length > 0 => new WebDavTarget(o.Target, o.Username, Secrets.Unprotect(o.Password)),
-        "sftp" when o.Target.Length > 0 => new SftpTarget(o.Target, o.Username, Secrets.Unprotect(o.Password)),
+        "sftp" when o.Target.Length > 0 => CreateSftp(o, store),
         _ => null,
     };
+
+    static SftpTarget CreateSftp(PhotoUploadOptions o, AuthStore? store)
+    {
+        var t = new SftpTarget(o.Target, o.Username, Secrets.Unprotect(o.Password));
+        var known = store?.Get(HostKeyPrefix + t.Key);
+        if (known == null) return t;
+        t.Dispose();
+        return new SftpTarget(o.Target, o.Username, Secrets.Unprotect(o.Password), known);
+    }
+
+    /// <summary>初めてつないだ SFTP の相手の鍵を覚える。</summary>
+    public static void RememberHostKey(IPhotoTarget target, AuthStore store)
+    {
+        if (target is SftpTarget { SeenHostKey: { } fp } s && store.Get(HostKeyPrefix + s.Key) == null)
+            store.Set(HostKeyPrefix + s.Key, fp);
+    }
 }

@@ -43,7 +43,14 @@ public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState 
                     lastUpload = DateTime.UtcNow;
                     await UploadAsync(o, dirs, stoppingToken).ConfigureAwait(false);
                 }
-                var woke = await _wake.WaitAsync(TimeSpan.FromMinutes(o.PhotoScanMinutes), stoppingToken).ConfigureAwait(false);
+                // 次に読み直す時刻か、次に送る時刻の早い方まで待つ
+                var wait = TimeSpan.FromMinutes(o.PhotoScanMinutes);
+                if (o.PhotoUpload.Kind != "none")
+                {
+                    var untilUpload = lastUpload + TimeSpan.FromMinutes(o.PhotoUpload.IntervalMinutes) - DateTime.UtcNow;
+                    if (untilUpload < wait) wait = untilUpload < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : untilUpload;
+                }
+                var woke = await _wake.WaitAsync(wait, stoppingToken).ConfigureAwait(false);
                 if (woke)
                 {
                     // 書き終えるのを待ち、続けて来た知らせはまとめる
@@ -61,13 +68,15 @@ public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState 
 
     async Task UploadAsync(YamaoriOptions o, IReadOnlyList<string> dirs, CancellationToken cancel)
     {
-        using var target = Photos.PhotoSync.Create(o.PhotoUpload);
-        if (target == null) return;
         using var db = Database.Open(o.DatabasePath);
+        var store = new AuthStore(db);
+        using var target = Photos.PhotoSync.Create(o.PhotoUpload, store);
+        if (target == null) return;
         var sync = new Photos.PhotoSync(new PhotoCatalog(db, state.DeviceId), target, dirs, thumbs);
         try
         {
             var r = await sync.RunAsync(o.PhotoUpload.Retention, o.PhotoUpload.RetentionDays, cancel, m => logger.LogWarning("{Message}", m)).ConfigureAwait(false);
+            Photos.PhotoSync.RememberHostKey(target, store);
             if (r.Uploaded + r.AlreadyThere + r.Failed + r.Removed > 0)
                 logger.LogInformation("写真を送った {Uploaded}・もうあった {Already}・送れなかった {Failed}・手元から消した {Removed}", r.Uploaded, r.AlreadyThere, r.Failed, r.Removed);
         }

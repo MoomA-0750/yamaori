@@ -289,7 +289,7 @@ public static class Auth
         var g = app.MapGroup("/api/settings/photos");
         g.MapGet("/", (IOptions<YamaoriOptions> o) => PhotoView(o.Value)).WithSummary("写真の設定");
 
-        g.MapPut("/", Results<Ok<PhotoSettingsView>, BadRequest<string>> (IOptions<YamaoriOptions> o, PhotoSettingsInput input) =>
+        g.MapPut("/", Results<Ok<PhotoSettingsView>, BadRequest<string>> (IOptions<YamaoriOptions> o, Database db, PhotoSettingsInput input) =>
         {
             if (input.Kind is { } k && k is not ("none" or "folder" or "webdav" or "sftp")) return TypedResults.BadRequest("kind は none・folder・webdav・sftp");
             if (input.Retention is { } r && r is not ("keep" or "days" or "after_upload")) return TypedResults.BadRequest("retention は keep・days・after_upload");
@@ -309,6 +309,9 @@ public static class Auth
             json["PhotoUpload"] = up;
             Directory.CreateDirectory(o.Value.DataDir);
             File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            // 保存し直したら、SFTP の相手の鍵は次につないだときに覚え直す（送り先の鍵を変えたとき用）
+            using (var del = db.Command("DELETE FROM settings WHERE key LIKE $p", null, ("$p", Photos.PhotoSync.HostKeyPrefix + "%")))
+                del.ExecuteNonQuery();
             // 書いた内容を読み直して返す（効くのは起こし直したあと）
             var next = new YamaoriOptions();
             new ConfigurationBuilder().AddJsonFile(path, optional: true).Build().Bind(next);

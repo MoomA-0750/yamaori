@@ -213,7 +213,7 @@
             <option value="sftp">SFTP</option>
           </select></label>
         {#if kind !== 'none'}
-          <p class="faint">{kind === 'folder' ? 'NAS の共有（\\\\NAS\\photo\\VRChat）や、割り当てたドライブ（Z:\\VRChat）。' : kind === 'webdav' ? 'https:// で始まる WebDAV のアドレス（Synology・QNAP・Nextcloud など）。' : 'sftp://ホスト/フォルダ の形。'}</p>
+          <p class="faint">{kind === 'folder' ? 'NAS の共有（\\\\NAS\\photo\\VRChat）や、割り当てたドライブ（Z:\\VRChat）。' : kind === 'webdav' ? 'https:// で始まる WebDAV のアドレス（Synology・QNAP・Nextcloud など）。' : 'sftp://ホスト/フォルダ の形。最初につないだときの相手の鍵を覚え、鍵が変わったら送らない（相手の鍵を変えたときは、ここで保存し直す）。'}</p>
           <label class="stack field">送り先のアドレス<input type="text" bind:value={target} placeholder={kind === 'folder' ? '\\\\NAS\\photo\\VRChat' : kind === 'webdav' ? 'https://nas.local:5006/photo/VRChat' : 'sftp://nas.local/volume1/photo/VRChat'} /></label>
           {#if kind !== 'folder'}
             <div class="grid2">
