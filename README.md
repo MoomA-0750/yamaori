@@ -4,7 +4,7 @@ VRChat で過ごした時間を自動で記録し、あとから振り返った�
 
 名前は「山折り」から。旅先で過ごした時間・訪れた場所・会った人・撮った写真を、一枚の紙に折りたたむようにしまっておき、あとで開いて振り返る。
 
-> 設計の段階。まだコードはない（2026-11-08）。
+> 設計の段階。まだコードはない（2026-11-08）。段階の計画は [docs/plan.md](docs/plan.md)。
 
 ## できるようにすること
 
@@ -74,15 +74,16 @@ VRChat で過ごした時間を自動で記録し、あとから振り返った�
 
 ## ログから取れること
 
-VRCX と VRChatActivityTools のソースで調べた（実際のログでの確認はまだ）。
+VRCX と VRChatActivityTools のソースで調べ、2026-11-08 に実際のログで確かめた（[docs/log-check-2026-11-08.md](docs/log-check-2026-11-08.md)）。
 
 - 入った（`Joining wrld_…:インスタンス`、`Entering Room: 名前`）
-- 出た（`OnLeftRoom`、移動の開始の `Destination fetching`、終了の `OnApplicationQuit`。強制終了のときはログの最後の行の時刻）。今の VRChat では詳しい記録のレベルでしか出ない例があり、起動オプション `--enable-sdk-log-levels` が要る見込み
+- 出た（`OnLeftRoom`、移動の開始の `Destination fetching`、終了の `OnApplicationQuit`。終了の行がないときはログの最後の行の時刻）。起動オプションなしで出る
+- 本人の名前と ID（`Preforming post login checks for 名前 (usr_…)`。`User Authenticated` は今は出ない）
 - 人の出入り（`OnPlayerJoined` / `OnPlayerLeft 名前 (usr_…)`）
 - 動画の URL（`[Video Playback] Attempting to resolve URL` など。流した人の名前は一部のプレイヤーだけ）
 - スクリーンショットの時刻とパス（`[VRC Camera] Took screenshot to: …`。Multi Layer カメラの撮影は出ない）
 - アバターの変更（名前だけで、ID は出ない）
-- 招待・フレンド申請の通知（`Received Notification` / `Send notification` / `AcceptNotification`。今のクライアントで出るかは未確認）
+- 招待・フレンド申請の通知（`Received Notification`。同じ通知が何度も出るので ID で重ねない。フレンド申請は確かめた。招待と、自分が送った・承諾した行はまだ確かめていない）
 - **取れないもの**: 自分の送ったフレンド申請が承諾されたこと（VRCX があればその `friend_log_history` から）
 - **VRChat は起動したときに 24 時間より古いログを消す**。だから常駐して読み、生のログも別の場所（NAS など）へ写して残す。読み方を増やしたら、残した生のログから読み直せる
 
