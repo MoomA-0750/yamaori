@@ -152,6 +152,7 @@ public static class Auth
     // X-Forwarded-For は相手が変えられるので、全体の失敗の数でも止める（10 分に 30 回を超えたら、だれのログインも 5 分止める）
     static readonly ConcurrentDictionary<string, (int Failures, DateTime Until)> Failures = new();
     static readonly Lock GlobalLock = new();
+    static readonly SemaphoreSlim Verifying = new(2, 2);
     static readonly Queue<DateTime> GlobalFailures = new();
     static DateTime GlobalUntil = DateTime.MinValue;
 
@@ -186,12 +187,25 @@ public static class Auth
 
         auth.MapPost("/login", Results<NoContent, UnauthorizedHttpResult, ProblemHttpResult> (HttpContext ctx, Database db, LoginInput input) =>
         {
-            var key = ctx.Connection.RemoteIpAddress?.ToString() + "|" + ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-            if ((Failures.TryGetValue(key, out var f) && f.Until > DateTime.UtcNow) || GloballyLocked())
+            // 相手は、つないできたアドレスで分ける。X-Forwarded-For は、この PC のプロキシ（tailscale serve など）越しのときだけ使う
+            var remote = ctx.Connection.RemoteIpAddress;
+            var fromLoopback = remote != null && System.Net.IPAddress.IsLoopback(remote);
+            var key = remote?.ToString() + (fromLoopback ? "|" + ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault() : "");
+            // 全体の止めは、この PC から直接のログインには掛けない（外からの失敗で、本人が自分の PC から入れなくなるのを防ぐ）
+            var direct = fromLoopback && !ctx.Request.Headers.ContainsKey("X-Forwarded-For");
+            if ((Failures.TryGetValue(key, out var f) && f.Until > DateTime.UtcNow) || (!direct && GloballyLocked()))
                 return TypedResults.Problem("ログインの失敗が続いたので、少し待ってから", statusCode: StatusCodes.Status429TooManyRequests);
+            if ((input.Password ?? "").Length > 1024) return TypedResults.Unauthorized();
+            // パスワードの検証は重い（PBKDF2 60 万回）ので、同時に走らせる数を絞る。空きがなければ待たせずに断る
+            if (!Verifying.Wait(TimeSpan.FromSeconds(2)))
+                return TypedResults.Problem("ログインが混み合っているので、少し待ってから", statusCode: StatusCodes.Status429TooManyRequests);
             var store = new AuthStore(db);
-            if (!store.VerifyPassword(input.Password ?? ""))
+            bool ok;
+            try { ok = store.VerifyPassword(input.Password ?? ""); }
+            finally { Verifying.Release(); }
+            if (!ok)
             {
+                if (Failures.Count > 10_000) foreach (var old in Failures.Where(x => x.Value.Until < DateTime.UtcNow).Select(x => x.Key).ToList()) Failures.TryRemove(old, out _);
                 var n = (f.Failures) + 1;
                 Failures[key] = (n, n >= 5 ? DateTime.UtcNow.AddMinutes(Math.Min(30, n - 4)) : DateTime.MinValue);
                 CountGlobalFailure();
@@ -251,6 +265,8 @@ public static class Auth
             var store = new AuthStore(db);
             var listen = input.Listen ?? o.Value.Listen;
             if (listen is not ("local" or "lan" or "tailscale")) return TypedResults.BadRequest("listen は local・lan・tailscale");
+            if (input.Port is { } port && port is < 1024 or > 65535) return TypedResults.BadRequest("番号は 1024〜65535");
+            if (input.DeviceName is { } dn && (dn.Trim().Length is 0 or > 64)) return TypedResults.BadRequest("端末の名前は 1〜64 文字");
             var open = input.AllowUnauthenticatedRemote ?? store.GetBool("allow_unauthenticated_remote");
             if (open && input.AllowUnauthenticatedRemote == true && input.ConfirmUnauthenticatedRemote != true)
                 return TypedResults.BadRequest("認証なしで外へ開くには、confirmUnauthenticatedRemote: true が要る（記録がだれにでも見える）");
@@ -315,7 +331,9 @@ public static class Auth
         g.MapPut("/", Results<Ok<SyncSettingsView>, BadRequest<string>> (IOptions<YamaoriOptions> o, SyncSettingsInput input) =>
         {
             if (input.Role is { } r && r is not ("standalone" or "child")) return TypedResults.BadRequest("role は standalone・child");
-            if (input.ParentUrl is { Length: > 0 } u && !Uri.TryCreate(u, UriKind.Absolute, out _)) return TypedResults.BadRequest("親のアドレスは http://… の形");
+            if (input.ParentUrl is { Length: > 0 } u && !(Uri.TryCreate(u.Trim(), UriKind.Absolute, out var pu) && (pu.Scheme == Uri.UriSchemeHttp || pu.Scheme == Uri.UriSchemeHttps)))
+                return TypedResults.BadRequest("親のアドレスは http://… か https://… の形");
+            if (input.SyncMinutes is { } sm && (!double.IsFinite(sm) || sm < 1 || sm > 1440)) return TypedResults.BadRequest("送る間隔は 1〜1440 分");
             var path = Path.Combine(o.Value.DataDir, "yamaori.json");
             JsonObject json;
             try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
@@ -359,6 +377,13 @@ public static class Auth
         {
             if (input.Kind is { } k && k is not ("none" or "folder" or "webdav" or "sftp")) return TypedResults.BadRequest("kind は none・folder・webdav・sftp");
             if (input.Retention is { } r && r is not ("keep" or "days" or "after_upload")) return TypedResults.BadRequest("retention は keep・days・after_upload");
+            if (input.RetentionDays is { } rd && rd is < 1 or > 3650) return TypedResults.BadRequest("残す日数は 1〜3650");
+            if (input.IntervalMinutes is { } im && (!double.IsFinite(im) || im < 1 || im > 1440)) return TypedResults.BadRequest("送る間隔は 1〜1440 分");
+            var kindToCheck = input.Kind ?? o.Value.PhotoUpload.Kind;
+            if (input.Target is { Length: > 0 } tg && CheckTarget(kindToCheck, tg.Trim()) is { } bad) return TypedResults.BadRequest(bad);
+            if (input.PhotoDirs != null)
+                foreach (var pd in input.PhotoDirs.Where(x => x.Trim().Length > 0))
+                    if (CheckPhotoDir(pd.Trim(), o.Value.DataDir) is { } badDir) return TypedResults.BadRequest(badDir);
             var path = Path.Combine(o.Value.DataDir, "yamaori.json");
             JsonObject json;
             try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
@@ -421,6 +446,30 @@ public static class Auth
         new(o.Listen, o.Port, store.GetList("tailscale_logins"), store.GetBool("local_requires_login"), store.GetBool("allow_unauthenticated_remote"), store.PasswordSet, o.DeviceName);
 
     /// <summary>yamaori.json に、変えた項目だけを書く。今の設定と変わったら true（起こし直しが要る）。</summary>
+    /// <summary>送り先のアドレスの形を確かめる（おかしければ理由）。</summary>
+    static string? CheckTarget(string kind, string target) => kind switch
+    {
+        "webdav" when !(Uri.TryCreate(target, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp))
+            => "WebDAV の送り先は https://… の形",
+        "sftp" when !(Uri.TryCreate(target, UriKind.Absolute, out var u) && u.Scheme == "sftp" && u.Host.Length > 0)
+            => "SFTP の送り先は sftp://ホスト/フォルダ の形",
+        "folder" when !Path.IsPathFullyQualified(target) => "フォルダの送り先は、ドライブか \\\\NAS から始まる道",
+        _ => null,
+    };
+
+    /// <summary>見張る写真のフォルダを確かめる。ドライブそのもの（全部を読み、記録から開けてしまう）と、Yamaori のデータのフォルダは断る。</summary>
+    static string? CheckPhotoDir(string dir, string dataDir)
+    {
+        if (!Path.IsPathFullyQualified(dir)) return $"写真のフォルダは、ドライブか \\\\NAS から始まる道: {dir}";
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dir));
+        var root = Path.TrimEndingDirectorySeparator(Path.GetPathRoot(full) ?? "");
+        if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase) || full.Length <= 1) return $"ドライブ全体は見張れない: {dir}";
+        var data = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dataDir));
+        if (full.StartsWith(data, StringComparison.OrdinalIgnoreCase) || data.StartsWith(full + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            return $"Yamaori のデータのフォルダと重なるフォルダは見張れない: {dir}";
+        return null;
+    }
+
     static bool WriteConfig(YamaoriOptions o, string? listen, int? port, string? deviceName)
     {
         if (listen == null && port == null && deviceName == null) return false;

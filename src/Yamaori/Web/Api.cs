@@ -80,13 +80,15 @@ public static class Api
         api.MapPost("/notes", Results<Created<Note>, BadRequest<string>> (Queries q, YamaoriState state, NoteInput input) =>
         {
             if (!Queries.TargetTypes.Contains(input.TargetType)) return TypedResults.BadRequest("targetType は visit・world・person・day");
+            if ((input.Body ?? "").Length > MaxNote) return TypedResults.BadRequest($"メモは {MaxNote} 文字まで");
             if (!q.TargetExists(input.TargetType, input.TargetId)) return TypedResults.BadRequest("付け先が見つからない");
             var note = q.AddNote(input.TargetType, input.TargetId, input.Body ?? "", state.DeviceId);
             return TypedResults.Created($"/api/notes/{note.Id}", note);
         }).WithSummary("メモを書く（訪問・ワールド・人・日に付ける。本文は Markdown）");
 
-        api.MapPut("/notes/{id}", Results<Ok<Note>, NotFound> (Queries q, string id, NoteUpdate input) =>
-            q.UpdateNote(id, input.Body ?? "") is { } n ? TypedResults.Ok(n) : TypedResults.NotFound())
+        api.MapPut("/notes/{id}", Results<Ok<Note>, NotFound, BadRequest<string>> (Queries q, string id, NoteUpdate input) =>
+            (input.Body ?? "").Length > MaxNote ? TypedResults.BadRequest($"メモは {MaxNote} 文字まで")
+            : q.UpdateNote(id, input.Body ?? "") is { } n ? TypedResults.Ok(n) : TypedResults.NotFound())
             .WithSummary("メモを書き換える");
 
         api.MapDelete("/notes/{id}", Results<NoContent, NotFound> (Queries q, string id) =>
@@ -107,6 +109,7 @@ public static class Api
 
         api.MapPost("/sync/notes", (HttpContext ctx, Database db, IReadOnlyList<SyncNote> notes) =>
             {
+                notes = notes.Where(x => x.Body.Length <= MaxNote).Take(10_000).ToList();
                 var only = Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t ? t.DeviceId ?? "" : null;
                 return new { applied = new SyncStore(db).ApplyNotes(notes, only) };
             })
@@ -133,7 +136,10 @@ public static class Api
                 if (accounts.Count != 1) return TypedResults.BadRequest("アカウントが 1 つに決まらないので accountId を渡す");
                 account = accounts[0].Id;
             }
-            return TypedResults.Ok(new ExtensionStore(db).SaveFriends(account, input.Friends ?? []));
+            if (input.Friends is { Count: > 10_000 }) return TypedResults.BadRequest("フレンドは 10000 人まで");
+            var friends = (input.Friends ?? []).Where(x => x.Id is { Length: > 0 and <= 64 })
+                .Select(x => x with { DisplayName = x.DisplayName is { Length: > 200 } dn ? dn[..200] : x.DisplayName }).ToList();
+            return TypedResults.Ok(new ExtensionStore(db).SaveFriends(account, friends));
         }).WithSummary("フレンドの一覧を入れ、前に入れた一覧と比べて増えた・減った・名前を変えた人を記録する（拡張機能から）");
 
         // ---- 写真
@@ -182,6 +188,9 @@ public static class Api
     public sealed record SaveWorldInput(string? Url, string? Text, string? WorldId, string? Name, string? List);
     public sealed record SavedWorld(string WorldId, string List);
     public sealed record FavoriteList(string Name, int Count);
+    /// <summary>メモの長さの上限（文字）。</summary>
+    public const int MaxNote = 100_000;
+
     public sealed record FriendSnapshotInput(string? AccountId, IReadOnlyList<FriendInput>? Friends);
     public sealed record DayView(string Date, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 
