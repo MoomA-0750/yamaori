@@ -7,7 +7,8 @@ namespace Yamaori;
 /// <summary>常駐するときの組み立て。ログの見張りと、WebUI・API を一つのプロセスで動かす。</summary>
 public static class Server
 {
-    public static WebApplication Build(string[] args, IConfiguration config, YamaoriOptions options)
+    /// <param name="configure">試験で、組み立てを差し替える（TestServer に載せるなど）。</param>
+    public static WebApplication Build(string[] args, IConfiguration config, YamaoriOptions options, Action<WebApplicationBuilder>? configure = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
         builder.Configuration.AddConfiguration(config);
@@ -27,6 +28,8 @@ public static class Server
                 k.Listen(IPAddress.IPv6Loopback, options.Port);
             }
         });
+
+        configure?.Invoke(builder);
 
         string deviceId;
         using (var db = Database.Open(options.DatabasePath)) deviceId = db.SelfDevice(options.DeviceName);
@@ -57,6 +60,8 @@ public static class Server
         {
             if (LiveHub.From(file, e) is { } live) hub.Publish(live);
         };
+        // 入口の見張りは、どの API に当たるかを知ってから決める
+        app.UseRouting();
         Auth.UseAccess(app);
         // 画面（web/ をビルドしたもの）。index.html は毎回確かめさせ、名前にハッシュの付いたものは長く持たせる
         app.UseDefaultFiles();

@@ -23,8 +23,14 @@ public static class Auth
     {
         app.Use(async (ctx, next) =>
         {
-            var path = ctx.Request.Path.Value ?? "/";
-            var isApi = path.StartsWith("/api/", StringComparison.Ordinal) || path.StartsWith("/openapi", StringComparison.Ordinal) || path.StartsWith("/mcp", StringComparison.Ordinal);
+            var path = ctx.Request.Path;
+            // 経路の照合（大文字小文字を区別しない）を先に済ませてあるので、API などに当たる要求は書き方によらず見張る。
+            // 当たらない要求（画面の静的なファイル）だけを、認証なしで通す
+            var isApi = ctx.GetEndpoint() != null
+                || path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWithSegments("/mcp", StringComparison.OrdinalIgnoreCase);
+            var isOpen = OpenApiPaths.Any(o => string.Equals(path.Value?.TrimEnd('/'), o, StringComparison.OrdinalIgnoreCase));
             var db = ctx.RequestServices.GetRequiredService<Database>();
             var store = new AuthStore(db);
             var result = AccessPolicy.Decide(Describe(ctx, store), Settings(ctx, store));
@@ -37,7 +43,7 @@ public static class Auth
                 return;
             }
             // 画面（静的なファイル）は誰にでも出す。中身は API で取るので、ここでは記録は見えない
-            if (result == AccessResult.Allow || !isApi || OpenApiPaths.Contains(path))
+            if (result == AccessResult.Allow || !isApi || isOpen)
             {
                 await next(ctx).ConfigureAwait(false);
                 return;
