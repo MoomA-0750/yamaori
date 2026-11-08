@@ -4,7 +4,7 @@ VRChat で過ごした時間を自動で記録し、あとから振り返った�
 
 名前は「山折り」から。旅先で過ごした時間・訪れた場所・会った人・撮った写真を、一枚の紙に折りたたむようにしまっておき、あとで開いて振り返る。
 
-> 作っているところ（2026-11-09）。ログの記録、生のログの保存、WebUI・REST API・SSE・MCP、写真の目録と NAS への送り出し、VRChatActivityTools・VRCX の取り込み、ブラウザの拡張機能、親と子の端末まで。インストーラーと winget はまだ。段階の計画は [docs/plan.md](docs/plan.md)。
+> 作っているところ（2026-11-09）。ログの記録、生のログの保存、WebUI・REST API・SSE・MCP、写真の目録と NAS への送り出し、VRChatActivityTools・VRCX の取り込み、ブラウザの拡張機能、親と子の端末、インストーラーまで。winget への登録は公開のとき。段階の計画は [docs/plan.md](docs/plan.md)。
 
 ### 試す
 
@@ -83,6 +83,17 @@ VRChat の利用規約（13.2(j)）は、VRChat が出していない道具で�
 - 親へ送る記録は 1 件ずつ ID を持ち、二重に入らない。親につながらない間は手元に溜めて、つながったら送る
 - 言語は .NET（C#）を想定。WinUI 3 のアプリと型を共有でき、サーバーは Linux でも動く
 - 時刻は UTC で持つ（ログの時刻はタイムゾーンのないローカル時刻なので、読むときに直す）
+
+### Linux のサーバーを親にする
+
+```sh
+docker compose up -d --build
+docker compose exec yamaori yamaori set-password --data-dir /data
+```
+
+- `http://<サーバー>:47800` を開いてログインし、設定でトークンを作る。子の端末（Windows）の設定に、親のアドレスとそのトークンを入れると、10 分ごとに記録とメモが送られる
+- サーバーには VRChat のログがないので、ログの見張りはしない。写真を目録に入れるなら、NAS をつないだフォルダを `/photos` に読むだけで渡す（[compose.yaml](compose.yaml) の注釈を外す）
+- 家の外から見るなら、Tailscale などを通し、パスワードかトークンを必ず使う
 
 ## 記録するもの
 

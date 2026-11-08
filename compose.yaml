@@ -1,0 +1,22 @@
+# Yamaori を Linux のサーバーで「親」として動かす見本。子の端末（Windows）から記録を受け取り、WebUI・API を配る。
+#
+#   docker compose up -d --build
+#   docker compose exec yamaori yamaori set-password --data-dir /data   # 最初にパスワードを決める
+#
+# そのあと http://<サーバー>:47800 を開いてログインし、設定でトークンを作って、子の端末の設定（親のアドレスとトークン）に入れる。
+services:
+  yamaori:
+    build: .
+    image: yamaori
+    restart: unless-stopped
+    ports:
+      - "47800:47800"
+    environment:
+      TZ: Asia/Tokyo            # 日の区切りに使う。付けないと UTC で区切る
+    volumes:
+      - yamaori-data:/data      # DB・メモ・縮小・設定
+      # 写真を目録に入れるなら、NAS をつないだフォルダを読むだけで渡す
+      # - /mnt/nas/VRChat:/photos:ro
+
+volumes:
+  yamaori-data:
