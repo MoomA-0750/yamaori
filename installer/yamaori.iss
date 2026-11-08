@@ -6,7 +6,6 @@
 ; 作り方（Windows で）:
 ;   powershell -File installer\build.ps1      … 画面と本体を発行してから、iscc で Yamaori-Setup-<版>.exe を作る
 ;
-; 2026-11-09 に書いた。まだ Windows で作って試していない。
 
 #ifndef AppVersion
   #define AppVersion "0.1.0"
@@ -59,7 +58,8 @@ Filename: "{app}\Yamaori.exe"; WorkingDir: "{app}"; Flags: nowait runasoriginalu
 Filename: "http://localhost:{code:GetPort}/"; Description: "Yamaori を開く"; Flags: postinstall shellexec skipifsilent nowait
 
 [UninstallRun]
-Filename: "{sys}\taskkill.exe"; Parameters: "/IM Yamaori.exe /F"; Flags: runhidden; RunOnceId: "StopYamaori"
+; 外す前に、ここに入れた Yamaori だけを止める（ほかの場所の Yamaori、開発中の版などには触らない）
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-Process Yamaori -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -eq '{app}\Yamaori.exe' } | Stop-Process -Force"""; Flags: runhidden; RunOnceId: "StopYamaori"
 
 [Code]
 // /PORT=… /LISTEN=… を、データのフォルダの yamaori.json に書く（すでにあれば触らない）
@@ -68,7 +68,6 @@ begin
   Result := ExpandConstant('{param:PORT|47800}');
 end;
 
-// 入れ替える前に、動いている Yamaori を止める
 // 入れ替える前に Yamaori を止める。まず頼んで止まってもらい（読み込みの途中でも区切って止まる）、止まらなければ強制的に止める。
 // そのあと、部品のファイル（clrjit.dll）が書き込み用に開けるようになるまで 60 秒まで待つ。
 // 強制的に止めた直後は、NAS（SMB）との読み書きが片付くまで Windows の中で後始末が続き、ファイルが放されない
@@ -79,12 +78,17 @@ var
 begin
   Log('Yamaori を止める');
   Dll := ExpandConstant('{app}\clrjit.dll');
+  // ここに入れた Yamaori だけを相手にする（ほかの場所の Yamaori、開発中の版などには触らない）。
+  // 止めるよう頼む番号は、データのフォルダの yamaori.json に書いてある番号（本人が設定で変えていても届くように）
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
     '-NoProfile -Command "' +
-    'try { Invoke-RestMethod -Method Post -Uri http://localhost:' + GetPort('') + '/api/settings/shutdown -TimeoutSec 5 | Out-Null } catch { }; ' +
-    'Wait-Process -Name Yamaori -Timeout 20 -ErrorAction SilentlyContinue; ' +
-    'Get-Process Yamaori -ErrorAction SilentlyContinue | Stop-Process -Force; ' +
-    'Wait-Process -Name Yamaori -Timeout 15 -ErrorAction SilentlyContinue; ' +
+    '$exe = ''' + ExpandConstant('{app}\Yamaori.exe') + '''; ' +
+    'function Mine { Get-Process Yamaori -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }; ' +
+    '$port = ' + GetPort('') + '; try { $j = Get-Content (Join-Path $env:LOCALAPPDATA ''Yamaori\yamaori.json'') -Raw | ConvertFrom-Json; if ($j.Port) { $port = $j.Port } } catch { }; ' +
+    'if (Mine) { try { Invoke-RestMethod -Method Post -Uri (''http://localhost:'' + $port + ''/api/settings/shutdown'') -TimeoutSec 5 | Out-Null } catch { } }; ' +
+    '$p = Mine; if ($p) { $p | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue }; ' +
+    'Mine | Stop-Process -Force; ' +
+    '$p = Mine; if ($p) { $p | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue }; ' +
     '$f = ''' + Dll + '''; for ($i = 0; $i -lt 120; $i++) { if (-not (Test-Path $f)) { break }; ' +
     'try { $s = [IO.File]::Open($f, ''Open'', ''ReadWrite'', ''None''); $s.Close(); break } catch { Start-Sleep -Milliseconds 500 } }"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
