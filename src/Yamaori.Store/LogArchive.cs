@@ -17,6 +17,9 @@ public sealed class LogArchive(string dir)
         var name = Path.GetFileName(sourcePath);
         var plain = Path.Combine(Dir, name);
         var gz = plain + ".gz";
+        // 写す先が元のログそのもの（ログのフォルダと残すフォルダが同じ）なら何もしない。固めるときに元を消してしまうため
+        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(plain), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            return;
         if (File.Exists(gz)) return;
         Directory.CreateDirectory(Dir);
 

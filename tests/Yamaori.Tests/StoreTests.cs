@@ -83,6 +83,16 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 残すフォルダがログのフォルダと同じでも_元のログを消さない()
+    {
+        var bytes = Fixture();
+        File.WriteAllBytes(LogPath, bytes);
+        var archive = new LogArchive(Path.GetDirectoryName(LogPath)!);
+        archive.Sync(LogPath, closed: true);
+        Assert.Equal(bytes, File.ReadAllBytes(LogPath));
+    }
+
+    [Fact]
     public void 生のログを少しずつ写し_閉じたら固め_そこから読み直せる()
     {
         var bytes = Fixture();
