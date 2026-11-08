@@ -14,6 +14,7 @@
   function close() {
     dialog?.close()
   }
+  const index = $derived(open ? photos.findIndex((p) => p.id === open!.id) : -1)
   function step(n: number) {
     if (!open) return
     const i = photos.findIndex((p) => p.id === open!.id)
@@ -59,8 +60,8 @@
           </div>
         </div>
         <div class="row">
-          <button class="ghost" onclick={() => step(-1)} aria-label="前の写真">←</button>
-          <button class="ghost" onclick={() => step(1)} aria-label="次の写真">→</button>
+          <button class="ghost" onclick={() => step(-1)} aria-label="前の写真" disabled={index <= 0}>←</button>
+          <button class="ghost" onclick={() => step(1)} aria-label="次の写真" disabled={index >= photos.length - 1}>→</button>
           {#if open.available}<a class="chip" href={api.photoFile(open.id)} target="_blank" rel="noopener">もとの大きさ ↗</a>{/if}
           <button onclick={close}>閉じる</button>
         </div>
@@ -74,7 +75,8 @@
   .cell { padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; width: 100%; aspect-ratio: 16 / 9; position: relative; background: var(--surface-2); display: block; min-height: 0; }
   .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cell:hover { border-color: var(--accent); }
-  .when { position: absolute; left: .35rem; bottom: .3rem; font-size: .72rem; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 70%); font-variant-numeric: tabular-nums; }
+  .when { position: absolute; left: 0; right: 0; bottom: 0; padding: 1rem .4rem .25rem; font-size: .75rem; color: #fff; text-align: left;
+    background: linear-gradient(transparent, rgb(0 0 0 / 65%)); font-variant-numeric: tabular-nums; }
   .missing { display: grid; place-items: center; height: 100%; font-size: .8rem; }
   dialog { border: 0; padding: 0; background: var(--surface); color: var(--ink); border-radius: var(--radius); width: min(96vw, 1100px); max-height: 94vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
   dialog::backdrop { background: rgb(0 0 0 / 70%); }
