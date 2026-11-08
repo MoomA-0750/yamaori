@@ -45,7 +45,7 @@
 <header class="top">
   <div class="bar">
     <a class="brand" href={href.days()} aria-label="Yamaori の日記へ">
-      <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><path d="M4 9 16 4l12 5v14l-12 5-12-5z" fill="var(--surface-2)"/><path d="M16 4v24" stroke="var(--accent)" stroke-width="2"/><path d="M4 9l12 5 12-5" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".6"/></svg>
+      <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><path d="M4 9 16 4l12 5v14l-12 5-12-5z" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width=".8" stroke-opacity=".5"/><path d="M16 4v24" stroke="var(--accent)" stroke-width="2"/><path d="M4 9l12 5 12-5" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".6"/></svg>
       Yamaori
     </a>
     {#if auth?.allowed}
@@ -96,7 +96,7 @@
   .tabs { display: flex; gap: .15rem; margin-left: auto; overflow-x: auto; }
   .tabs a { padding: .4rem .75rem; border-radius: 999px; color: var(--ink-2); white-space: nowrap; }
   .tabs a:hover { background: var(--surface-2); color: var(--ink); }
-  .tabs a[aria-current='page'] { background: var(--ink); color: var(--bg); }
+  .tabs a[aria-current='page'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .now { max-width: 52rem; margin: 0 auto; padding: .35rem 1rem .55rem; display: flex; align-items: baseline; gap: .5rem; font-size: .9rem; }
   .now:hover { color: inherit; }
   .now:hover .world { color: var(--accent); }

@@ -35,6 +35,8 @@ public static class Server
         builder.Services.AddScoped(_ => Database.Open(options.DatabasePath));
         builder.Services.AddScoped(s => new Queries(s.GetRequiredService<Database>()));
         builder.Services.AddOpenApi();
+        // AI のエージェント向けの口（/mcp）。要求ごとに完結させる（つなぎっぱなしの状態を持たない）
+        builder.Services.AddMcpServer().WithHttpTransport(o => o.Stateless = true).WithTools<McpTools>();
         builder.Services.ConfigureHttpJsonOptions(j =>
         {
             j.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
@@ -59,6 +61,7 @@ public static class Server
         app.MapOpenApi();
         Auth.Map(app);
         Api.Map(app);
+        app.MapMcp("/mcp");
         return app;
     }
 }

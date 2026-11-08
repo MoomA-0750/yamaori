@@ -11,6 +11,7 @@ using Yamaori.Store;
 // yamaori summary            DB のまとめを出す
 // yamaori rebuild            DB に残した出来事から、記録を全部組み立て直す
 // yamaori reparse            残した生のログから、出来事を全部読み直す（読み方を直したあと）
+// yamaori export --out <dir> 日記を日ごとの Markdown に書き出す
 // 共通の引数: --log-dir <フォルダ> --data-dir <フォルダ> --database <ファイル>
 var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
 // Windows では窓を出さない形（WinExe）で作るので、コマンドのときは呼んだ側のコンソールにつなぐ
@@ -79,8 +80,23 @@ switch (command)
         Summary.Print(db);
         return 0;
     }
+    case "export":
+    {
+        // yamaori export --out <フォルダ>  日ごとの Markdown を書き出す
+        var outDir = new ConfigurationBuilder().AddCommandLine(rest).Build()["out"] ?? Path.Combine(options.DataDir, "export");
+        Directory.CreateDirectory(outDir);
+        using var db = Database.Open(options.DatabasePath);
+        var count = 0;
+        foreach (var (file, content) in new MarkdownExport(new Queries(db)).Days())
+        {
+            File.WriteAllText(Path.Combine(outDir, file), content);
+            count++;
+        }
+        Console.WriteLine($"{count} 日分を {outDir} に書き出した");
+        return 0;
+    }
     default:
-        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse）");
+        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export）");
         return 2;
 }
 

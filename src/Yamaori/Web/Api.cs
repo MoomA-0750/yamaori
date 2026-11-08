@@ -84,17 +84,32 @@ public static class Api
             q.DeleteNote(id) ? TypedResults.NoContent() : TypedResults.NotFound())
             .WithSummary("メモを消す");
 
+        // ---- 書き出し
+
+        api.MapGet("/export/markdown", (Queries q, DateOnly? from, DateOnly? to) =>
+        {
+            var text = string.Join("\n", new MarkdownExport(q).Days(from, to).Select(x => x.Content));
+            return TypedResults.Text(text, "text/markdown; charset=utf-8");
+        }).WithSummary("日記を Markdown で書き出す（期間の日を古い順に 1 つの文書に。日ごとのファイルは yamaori export で）");
+
         // ---- 今の出来事
 
-        api.MapGet("/stream", (LiveHub hub, CancellationToken cancel) =>
-            TypedResults.ServerSentEvents(Stream(hub, cancel)))
+        api.MapGet("/stream", (LiveHub hub, IHostApplicationLifetime life, CancellationToken cancel) =>
+        {
+            // 相手が切ったときだけでなく、Yamaori を止めるときにも閉じる（閉じないと止まるのを待たせる）
+            var linked = CancellationTokenSource.CreateLinkedTokenSource(cancel, life.ApplicationStopping);
+            return TypedResults.ServerSentEvents(Stream(hub, linked));
+        })
             .WithSummary("今の出来事を SSE で流す（入った・出た・人が来た・動画・スクショ・通知）");
     }
 
     public sealed record DayView(string Date, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 
-    static async IAsyncEnumerable<SseItem<LiveEvent>> Stream(LiveHub hub, [EnumeratorCancellation] CancellationToken cancel)
+    static async IAsyncEnumerable<SseItem<LiveEvent>> Stream(LiveHub hub, CancellationTokenSource linked, [EnumeratorCancellation] CancellationToken enumeration = default)
     {
+        using var _ = linked;
+        using var both = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, enumeration);
+        var cancel = both.Token;
         var reader = hub.Subscribe(cancel);
         yield return new SseItem<LiveEvent>(new LiveEvent("hello", DateTime.UtcNow, new Dictionary<string, string?>()), "hello");
         while (!cancel.IsCancellationRequested)
