@@ -40,6 +40,18 @@ public sealed class YamaoriOptions
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "VRChat");
     }
 
+    /// <summary>端末の役割。standalone（ひとりで。既定。親にもなれる）・child（子。記録を親へ送る）。</summary>
+    public string Role { get; set; } = "standalone";
+
+    /// <summary>子のとき、親の Yamaori のアドレス（http://desktop:47800 など）。</summary>
+    public string? ParentUrl { get; set; }
+
+    /// <summary>子のとき、親で作ったトークン（暗号化した形）。</summary>
+    public string? ParentToken { get; set; }
+
+    /// <summary>子のとき、親へ送る間隔（分）。</summary>
+    public double SyncMinutes { get; set; } = 10;
+
     /// <summary>写真を NAS などへ送る設定。</summary>
     public PhotoUploadOptions PhotoUpload { get; set; } = new();
 

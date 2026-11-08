@@ -232,6 +232,50 @@ public static class Auth
     static PhotoSettingsView PhotoView(YamaoriOptions o) => new(o.PhotoDirs, o.EffectivePhotoDirs, o.PhotoUpload.Kind, o.PhotoUpload.Target,
         o.PhotoUpload.Username, !string.IsNullOrEmpty(o.PhotoUpload.Password), o.PhotoUpload.Retention, o.PhotoUpload.RetentionDays, o.PhotoUpload.IntervalMinutes);
 
+    public sealed record SyncSettingsView(string Role, string? ParentUrl, bool ParentTokenSet, double SyncMinutes);
+    public sealed record SyncSettingsInput(string? Role, string? ParentUrl, string? ParentToken, double? SyncMinutes);
+
+    /// <summary>端末の役割（ひとりで・子）。yamaori.json に書き、起こし直すと効く。</summary>
+    public static void MapSyncSettings(WebApplication app)
+    {
+        var g = app.MapGroup("/api/settings/sync");
+        g.MapGet("/", (IOptions<YamaoriOptions> o) => new SyncSettingsView(o.Value.Role, o.Value.ParentUrl, !string.IsNullOrEmpty(o.Value.ParentToken), o.Value.SyncMinutes))
+            .WithSummary("端末の役割（ひとりで・子）");
+        g.MapPut("/", Results<Ok<SyncSettingsView>, BadRequest<string>> (IOptions<YamaoriOptions> o, SyncSettingsInput input) =>
+        {
+            if (input.Role is { } r && r is not ("standalone" or "child")) return TypedResults.BadRequest("role は standalone・child");
+            if (input.ParentUrl is { Length: > 0 } u && !Uri.TryCreate(u, UriKind.Absolute, out _)) return TypedResults.BadRequest("親のアドレスは http://… の形");
+            var path = Path.Combine(o.Value.DataDir, "yamaori.json");
+            JsonObject json;
+            try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
+            catch (JsonException) { json = []; }
+            if (input.Role != null) json["Role"] = input.Role;
+            if (input.ParentUrl != null) json["ParentUrl"] = input.ParentUrl.Trim();
+            if (input.ParentToken is { Length: > 0 } t) json["ParentToken"] = Photos.Secrets.Protect(t.Trim());
+            if (input.SyncMinutes is { } m) json["SyncMinutes"] = Math.Max(1, m);
+            Directory.CreateDirectory(o.Value.DataDir);
+            File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            return TypedResults.Ok(new SyncSettingsView((string?)json["Role"] ?? "standalone", (string?)json["ParentUrl"], json["ParentToken"] != null, (double?)json["SyncMinutes"] ?? 10));
+        }).WithSummary("端末の役割を変える（起こし直すと効く。トークンは暗号化して置く）");
+        g.MapPost("/test", async (IOptions<YamaoriOptions> o, SyncSettingsInput input, CancellationToken cancel) =>
+        {
+            var url = input.ParentUrl ?? o.Value.ParentUrl;
+            var token = input.ParentToken is { Length: > 0 } t ? t.Trim() : Photos.Secrets.Unprotect(o.Value.ParentToken);
+            if (string.IsNullOrEmpty(url)) return new ConnectionTest(false, "親のアドレスが決まっていない");
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            if (token != null) http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            try
+            {
+                using var res = await http.GetAsync(url.TrimEnd('/') + "/api/status", cancel).ConfigureAwait(false);
+                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized) return new ConnectionTest(false, "親が断った（トークンを確かめる）");
+                if (!res.IsSuccessStatusCode) return new ConnectionTest(false, $"親が {(int)res.StatusCode} を返した");
+                var status = await res.Content.ReadFromJsonAsync<Api.Status>(cancel).ConfigureAwait(false);
+                return new ConnectionTest(true, $"親（{status?.DeviceName}）につながった");
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { return new ConnectionTest(false, ex.Message); }
+        }).WithSummary("親に試しにつなぐ");
+    }
+
     /// <summary>写真の設定（見張るフォルダ・送り先・手元の残し方）。yamaori.json に書き、起こし直すと効く。</summary>
     public static void MapPhotoSettings(WebApplication app)
     {

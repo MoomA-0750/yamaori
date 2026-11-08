@@ -35,8 +35,10 @@ config.Bind(options);
 switch (command)
 {
     case "run":
-        // 同じ本人のもとで二つ起きないようにする
-        using (var mutex = new Mutex(false, @"Local\Yamaori"))
+        // 同じデータのフォルダで二つ起きないようにする（データのフォルダが違えば、別々に動ける）
+        var mutexName = @"Local\Yamaori-" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(options.DataDir).ToLowerInvariant())), 0, 8);
+        using (var mutex = new Mutex(false, mutexName))
         {
             // 起こし直しのときは、前のものが止まるのを少し待つ
             bool first;

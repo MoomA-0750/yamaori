@@ -123,6 +123,27 @@
     try { const r = await api.testPhotoTarget(photoInput()); testMsg = r.ok ? 'つながりました' : `つながりません: ${r.message}` } catch (e) { testMsg = (e as Error).message }
   }
 
+  // 端末の役割
+  let sync = $state<import('./../schema').components['schemas']['SyncSettingsView'] | null>(null)
+  let role = $state('standalone')
+  let parentUrl = $state('')
+  let parentToken = $state('')
+  let syncMsg = $state('')
+  api.syncSettings().then((x) => { sync = x; role = x.role; parentUrl = x.parentUrl ?? '' }).catch(() => {})
+  async function saveSync() {
+    syncMsg = ''
+    try {
+      sync = await api.saveSyncSettings({ role, parentUrl, parentToken: parentToken || null })
+      parentToken = ''
+      syncMsg = '保存しました。起こし直すと効きます。'
+      restartNeeded = true
+    } catch (e) { syncMsg = (e as Error).message }
+  }
+  async function testParent() {
+    syncMsg = 'つないでいます…'
+    try { const r = await api.testParent({ parentUrl, parentToken: parentToken || null }); syncMsg = r.ok ? r.message : `つながりません: ${r.message}` } catch (e) { syncMsg = (e as Error).message }
+  }
+
   async function logout() {
     await api.logout()
     onLogout()
@@ -214,6 +235,32 @@
         {/if}
         <div class="row"><button class="primary" onclick={savePhoto}>保存</button>{#if restartNeeded}<button onclick={restart} disabled={restarting}>{restarting ? '起こし直しています…' : 'Yamaori を起こし直す'}</button>{/if}</div>
         {#if photoMsg}<p class="muted">{photoMsg}</p>{/if}
+      </section>
+    {/if}
+
+    {#if sync}
+      <section class="card pad stack">
+        <h2>ほかの端末と</h2>
+        <fieldset class="stack choices">
+          <legend class="sr">この端末の役割</legend>
+          <label class="choice"><input type="radio" bind:group={role} value="standalone" />
+            <span><b>ひとりで（親にもなれる）</b><span class="faint">記録をこの端末に持ちます。ほかの端末（子）からの記録も受け取れます</span></span></label>
+          <label class="choice"><input type="radio" bind:group={role} value="child" />
+            <span><b>子</b><span class="faint">この端末でも記録し、親の端末へ 10 分ごとに送ります（ノートなど）。親につながらない間は、つながったときにまとめて送ります</span></span></label>
+        </fieldset>
+        {#if role === 'child'}
+          <label class="stack field">親のアドレス<input type="text" bind:value={parentUrl} placeholder="http://desktop:47800" /></label>
+          <label class="stack field">親で作ったトークン{sync.parentTokenSet ? '（決めてあります。変えるときだけ入れる）' : ''}<input type="password" bind:value={parentToken} autocomplete="off" /></label>
+          <p class="faint">親の端末では、見せ方を「家の中の端末からも」か「Tailscale から」にし、設定の「ほかのアプリ用のトークン」でこの端末用のトークンを作ります。</p>
+        {:else}
+          <p class="faint">この端末を親にするときは、見せ方を「家の中の端末からも」か「Tailscale から」にし、子の端末ごとにトークンを作って渡します。</p>
+        {/if}
+        <div class="row">
+          {#if role === 'child'}<button onclick={testParent}>試しにつなぐ</button>{/if}
+          <button class="primary" onclick={saveSync}>保存</button>
+          {#if restartNeeded}<button onclick={restart} disabled={restarting}>{restarting ? '起こし直しています…' : 'Yamaori を起こし直す'}</button>{/if}
+        </div>
+        {#if syncMsg}<p class="muted">{syncMsg}</p>{/if}
       </section>
     {/if}
 

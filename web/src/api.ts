@@ -92,5 +92,8 @@ export const api = {
   photoSettings: () => call<PhotoSettingsView>('GET', '/api/settings/photos/'),
   savePhotoSettings: (s: Partial<S['PhotoSettingsInput']>) => call<PhotoSettingsView>('PUT', '/api/settings/photos/', s),
   testPhotoTarget: (s: Partial<S['PhotoSettingsInput']>) => call<S['ConnectionTest']>('POST', '/api/settings/photos/test', s),
+  syncSettings: () => call<S['SyncSettingsView']>('GET', '/api/settings/sync/'),
+  saveSyncSettings: (s: Partial<S['SyncSettingsInput']>) => call<S['SyncSettingsView']>('PUT', '/api/settings/sync/', s),
+  testParent: (s: Partial<S['SyncSettingsInput']>) => call<S['ConnectionTest']>('POST', '/api/settings/sync/test', s),
   restart: () => call<void>('POST', '/api/settings/restart'),
 }

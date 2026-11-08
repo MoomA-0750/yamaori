@@ -345,6 +345,94 @@
         }
       }
     },
+    "/api/settings/sync": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "端末の役割（ひとりで・子）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "端末の役割を変える（起こし直すと効く。トークンは暗号化して置く）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/sync/test": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "親に試しにつなぐ",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/status": {
       "get": {
         "tags": [
@@ -1019,6 +1107,72 @@
         }
       }
     },
+    "/api/sync/projection": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "子の端末から、出どころ 1 つ分の記録を受け取って入れ替える",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncProjection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/notes": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "子の端末から、メモを受け取る（後から直した方を残す）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SyncNote"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnonymousTypeOfint"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/worlds/{id}/details": {
       "put": {
         "tags": [
@@ -1390,6 +1544,76 @@
           }
         }
       },
+      "ActivityEvent": {
+        "required": [
+          "id",
+          "source",
+          "visitId",
+          "at",
+          "kind",
+          "userId",
+          "name",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "visitId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AnonymousTypeOfint": {
+        "required": [
+          "applied"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ApiToken": {
         "required": [
           "id",
@@ -1558,6 +1782,45 @@
           "visitCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "Encounter": {
+        "required": [
+          "id",
+          "visitId",
+          "userId",
+          "name",
+          "joinedAt",
+          "leftAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visitId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leftAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -1732,6 +1995,72 @@
             "additionalProperties": {
               "type": "string"
             }
+          }
+        }
+      },
+      "LogSession": {
+        "required": [
+          "deviceId",
+          "logFile",
+          "startedAt",
+          "endedAt",
+          "endReason",
+          "selfId",
+          "selfName",
+          "vr",
+          "hmd"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "logFile": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "selfId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "selfName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vr": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "hmd": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2269,6 +2598,49 @@
           }
         }
       },
+      "Projection": {
+        "required": [
+          "deviceId",
+          "session",
+          "visits",
+          "encounters",
+          "events"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "session": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LogSession"
+              }
+            ]
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Visit"
+            }
+          },
+          "encounters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Encounter"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityEvent"
+            }
+          }
+        }
+      },
       "SettingsInput": {
         "required": [
           "listen",
@@ -2442,6 +2814,132 @@
           }
         }
       },
+      "SyncNote": {
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "body",
+          "deviceId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SyncProjection": {
+        "required": [
+          "deviceId",
+          "deviceName",
+          "source",
+          "projection"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/Projection"
+          }
+        }
+      },
+      "SyncSettingsInput": {
+        "required": [
+          "role",
+          "parentUrl",
+          "parentToken",
+          "syncMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parentUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parentToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "syncMinutes": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "SyncSettingsView": {
+        "required": [
+          "role",
+          "parentUrl",
+          "parentTokenSet",
+          "syncMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "parentUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parentTokenSet": {
+            "type": "boolean"
+          },
+          "syncMinutes": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "TokenCreated": {
         "required": [
           "token",
@@ -2465,6 +2963,88 @@
         "properties": {
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "Visit": {
+        "required": [
+          "id",
+          "source",
+          "worldId",
+          "worldName",
+          "instance",
+          "instanceNumber",
+          "access",
+          "ownerId",
+          "groupId",
+          "region",
+          "joinedAt",
+          "leftAt",
+          "leftReason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "worldId": {
+            "type": "string"
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": "string"
+          },
+          "instanceNumber": {
+            "type": "string"
+          },
+          "access": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "region": {
+            "type": "string"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leftAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "leftReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

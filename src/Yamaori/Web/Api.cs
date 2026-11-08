@@ -84,6 +84,18 @@ public static class Api
             q.DeleteNote(id) ? TypedResults.NoContent() : TypedResults.NotFound())
             .WithSummary("メモを消す");
 
+        // ---- 子の端末から（親で受ける）
+
+        api.MapPost("/sync/projection", Results<NoContent, BadRequest<string>> (Database db, SyncProjection input) =>
+        {
+            try { new SyncStore(db).Apply(input); }
+            catch (ArgumentException ex) { return TypedResults.BadRequest(ex.Message); }
+            return TypedResults.NoContent();
+        }).WithSummary("子の端末から、出どころ 1 つ分の記録を受け取って入れ替える");
+
+        api.MapPost("/sync/notes", (Database db, IReadOnlyList<SyncNote> notes) => new { applied = new SyncStore(db).ApplyNotes(notes) })
+            .WithSummary("子の端末から、メモを受け取る（後から直した方を残す）");
+
         // ---- 拡張機能から
 
         api.MapPut("/worlds/{id}/details", Results<NoContent, BadRequest<string>> (Database db, string id, WorldDetailsInput input) =>

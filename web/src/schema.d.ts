@@ -483,6 +483,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 端末の役割（ひとりで・子） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SyncSettingsView"];
+                    };
+                };
+            };
+        };
+        /** 端末の役割を変える（起こし直すと効く。トークンは暗号化して置く） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SyncSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SyncSettingsView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/sync/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 親に試しにつなぐ */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SyncSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConnectionTest"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -1158,6 +1267,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/projection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 子の端末から、出どころ 1 つ分の記録を受け取って入れ替える */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SyncProjection"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 子の端末から、メモを受け取る（後から直した方を残す） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SyncNote"][];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AnonymousTypeOfint"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/worlds/{id}/details": {
         parameters: {
             query?: never;
@@ -1544,6 +1740,24 @@ export interface components {
             visitCount: number;
             names: components["schemas"]["NameSpan"][];
         };
+        ActivityEvent: {
+            id: string;
+            source: string;
+            visitId: null | string;
+            /** Format: date-time */
+            at: string;
+            kind: string;
+            userId: null | string;
+            name: null | string;
+            data: {
+                [key: string]: string;
+            };
+            accountId?: null | string;
+        };
+        AnonymousTypeOfint: {
+            /** Format: int32 */
+            applied: number;
+        };
         ApiToken: {
             id: string;
             name: string;
@@ -1592,6 +1806,16 @@ export interface components {
             /** Format: int32 */
             visitCount: number;
         };
+        Encounter: {
+            id: string;
+            visitId: string;
+            userId: null | string;
+            name: string;
+            /** Format: date-time */
+            joinedAt: string;
+            /** Format: date-time */
+            leftAt: null | string;
+        };
         EncounterView: {
             userId: null | string;
             name: string;
@@ -1634,6 +1858,19 @@ export interface components {
             data: {
                 [key: string]: string;
             };
+        };
+        LogSession: {
+            deviceId: string;
+            logFile: string;
+            /** Format: date-time */
+            startedAt: null | string;
+            /** Format: date-time */
+            endedAt: null | string;
+            endReason: null | string;
+            selfId: null | string;
+            selfName: null | string;
+            vr: null | boolean;
+            hmd: null | string;
         };
         LoginInput: {
             password: string;
@@ -1763,6 +2000,13 @@ export interface components {
             authorName: null | string;
             available: boolean;
         };
+        Projection: {
+            deviceId: string;
+            session: null | components["schemas"]["LogSession"];
+            visits: components["schemas"]["Visit"][];
+            encounters: components["schemas"]["Encounter"][];
+            events: components["schemas"]["ActivityEvent"][];
+        };
         SettingsInput: {
             listen: null | string;
             /** Format: int32 */
@@ -1802,12 +2046,61 @@ export interface components {
             /** Format: date-time */
             now: string;
         };
+        SyncNote: {
+            id: string;
+            targetType: string;
+            targetId: string;
+            body: string;
+            deviceId: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SyncProjection: {
+            deviceId: string;
+            deviceName: string;
+            source: string;
+            projection: components["schemas"]["Projection"];
+        };
+        SyncSettingsInput: {
+            role: null | string;
+            parentUrl: null | string;
+            parentToken: null | string;
+            /** Format: double */
+            syncMinutes: null | number;
+        };
+        SyncSettingsView: {
+            role: string;
+            parentUrl: null | string;
+            parentTokenSet: boolean;
+            /** Format: double */
+            syncMinutes: number;
+        };
         TokenCreated: {
             token: components["schemas"]["ApiToken"];
             secret: string;
         };
         TokenInput: {
             name: string;
+        };
+        Visit: {
+            id: string;
+            source: string;
+            worldId: string;
+            worldName: null | string;
+            instance: string;
+            instanceNumber: string;
+            access: string;
+            ownerId: null | string;
+            groupId: null | string;
+            region: string;
+            /** Format: date-time */
+            joinedAt: string;
+            /** Format: date-time */
+            leftAt: null | string;
+            leftReason: null | string;
+            accountId?: null | string;
         };
         VisitDetail: {
             visit: components["schemas"]["VisitSummary"];

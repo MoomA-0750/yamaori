@@ -287,6 +287,16 @@ public sealed class Database : IDisposable
             PRIMARY KEY (photo_id, target)
         );
         """,
+        // 9 版目: 子の端末が親へ送った記録（出どころごとの中身のハッシュ。変わったものだけ送る）
+        """
+        CREATE TABLE sync_state (
+            parent TEXT NOT NULL,
+            source TEXT NOT NULL,          -- 出どころ（log:…）、メモは notes
+            hash TEXT NOT NULL,            -- 送った中身のハッシュ（メモは最後に送った updated_at）
+            pushed_at TEXT NOT NULL,
+            PRIMARY KEY (parent, source)
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
