@@ -31,9 +31,12 @@ public static class Server
         builder.Services.AddSingleton<LiveHub>();
         builder.Services.AddSingleton<LogWatcher>();
         builder.Services.AddHostedService(s => s.GetRequiredService<LogWatcher>());
+        builder.Services.AddHostedService<PhotoWatcher>();
+        builder.Services.AddSingleton(new Thumbnails(Path.Combine(options.DataDir, "thumbs")));
         // 要求ごとに DB へつなぐ（見張りとは別の接続）
         builder.Services.AddScoped(_ => Database.Open(options.DatabasePath));
         builder.Services.AddScoped(s => new Queries(s.GetRequiredService<Database>()));
+        builder.Services.AddScoped(s => new PhotoCatalog(s.GetRequiredService<Database>(), deviceId));
         builder.Services.AddOpenApi();
         // AI のエージェント向けの口（/mcp）。要求ごとに完結させる（つなぎっぱなしの状態を持たない）
         builder.Services.AddMcpServer().WithHttpTransport(o => o.Stateless = true).WithTools<McpTools>();

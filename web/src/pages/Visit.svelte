@@ -5,6 +5,8 @@
   import { href } from '../router.svelte'
   import { live } from '../live.svelte'
   import Notes from '../components/Notes.svelte'
+  import PhotoGrid from '../components/PhotoGrid.svelte'
+  import type { PhotoView } from '../api'
   import Loading from '../components/Loading.svelte'
 
   let { id }: { id: string } = $props()
@@ -18,7 +20,9 @@
     const done = untrack(() => data && data.visit.id === target && data.visit.leftAt)
     if (done) return
     api.visit(target).then((d) => (data = d)).catch((e) => (error = (e as Error).message))
+    api.photos({ visit: target, limit: 500 }).then((p) => (photos = p.items)).catch(() => {})
   })
+  let photos = $state<PhotoView[]>([])
 
   const videos = $derived(data?.events.filter((e) => e.kind === 'video') ?? [])
   const shots = $derived(data?.events.filter((e) => e.kind === 'screenshot') ?? [])
@@ -85,9 +89,15 @@
       </section>
     {/if}
 
-    {#if shots.length}
+    {#if photos.length}
+      <section>
+        <h2 class="section-title">撮った写真 <span class="faint">{photos.length}</span></h2>
+        <PhotoGrid {photos} />
+      </section>
+    {:else if shots.length}
       <section>
         <h2 class="section-title">撮った写真 <span class="faint">{shots.length}</span></h2>
+        <p class="faint">写真のフォルダにまだ見つかっていません（ログに残った置き場所）。</p>
         <ul class="list card">
           {#each shots as e (e.id)}
             <li><span class="faint nowrap">{time(e.at)}</span> <span class="break mono">{e.data.path}</span></li>

@@ -207,6 +207,35 @@ public sealed class Database : IDisposable
             last_used_at TEXT
         );
         """,
+        // 5 版目: 写真の目録。写真そのもの（photos）と置き場所（photo_locations）を分け、NAS へ移っても同じ写真として扱う
+        """
+        CREATE TABLE photos (
+            id TEXT PRIMARY KEY,           -- ファイル名と大きさから決める
+            file_name TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            taken_at TEXT NOT NULL,        -- 撮った時刻（XMP、なければファイル名、なければファイルの時刻）
+            taken_source TEXT NOT NULL,    -- xmp・file_name・file_time
+            width INTEGER,
+            height INTEGER,
+            world_id TEXT,                 -- XMP の vrc:WorldID（2025.3.1 以降の VRChat）
+            world_name TEXT,
+            author_id TEXT,                -- 撮った人（XMP の vrc:AuthorID）
+            author_name TEXT,
+            indexed_at TEXT NOT NULL
+        );
+        CREATE INDEX photos_taken ON photos (taken_at);
+        CREATE INDEX photos_world ON photos (world_id);
+        CREATE TABLE photo_locations (
+            path TEXT PRIMARY KEY,
+            photo_id TEXT NOT NULL,
+            root TEXT NOT NULL,            -- 見張っているフォルダ
+            mtime TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            device_id TEXT
+        );
+        CREATE INDEX photo_locations_photo ON photo_locations (photo_id);
+        CREATE INDEX photo_locations_root ON photo_locations (root);
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

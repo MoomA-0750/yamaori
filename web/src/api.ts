@@ -17,6 +17,7 @@ export type EventView = S['EventView']
 export type AuthState = S['AuthState']
 export type SettingsView = S['SettingsView']
 export type ApiToken = S['ApiToken']
+export type PhotoView = S['PhotoView']
 export type Page<T> = { items: T[]; total: number }
 export type TargetType = 'visit' | 'world' | 'person' | 'day'
 
@@ -70,6 +71,9 @@ export const api = {
   world: (id: string) => call<WorldDetail>('GET', `/api/worlds/${encodeURIComponent(id)}`),
   people: (p: { q?: string; sort?: string; limit?: number; offset?: number; kind?: string } = {}) => call<Page<PersonSummary>>('GET', '/api/people' + q(p)),
   person: (id: string) => call<PersonDetail>('GET', `/api/people/${encodeURIComponent(id)}`),
+  photos: (p: { visit?: string; world?: string; from?: string; to?: string; limit?: number; offset?: number } = {}) => call<Page<PhotoView>>('GET', '/api/photos' + q(p)),
+  thumb: (id: string, size = 320) => `/api/photos/${id}/thumb?size=${size}`,
+  photoFile: (id: string) => `/api/photos/${id}/file`,
   accounts: () => call<AccountView[]>('GET', '/api/accounts'),
   devices: () => call<DeviceView[]>('GET', '/api/devices'),
   addNote: (targetType: TargetType, targetId: string, body: string) => call<Note>('POST', '/api/notes', { targetType, targetId, body }),

@@ -11,6 +11,7 @@
   import People from './pages/People.svelte'
   import Person from './pages/Person.svelte'
   import Settings from './pages/Settings.svelte'
+  import Photos from './pages/Photos.svelte'
   import Login from './pages/Login.svelte'
 
   let auth = $state<AuthState | null>(null)
@@ -36,6 +37,7 @@
     { key: 'days', label: '日記', href: href.days(), pages: ['days', 'day', 'visit'] },
     { key: 'worlds', label: 'ワールド', href: href.worlds(), pages: ['worlds', 'world'] },
     { key: 'people', label: '人', href: href.people(), pages: ['people', 'person'] },
+    { key: 'photos', label: '写真', href: href.photos(), pages: ['photos'] },
     { key: 'settings', label: '設定', href: href.settings(), pages: ['settings'] },
   ]
   const current = $derived(live.current)
@@ -83,6 +85,7 @@
       {:else if router.route.page === 'world'}<World id={router.route.id} />
       {:else if router.route.page === 'people'}<People />
       {:else if router.route.page === 'person'}<Person id={router.route.id} />
+      {:else if router.route.page === 'photos'}<Photos />
       {:else if router.route.page === 'settings'}<Settings {auth} onLogout={check} />
       {/if}
     {/key}

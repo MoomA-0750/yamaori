@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://127.0.0.1:47804/"
+      "url": "http://localhost:47811/"
     }
   ],
   "paths": {
@@ -624,7 +624,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "会った人の一覧（q で名前を検索。前の名前も見る）",
+        "summary": "会った人の一覧（q で名前を検索。前の名前も見る。kind は all・id・name。名前だけの人の ID は name:名前）",
         "parameters": [
           {
             "name": "q",
@@ -654,6 +654,13 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -920,6 +927,192 @@
           },
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/photos": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に）",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "world",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "visit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfPhotoView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/{id}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真のメタデータ（撮った時刻・ワールド・撮った人・大きさ）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/thumb": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の縮小（size は 320・800・1600 のうち、それ以上でいちばん小さいもの）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/file": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真のもとのファイル",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/export/markdown": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "日記を Markdown で書き出す（期間の日を古い順に 1 つの文書に。日ごとのファイルは yamaori export で）",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -1390,6 +1583,25 @@
           }
         }
       },
+      "PageOfPhotoView": {
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoView"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PageOfVisitSummary": {
         "required": [
           "items",
@@ -1519,6 +1731,83 @@
           "noteCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "PhotoView": {
+        "required": [
+          "id",
+          "fileName",
+          "size",
+          "takenAt",
+          "takenSource",
+          "width",
+          "height",
+          "worldId",
+          "worldName",
+          "authorId",
+          "authorName",
+          "available"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "takenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "takenSource": {
+            "type": "string"
+          },
+          "width": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "height": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "worldId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "available": {
+            "type": "boolean"
           }
         }
       },

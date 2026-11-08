@@ -8,6 +8,7 @@ export type Route =
   | { page: 'world'; id: string }
   | { page: 'people' }
   | { page: 'person'; id: string }
+  | { page: 'photos' }
   | { page: 'settings' }
 
 function parse(hash: string): Route {
@@ -19,6 +20,7 @@ function parse(hash: string): Route {
     case 'world': return parts[1] ? { page: 'world', id: parts[1] } : { page: 'worlds' }
     case 'people': return { page: 'people' }
     case 'person': return parts[1] ? { page: 'person', id: parts[1] } : { page: 'people' }
+    case 'photos': return { page: 'photos' }
     case 'settings': return { page: 'settings' }
     default: return { page: 'days' }
   }
@@ -39,5 +41,6 @@ export const href = {
   world: (id: string) => `#/world/${encodeURIComponent(id)}`,
   people: () => '#/people',
   person: (id: string) => `#/person/${encodeURIComponent(id)}`,
+  photos: () => '#/photos',
   settings: () => '#/settings',
 }

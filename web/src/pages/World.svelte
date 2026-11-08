@@ -4,6 +4,8 @@
   import { href } from '../router.svelte'
   import VisitList from '../components/VisitList.svelte'
   import Notes from '../components/Notes.svelte'
+  import PhotoGrid from '../components/PhotoGrid.svelte'
+  import type { PhotoView } from '../api'
   import Loading from '../components/Loading.svelte'
 
   let { id }: { id: string } = $props()
@@ -22,8 +24,12 @@
     void total
   }
 
+  let photos = $state<PhotoView[]>([])
+  let photoTotal = $state(0)
+
   $effect(() => {
     more = []
+    api.photos({ world: id, limit: 60 }).then((p) => { photos = p.items; photoTotal = p.total }).catch(() => {})
     api.world(id).then((d) => (data = d)).catch((e) => (error = (e as Error).message))
   })
 </script>
@@ -37,8 +43,12 @@
     <header class="stack head">
       <h1 class="break">{w.name ?? w.id}</h1>
       <p class="muted">
-        {w.visitCount} 回 · {minutes(w.minutes)}
-        {#if w.firstVisitAt}· はじめて {dateTime(w.firstVisitAt)}{/if}
+        {#if w.visitCount}
+          {w.visitCount} 回 · {minutes(w.minutes)}
+          {#if w.firstVisitAt}· はじめて {dateTime(w.firstVisitAt)}{/if}
+        {:else}
+          訪問の記録はまだありません（写真から分かったワールド）
+        {/if}
       </p>
       <p class="row">
         <a class="chip" href={`https://vrchat.com/home/world/${w.id}`} target="_blank" rel="noopener noreferrer">vrchat.com で開く ↗</a>
@@ -46,13 +56,19 @@
       </p>
     </header>
     <Notes targetType="world" targetId={w.id} notes={data.notes} placeholder="このワールドのことを書く（Markdown が使える）" />
-    <section>
+    {#if photos.length}
+      <section>
+        <h2 class="section-title">撮った写真 <span class="faint">{photoTotal}</span></h2>
+        <PhotoGrid {photos} showDate />
+      </section>
+    {/if}
+    {#if w.visitCount}<section>
       <h2 class="section-title">行ったとき <span class="faint">{w.visitCount}</span></h2>
       <VisitList visits={[...data.visits, ...more]} showDate showWorld={false} />
       {#if data.visits.length + more.length < w.visitCount}
         <button class="more" onclick={() => loadMore(w.id, w.visitCount)} disabled={loadingMore}>もっと見る</button>
       {/if}
-    </section>
+    </section>{/if}
   </div>
 {/if}
 

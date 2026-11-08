@@ -721,7 +721,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 会った人の一覧（q で名前を検索。前の名前も見る） */
+        /** 会った人の一覧（q で名前を検索。前の名前も見る。kind は all・id・name。名前だけの人の ID は name:名前） */
         get: {
             parameters: {
                 query?: {
@@ -729,6 +729,7 @@ export interface paths {
                     sort?: string;
                     limit?: number;
                     offset?: number;
+                    kind?: string;
                 };
                 header?: never;
                 path?: never;
@@ -1048,6 +1049,205 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に） */
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                    world?: string;
+                    visit?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PageOfPhotoView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 写真のメタデータ（撮った時刻・ワールド・撮った人・大きさ） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{id}/thumb": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 写真の縮小（size は 320・800・1600 のうち、それ以上でいちばん小さいもの） */
+        get: {
+            parameters: {
+                query?: {
+                    size?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 写真のもとのファイル */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/markdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 日記を Markdown で書き出す（期間の日を古い順に 1 つの文書に。日ごとのファイルは yamaori export で） */
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stream": {
         parameters: {
             query?: never;
@@ -1209,6 +1409,11 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        PageOfPhotoView: {
+            items: components["schemas"]["PhotoView"][];
+            /** Format: int32 */
+            total: number;
+        };
         PageOfVisitSummary: {
             items: components["schemas"]["VisitSummary"][];
             /** Format: int32 */
@@ -1240,6 +1445,24 @@ export interface components {
             visitCount: number;
             /** Format: int32 */
             noteCount: number;
+        };
+        PhotoView: {
+            id: string;
+            fileName: string;
+            /** Format: int64 */
+            size: number;
+            /** Format: date-time */
+            takenAt: string;
+            takenSource: string;
+            /** Format: int32 */
+            width: null | number;
+            /** Format: int32 */
+            height: null | number;
+            worldId: null | string;
+            worldName: null | string;
+            authorId: null | string;
+            authorName: null | string;
+            available: boolean;
         };
         SettingsInput: {
             listen: null | string;

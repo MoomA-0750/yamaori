@@ -84,6 +84,30 @@ public static class Api
             q.DeleteNote(id) ? TypedResults.NoContent() : TypedResults.NotFound())
             .WithSummary("メモを消す");
 
+        // ---- 写真
+
+        api.MapGet("/photos", (PhotoCatalog photos, DateTime? from, DateTime? to, string? world, string? visit, int? limit, int? offset) =>
+            photos.List(Utc(from), Utc(to), world, visit, limit ?? 100, offset ?? 0))
+            .WithSummary("写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に）");
+
+        api.MapGet("/photos/{id}", Results<Ok<PhotoView>, NotFound> (PhotoCatalog photos, string id) =>
+            photos.Get(id) is { } p ? TypedResults.Ok(p) : TypedResults.NotFound())
+            .WithSummary("写真のメタデータ（撮った時刻・ワールド・撮った人・大きさ）");
+
+        api.MapGet("/photos/{id}/thumb", async Task<Results<PhysicalFileHttpResult, NotFound>> (PhotoCatalog photos, Thumbnails thumbs, string id, int? size, CancellationToken cancel) =>
+        {
+            if (photos.FindFile(id) is not { } file) return TypedResults.NotFound();
+            var path = await thumbs.GetAsync(id, file, size ?? 320, cancel).ConfigureAwait(false);
+            return path == null ? TypedResults.NotFound() : TypedResults.PhysicalFile(path, "image/jpeg", enableRangeProcessing: false);
+        }).WithSummary("写真の縮小（size は 320・800・1600 のうち、それ以上でいちばん小さいもの）");
+
+        api.MapGet("/photos/{id}/file", Results<PhysicalFileHttpResult, NotFound> (PhotoCatalog photos, string id) =>
+        {
+            if (photos.FindFile(id) is not { } file) return TypedResults.NotFound();
+            var type = Path.GetExtension(file).ToLowerInvariant() switch { ".png" => "image/png", ".webp" => "image/webp", _ => "image/jpeg" };
+            return TypedResults.PhysicalFile(file, type, Path.GetFileName(file), enableRangeProcessing: true);
+        }).WithSummary("写真のもとのファイル");
+
         // ---- 書き出し
 
         api.MapGet("/export/markdown", (Queries q, DateOnly? from, DateOnly? to) =>

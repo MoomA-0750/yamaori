@@ -15,6 +15,31 @@ public sealed class YamaoriOptions
     /// <summary>この端末の名前（どの端末の記録かを見分けるのに使う）。既定は PC の名前。</summary>
     public string DeviceName { get; set; } = Environment.MachineName;
 
+    /// <summary>
+    /// 写真を見張るフォルダ（NAS の共有も可）。空なら VRChat の写真のフォルダ（VRChat の config.json の picture_output_folder、なければ ピクチャ\VRChat）。
+    /// </summary>
+    public List<string> PhotoDirs { get; set; } = [];
+
+    /// <summary>写真のフォルダを読み直す間隔（分）。新しく撮った写真は、この PC のフォルダならすぐ入る。</summary>
+    public double PhotoScanMinutes { get; set; } = 10;
+
+    /// <summary>見張る写真のフォルダ（決めていなければ VRChat の写真のフォルダ）。</summary>
+    public IReadOnlyList<string> EffectivePhotoDirs => PhotoDirs.Count > 0 ? PhotoDirs : [VrchatPictureDir()];
+
+    string VrchatPictureDir()
+    {
+        try
+        {
+            var config = Path.Combine(LogDir, "config.json");
+            if (File.Exists(config) && System.Text.Json.JsonDocument.Parse(File.ReadAllText(config)).RootElement.TryGetProperty("picture_output_folder", out var p)
+                && p.GetString() is { Length: > 0 } dir)
+                return Path.Combine(dir, "VRChat");
+        }
+        catch (System.Text.Json.JsonException) { }
+        catch (IOException) { }
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "VRChat");
+    }
+
     /// <summary>WebUI と API の番号。</summary>
     public int Port { get; set; } = 47800;
 
