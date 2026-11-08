@@ -117,9 +117,19 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
 
         using var tx = db.Connection.BeginTransaction();
         ProjectionWriter.Replace(db, Source, new Projection(deviceId, null, visits, encounters, events), tx);
+        // 起動の記録のないアカウントにも名前を付ける（本人の名前のうち、最後に使っていたもの）
+        if (accountId != null && LastSelfName(rows, selfNames) is { } selfName)
+        {
+            using var cmd = db.Command("INSERT INTO settings (key, value) VALUES ($k, $v) ON CONFLICT (key) DO UPDATE SET value = $v", tx,
+                ("$k", "account_name:" + accountId), ("$v", selfName));
+            cmd.ExecuteNonQuery();
+        }
         tx.Commit();
         return new Result(visits.Count, encounters.Count, resolved, events.Count, skipped, selfNames.Order(StringComparer.Ordinal).ToList());
     }
+
+    static string? LastSelfName(List<Row> rows, HashSet<string> selfNames) =>
+        rows.LastOrDefault(r => r.Type == 1 && r.UserName != null && selfNames.Contains(r.UserName))?.UserName;
 
     /// <summary>
     /// 本人の名前を見分ける。VAT は自分も「会った人」に入れるので、その名前が使われていた期間の訪問の半分以上に出てくる名前（20 回以上）を本人とみなす。

@@ -133,6 +133,10 @@ public sealed class VatImportTests : IDisposable
         var r = new VatImport(db, "d_test", Tokyo).Import(vat);
         Assert.Equal(["Me"], r.SelfNames);
         Assert.Equal(6, r.Encounters); // Friend だけ
+        // アカウントを渡せば、起動の記録がなくても名前つきでアカウントの一覧に出る
+        new VatImport(db, "d_test", Tokyo).Import(vat, "usr_old");
+        var acc = Assert.Single(new Queries(db).Accounts());
+        Assert.Equal(("usr_old", "Me", 30), (acc.Id, acc.Name, acc.VisitCount));
     }
 
     public void Dispose()

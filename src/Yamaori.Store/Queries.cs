@@ -264,7 +264,14 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     {
         var names = List("SELECT id, name, first_seen_at, last_seen_at FROM account_names ORDER BY first_seen_at",
             r => (Id: r.GetString(0), Span: new NameSpan(r.GetString(1), Time(r, 2), Time(r, 3)))).ToLookup(x => x.Id, x => x.Span);
-        return List("SELECT a.id, a.name, a.first_seen_at, a.last_seen_at, (SELECT COUNT(*) FROM visits v WHERE v.account_id = a.id) FROM accounts a ORDER BY a.last_seen_at DESC",
+        // 起動の記録（ログ）のあるアカウントと、訪問だけがあるアカウント（VAT の取り込みなど。名前は取り込みのときに見分けたもの）
+        return List("""
+            SELECT a.id, a.name, a.first_seen_at, a.last_seen_at, (SELECT COUNT(*) FROM visits v WHERE v.account_id = a.id) FROM accounts a
+            UNION ALL
+            SELECT v.account_id, (SELECT value FROM settings WHERE key = 'account_name:' || v.account_id), MIN(v.joined_at), MAX(COALESCE(v.left_at, v.joined_at)), COUNT(*)
+            FROM visits v WHERE v.account_id IS NOT NULL AND v.account_id NOT IN (SELECT id FROM accounts) GROUP BY v.account_id
+            ORDER BY 4 DESC
+            """,
             r => new AccountView(r.GetString(0), Str(r, 1), Time(r, 2), Time(r, 3), r.GetInt32(4), names[r.GetString(0)].ToList()));
     }
 
