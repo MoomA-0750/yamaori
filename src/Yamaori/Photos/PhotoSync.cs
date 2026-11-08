@@ -17,6 +17,17 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
     public string RemotePath(PhotoCatalog.LocalPhoto p) =>
         $"{TimeZoneInfo.ConvertTimeFromUtc(p.TakenAt, _tz):yyyy-MM}/{p.FileName}";
 
+    /// <summary>名前がぶつかったときの送り先（ファイル名に写真の ID の頭を足す）。</summary>
+    static string AltPath(string remote, string photoId)
+    {
+        var dot = remote.LastIndexOf('.');
+        var tag = "-" + photoId[^8..];
+        return dot > remote.LastIndexOf('/') ? remote[..dot] + tag + remote[dot..] : remote + tag;
+    }
+
+    static bool SameFile(string a, string b) =>
+        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
     public async Task<Result> RunAsync(string retention, int retentionDays, CancellationToken cancel, Action<string>? log = null)
     {
         int uploaded = 0, already = 0, failed = 0, removed = 0;
@@ -26,7 +37,14 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
             var remote = RemotePath(p);
             try
             {
-                if (await target.SizeAsync(remote, cancel).ConfigureAwait(false) == p.Size) already++;
+                var there = await target.SizeAsync(remote, cancel).ConfigureAwait(false);
+                if (there != null && there != p.Size)
+                {
+                    // 同じ名前で大きさの違う写真が送り先にある（ほかのフォルダの同じ名前の写真など）。上書きせず、別の名前で送る
+                    remote = AltPath(remote, p.PhotoId);
+                    there = await target.SizeAsync(remote, cancel).ConfigureAwait(false);
+                }
+                if (there == p.Size) already++;
                 else
                 {
                     await target.UploadAsync(p.Path, remote, cancel).ConfigureAwait(false);
@@ -58,13 +76,25 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
                 cancel.ThrowIfCancellationRequested();
                 try
                 {
+                    // 消す前に確かめ直す: 手元のファイルが目録のときと同じ大きさか（置き換わっていないか）、
+                    // 送り先が手元と同じファイルではないか、送り先にまだ同じ大きさであるか（なければ送り直しに戻す）
+                    var local = new FileInfo(p.Path);
+                    if (!local.Exists || local.Length != p.Size) continue;
+                    if (p.RemotePath == null) continue;
+                    if (target.LocalPath(p.RemotePath) is { } same && SameFile(same, p.Path)) continue;
+                    if (await target.SizeAsync(p.RemotePath, cancel).ConfigureAwait(false) != p.Size)
+                    {
+                        catalog.ForgetUpload(p.PhotoId, target.Key);
+                        log?.Invoke($"{p.FileName} が送り先で見つからないか大きさが違うので、消さずに送り直す");
+                        continue;
+                    }
                     if (thumbs != null)
                         foreach (var size in new[] { 320, 1600 }) await thumbs.GetAsync(p.PhotoId, p.Path, size, cancel).ConfigureAwait(false);
                     File.Delete(p.Path);
                     catalog.RemoveLocation(p.Path);
                     removed++;
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or Renci.SshNet.Common.SshException)
                 {
                     log?.Invoke($"{p.FileName} を手元から消せなかった: {ex.Message}");
                 }

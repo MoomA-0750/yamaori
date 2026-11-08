@@ -63,6 +63,79 @@ public sealed class PhotoSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task 見張っているフォルダそのものが送り先でも_写真を消さない()
+    {
+        // NAS の写真のフォルダを見張り、同じフォルダを送り先にして「送ったら消す」にした
+        var nas = Directory.CreateDirectory(Path.Combine(_dir, "nas", "2026-11")).Parent!.FullName;
+        var shot = Path.Combine(nas, "2026-11", "VRChat_2026-11-08_02-38-21.263_1920x1080.png");
+        File.WriteAllBytes(shot, [1, 2, 3]);
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        var catalog = new PhotoCatalog(db, "d_test", Tokyo);
+        catalog.Scan(nas);
+        using var target = new FolderTarget(nas);
+        var r = await new PhotoSync(catalog, target, [nas], null, Tokyo).RunAsync("after_upload", 30, default);
+        Assert.Equal(0, r.Removed);
+        Assert.True(File.Exists(shot));
+    }
+
+    [Fact]
+    public async Task 送ったあと送り先から消えていたら_手元を消さずに送り直す()
+    {
+        var (db, catalog, local) = Setup("VRChat_2020-01-01_00-00-00.000_1920x1080.png");
+        using var _ = db;
+        var nas = Path.Combine(_dir, "nas");
+        using var target = new FolderTarget(nas);
+        var sync = new PhotoSync(catalog, target, [local], null, Tokyo);
+        Assert.Equal(1, (await sync.RunAsync("keep", 30, default)).Uploaded);
+        File.Delete(Path.Combine(nas, "2020-01", "VRChat_2020-01-01_00-00-00.000_1920x1080.png"));
+        catalog.Scan(nas);
+
+        var r = await sync.RunAsync("days", 30, default);
+        Assert.Equal(0, r.Removed);
+        Assert.Single(Directory.GetFiles(local));
+        // 次の回で送り直し、そのあと消す
+        r = await sync.RunAsync("days", 30, default);
+        Assert.Equal(1, r.Uploaded);
+        Assert.Equal(1, r.Removed);
+        Assert.True(File.Exists(Path.Combine(nas, "2020-01", "VRChat_2020-01-01_00-00-00.000_1920x1080.png")));
+    }
+
+    [Fact]
+    public async Task 手元のファイルが置き換わっていたら消さない()
+    {
+        var (db, catalog, local) = Setup("VRChat_2020-01-01_00-00-00.000_1920x1080.png");
+        using var _ = db;
+        using var target = new FolderTarget(Path.Combine(_dir, "nas"));
+        var sync = new PhotoSync(catalog, target, [local], null, Tokyo);
+        await sync.RunAsync("keep", 30, default);
+        File.WriteAllBytes(Path.Combine(local, "VRChat_2020-01-01_00-00-00.000_1920x1080.png"), [9, 9, 9, 9, 9, 9, 9]);
+        var r = await sync.RunAsync("after_upload", 30, default);
+        Assert.Equal(0, r.Removed);
+        Assert.Single(Directory.GetFiles(local));
+    }
+
+    [Fact]
+    public async Task 同じ名前で中身の違う写真は_送り先で上書きしない()
+    {
+        var name = "VRChat_2026-11-08_02-38-21.263_1920x1080.png";
+        var a = Directory.CreateDirectory(Path.Combine(_dir, "A")).FullName;
+        var b = Directory.CreateDirectory(Path.Combine(_dir, "B")).FullName;
+        File.WriteAllBytes(Path.Combine(a, name), [1, 2, 3]);
+        File.WriteAllBytes(Path.Combine(b, name), [1, 2, 3, 4, 5, 6]);
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        var catalog = new PhotoCatalog(db, "d_test", Tokyo);
+        catalog.Scan(a);
+        catalog.Scan(b);
+        var nas = Path.Combine(_dir, "nas");
+        using var target = new FolderTarget(nas);
+        var r = await new PhotoSync(catalog, target, [a, b], null, Tokyo).RunAsync("after_upload", 30, default);
+        Assert.Equal(2, r.Uploaded);
+        Assert.Equal(2, r.Removed);
+        var sizes = Directory.GetFiles(Path.Combine(nas, "2026-11")).Select(f => new FileInfo(f).Length).Order().ToArray();
+        Assert.Equal([3L, 6L], sizes);
+    }
+
+    [Fact]
     public async Task 送り先で大きさが合わなければ記録せず消さない()
     {
         var (db, catalog, local) = Setup("VRChat_2026-11-08_02-38-21.263_1920x1080.png");
