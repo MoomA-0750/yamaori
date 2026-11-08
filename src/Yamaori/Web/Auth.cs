@@ -86,8 +86,28 @@ public static class Auth
     public sealed record SettingsView(string Listen, int Port, IReadOnlyList<string> TailscaleLogins, bool LocalRequiresLogin, bool AllowUnauthenticatedRemote, bool PasswordSet, string DeviceName);
     public sealed record SettingsInput(string? Listen, int? Port, IReadOnlyList<string>? TailscaleLogins, bool? LocalRequiresLogin, bool? AllowUnauthenticatedRemote, bool? ConfirmUnauthenticatedRemote, string? DeviceName);
 
-    // ログインの失敗が続く相手を少し待たせる（相手のアドレスごと）
+    // ログインの失敗が続く相手を少し待たせる（相手のアドレスごと）。
+    // X-Forwarded-For は相手が変えられるので、全体の失敗の数でも止める（10 分に 30 回を超えたら、だれのログインも 5 分止める）
     static readonly ConcurrentDictionary<string, (int Failures, DateTime Until)> Failures = new();
+    static readonly Lock GlobalLock = new();
+    static readonly Queue<DateTime> GlobalFailures = new();
+    static DateTime GlobalUntil = DateTime.MinValue;
+
+    static bool GloballyLocked()
+    {
+        lock (GlobalLock) return GlobalUntil > DateTime.UtcNow;
+    }
+
+    static void CountGlobalFailure()
+    {
+        lock (GlobalLock)
+        {
+            var now = DateTime.UtcNow;
+            GlobalFailures.Enqueue(now);
+            while (GlobalFailures.Count > 0 && GlobalFailures.Peek() < now.AddMinutes(-10)) GlobalFailures.Dequeue();
+            if (GlobalFailures.Count > 30) GlobalUntil = now.AddMinutes(5);
+        }
+    }
 
     public static void Map(WebApplication app)
     {
@@ -105,13 +125,14 @@ public static class Auth
         auth.MapPost("/login", Results<NoContent, UnauthorizedHttpResult, ProblemHttpResult> (HttpContext ctx, Database db, LoginInput input) =>
         {
             var key = ctx.Connection.RemoteIpAddress?.ToString() + "|" + ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-            if (Failures.TryGetValue(key, out var f) && f.Until > DateTime.UtcNow)
+            if ((Failures.TryGetValue(key, out var f) && f.Until > DateTime.UtcNow) || GloballyLocked())
                 return TypedResults.Problem("ログインの失敗が続いたので、少し待ってから", statusCode: StatusCodes.Status429TooManyRequests);
             var store = new AuthStore(db);
             if (!store.VerifyPassword(input.Password ?? ""))
             {
                 var n = (f.Failures) + 1;
                 Failures[key] = (n, n >= 5 ? DateTime.UtcNow.AddMinutes(Math.Min(30, n - 4)) : DateTime.MinValue);
+                CountGlobalFailure();
                 return TypedResults.Unauthorized();
             }
             Failures.TryRemove(key, out _);
