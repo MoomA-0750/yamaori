@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:47812/"
+      "url": "http://localhost:47813/"
     }
   ],
   "paths": {
@@ -931,6 +931,122 @@
         }
       }
     },
+    "/api/worlds/{id}/details": {
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ワールドの詳しい情報を入れる（拡張機能が vrchat.com のページから取ったもの）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorldDetailsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/worlds/missing-details": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "詳しい情報のないワールド（行った回数の多い順。拡張機能がまとめて取るときに使う）",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MissingWorld"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/friends/snapshot": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "フレンドの一覧を入れ、前に入れた一覧と比べて増えた・減った・名前を変えた人を記録する（拡張機能から）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendSnapshotInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendSnapshotResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/photos": {
       "get": {
         "tags": [
@@ -1414,6 +1530,85 @@
           }
         }
       },
+      "FriendInput": {
+        "required": [
+          "id",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "FriendSnapshotInput": {
+        "required": [
+          "accountId",
+          "friends"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "friends": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FriendInput"
+            }
+          }
+        }
+      },
+      "FriendSnapshotResult": {
+        "required": [
+          "first",
+          "count",
+          "added",
+          "removed",
+          "renamed"
+        ],
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "renamed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "LiveEvent": {
         "required": [
           "kind",
@@ -1445,6 +1640,37 @@
         "properties": {
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "MissingWorld": {
+        "required": [
+          "id",
+          "name",
+          "lastVisitAt",
+          "visitCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastVisitAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "visitCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -2184,6 +2410,106 @@
           }
         }
       },
+      "WorldDetailsInput": {
+        "required": [
+          "name",
+          "authorId",
+          "authorName",
+          "description",
+          "imageUrl",
+          "thumbnailUrl",
+          "releaseStatus",
+          "capacity",
+          "tags",
+          "platforms",
+          "visits",
+          "favorites"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thumbnailUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "releaseStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "capacity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "tags": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "platforms": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "visits": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "favorites": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "WorldInfo": {
         "required": [
           "authorId",
@@ -2195,7 +2521,12 @@
           "capacity",
           "detailsSource",
           "detailsUpdatedAt",
-          "favorites"
+          "favorites",
+          "categories",
+          "tags",
+          "platforms",
+          "visitsTotal",
+          "favoritesTotal"
         ],
         "type": "object",
         "properties": {
@@ -2260,6 +2591,38 @@
             "items": {
               "type": "string"
             }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "visitsTotal": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "favoritesTotal": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         }
       },

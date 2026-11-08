@@ -1049,6 +1049,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/worlds/{id}/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** ワールドの詳しい情報を入れる（拡張機能が vrchat.com のページから取ったもの） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["WorldDetailsInput"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worlds/missing-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 詳しい情報のないワールド（行った回数の多い順。拡張機能がまとめて取るときに使う） */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissingWorld"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/friends/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** フレンドの一覧を入れ、前に入れた一覧と比べて増えた・減った・名前を変えた人を記録する（拡張機能から） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FriendSnapshotInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FriendSnapshotResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/photos": {
         parameters: {
             query?: never;
@@ -1362,6 +1498,22 @@ export interface components {
                 [key: string]: string;
             };
         };
+        FriendInput: {
+            id: string;
+            displayName: null | string;
+        };
+        FriendSnapshotInput: {
+            accountId: null | string;
+            friends: null | components["schemas"]["FriendInput"][];
+        };
+        FriendSnapshotResult: {
+            first: boolean;
+            /** Format: int32 */
+            count: number;
+            added: string[];
+            removed: string[];
+            renamed: string[];
+        };
         LiveEvent: {
             kind: string;
             /** Format: date-time */
@@ -1372,6 +1524,14 @@ export interface components {
         };
         LoginInput: {
             password: string;
+        };
+        MissingWorld: {
+            id: string;
+            name: null | string;
+            /** Format: date-time */
+            lastVisitAt: null | string;
+            /** Format: int32 */
+            visitCount: number;
         };
         NameSpan: {
             name: string;
@@ -1549,6 +1709,23 @@ export interface components {
             visits: components["schemas"]["VisitSummary"][];
             notes: components["schemas"]["Note"][];
         };
+        WorldDetailsInput: {
+            name: null | string;
+            authorId: null | string;
+            authorName: null | string;
+            description: null | string;
+            imageUrl: null | string;
+            thumbnailUrl: null | string;
+            releaseStatus: null | string;
+            /** Format: int32 */
+            capacity: null | number;
+            tags: null | string[];
+            platforms: null | string[];
+            /** Format: int32 */
+            visits: null | number;
+            /** Format: int32 */
+            favorites: null | number;
+        };
         WorldInfo: {
             authorId: null | string;
             authorName: null | string;
@@ -1562,6 +1739,13 @@ export interface components {
             /** Format: date-time */
             detailsUpdatedAt: null | string;
             favorites: string[];
+            categories: string[];
+            tags: string[];
+            platforms: string[];
+            /** Format: int32 */
+            visitsTotal: null | number;
+            /** Format: int32 */
+            favoritesTotal: null | number;
         };
         WorldSummary: {
             id: string;

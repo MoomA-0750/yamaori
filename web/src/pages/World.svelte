@@ -9,6 +9,8 @@
   import Loading from '../components/Loading.svelte'
 
   let { id }: { id: string } = $props()
+  let thumbFailed = $state(false)
+  const platformLabel = (p: string) => ({ standalonewindows: 'PC', android: 'Quest・Android', ios: 'iOS' } as Record<string, string>)[p] ?? p
   let data = $state<WorldDetail | null>(null)
   let error = $state('')
 
@@ -47,7 +49,7 @@
           {w.visitCount} 回 · {minutes(w.minutes)}
           {#if w.firstVisitAt}· はじめて {dateTime(w.firstVisitAt)}{/if}
         {:else}
-          訪問の記録はまだありません（写真から分かったワールド）
+          訪問の記録はまだありません
         {/if}
       </p>
       <p class="row">
@@ -55,14 +57,22 @@
         <span class="faint mono break">{w.id}</span>
       </p>
     </header>
-    {#if data.info.description || data.info.authorName || data.info.thumbnailUrl || data.info.favorites.length}
-      <section class="info card" class:with-thumb={!!data.info.thumbnailUrl}>
-        {#if data.info.thumbnailUrl}<img class="thumb" src={data.info.thumbnailUrl} alt="" loading="lazy" referrerpolicy="no-referrer" />{/if}
+    {#if data.info.description || data.info.authorName || data.info.thumbnailUrl || data.info.favorites.length || data.info.categories.length}
+      <section class="info card" class:with-thumb={!!data.info.thumbnailUrl && !thumbFailed}>
+        {#if data.info.thumbnailUrl && !thumbFailed}<img class="thumb" src={data.info.thumbnailUrl} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={() => (thumbFailed = true)} />{/if}
         <div class="stack text">
           {#if data.info.authorName}<div class="muted">作者 {data.info.authorName}</div>{/if}
           {#if data.info.favorites.length}<div class="row">{#each data.info.favorites as f (f)}<span class="chip accent">★ {f}</span>{/each}</div>{/if}
+          {#if data.info.categories.length}<div class="row">{#each data.info.categories as c (c)}<span class="chip">{c}</span>{/each}</div>{/if}
+          {#if data.info.platforms.length || data.info.capacity || data.info.visitsTotal}
+            <div class="faint">
+              {#if data.info.platforms.length}{data.info.platforms.map(platformLabel).join('・')}{/if}
+              {#if data.info.capacity} · {data.info.capacity} 人まで{/if}
+              {#if data.info.visitsTotal} · vrchat.com の訪問 {data.info.visitsTotal.toLocaleString()}{/if}
+            </div>
+          {/if}
           {#if data.info.description}<p class="desc break">{data.info.description}</p>{/if}
-          {#if data.info.detailsSource}<div class="faint">情報の出どころ: {data.info.detailsSource === 'vrcx' ? 'VRCX' : data.info.detailsSource}{data.info.detailsUpdatedAt ? `（${dateTime(data.info.detailsUpdatedAt)}）` : ''}</div>{/if}
+          {#if data.info.detailsSource}<div class="faint">情報の出どころ: {data.info.detailsSource === 'vrcx' ? 'VRCX' : data.info.detailsSource === 'extension' ? '拡張機能' : data.info.detailsSource}{data.info.detailsUpdatedAt ? `（${dateTime(data.info.detailsUpdatedAt)}）` : ''}</div>{/if}
         </div>
       </section>
     {/if}
