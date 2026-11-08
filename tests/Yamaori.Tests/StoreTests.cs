@@ -29,12 +29,12 @@ public sealed class StoreTests : IDisposable
         var bytes = Fixture();
         using var whole = Database.Open(Path.Combine(_dir, "whole.sqlite3"));
         File.WriteAllBytes(LogPath, bytes);
-        new LogIngestor(whole).Ingest(LogPath, closed: true, Tokyo);
+        new LogIngestor(whole, "d_test").Ingest(LogPath, closed: true, Tokyo);
         var expected = Visits(whole);
         Assert.Equal(2, expected.Count);
 
         using var db = Database.Open(Path.Combine(_dir, "step.sqlite3"));
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, "d_test");
         File.WriteAllBytes(LogPath, []);
         for (var cut = 0; cut <= bytes.Length; cut += 97)
         {
@@ -57,10 +57,10 @@ public sealed class StoreTests : IDisposable
     {
         File.WriteAllBytes(LogPath, Fixture());
         var path = Path.Combine(_dir, "y.sqlite3");
-        using (var db = Database.Open(path)) new LogIngestor(db).Ingest(LogPath, closed: false, Tokyo);
+        using (var db = Database.Open(path)) new LogIngestor(db, "d_test").Ingest(LogPath, closed: false, Tokyo);
         using (var db = Database.Open(path))
         {
-            var r = new LogIngestor(db).Ingest(LogPath, closed: true, Tokyo);
+            var r = new LogIngestor(db, "d_test").Ingest(LogPath, closed: true, Tokyo);
             Assert.Empty(r.NewEvents); // 閉じたときに読むのは最後の 1 件（Destroying）だけで、出来事にならない
             Assert.Equal(1L, (long)db.Scalar("SELECT COUNT(*) FROM visits WHERE left_reason = 'log_end'")!);
             Assert.Equal(2L, (long)db.Scalar("SELECT COUNT(*) FROM visits")!);
@@ -72,7 +72,7 @@ public sealed class StoreTests : IDisposable
     {
         File.WriteAllBytes(LogPath, Fixture());
         using var db = Database.Open(Path.Combine(_dir, "r.sqlite3"));
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, "d_test");
         ingestor.Ingest(LogPath, closed: true, Tokyo);
         var before = Visits(db);
         File.Delete(LogPath); // 生のログがなくても組み立て直せる
@@ -104,13 +104,40 @@ public sealed class StoreTests : IDisposable
         Assert.True(closed);
 
         using var db = Database.Open(Path.Combine(_dir, "a.sqlite3"));
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, "d_test");
         ingestor.Ingest(LogPath, closed: true, Tokyo);
         var before = Visits(db);
         File.Delete(LogPath); // VRChat がログを消しても
         using (var s = open()) ingestor.Reparse(name, s, closed);
         Assert.Equal(before, Visits(db));
         Assert.Equal(2L, Count(db, "visits"));
+    }
+
+    [Fact]
+    public void 端末が違えば同じ名前のログでもぶつからない()
+    {
+        File.WriteAllBytes(LogPath, Fixture());
+        using var db = Database.Open(Path.Combine(_dir, "d.sqlite3"));
+        new LogIngestor(db, "d_desktop").Ingest(LogPath, closed: true, Tokyo);
+        new LogIngestor(db, "d_laptop").Ingest(LogPath, closed: true, Tokyo);
+        Assert.Equal(4L, Count(db, "visits"));
+        Assert.Equal(2L, (long)db.Scalar("SELECT COUNT(DISTINCT device_id) FROM visits")!);
+        Assert.Equal(2L, (long)db.Scalar("SELECT COUNT(*) FROM sessions")!);
+        // 通知はアカウントに届くものなので、端末をまたいで重ねる
+        Assert.Equal(2L, (long)db.Scalar("SELECT COUNT(*) FROM events WHERE kind = 'notification'")!);
+    }
+
+    [Fact]
+    public void この端末のIDは一度決めたら変わらない()
+    {
+        var path = Path.Combine(_dir, "self.sqlite3");
+        string id;
+        using (var db = Database.Open(path)) id = db.SelfDevice("to-fu");
+        using (var db = Database.Open(path))
+        {
+            Assert.Equal(id, db.SelfDevice("to-fu-renamed"));
+            Assert.Equal("to-fu-renamed", db.Scalar("SELECT name FROM devices WHERE id = $id", ("$id", id)));
+        }
     }
 
     public void Dispose()

@@ -16,7 +16,7 @@ public class LogTests
         using var s = new MemoryStream(Fixture());
         var r = LogReader.Read(s, 0, final: closed);
         var events = r.Entries.Select(e => (e.Offset, Event: LineParser.Parse(e))).Where(x => x.Event != null).Select(x => (x.Offset, x.Event!));
-        return LogProjector.Project(FileName, events, Tokyo, r.Entries[^1].LocalTime, closed);
+        return LogProjector.Project("d_test", FileName, events, Tokyo, r.Entries[^1].LocalTime, closed);
     }
 
     [Fact]

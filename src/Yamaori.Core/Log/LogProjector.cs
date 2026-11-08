@@ -6,14 +6,15 @@ namespace Yamaori.Core.Log;
 /// </summary>
 public static class LogProjector
 {
+    /// <param name="deviceId">ログを書いた端末（ほかの端末の同じ名前のログとぶつからないように、ID に入れる）。</param>
     /// <param name="logFile">ログのファイル名（パスでなく名前。写して残したログでも同じになる）。</param>
     /// <param name="events">出来事と、その件のバイト位置。位置の順に並べる。</param>
     /// <param name="timeZone">ログを書いた PC のタイムゾーン（ログの時刻はローカル時刻）。</param>
     /// <param name="lastEntryAt">ログの最後の件の時刻（ローカル）。終了の行がないとき、ここで閉じる。</param>
     /// <param name="closed">ログが閉じた（VRChat が終わった、または次のログに移った）か。閉じていなければ、最後の訪問はまだ続いている。</param>
-    public static Projection Project(string logFile, IEnumerable<(long Offset, LogEvent Event)> events, TimeZoneInfo timeZone, DateTime? lastEntryAt, bool closed)
+    public static Projection Project(string deviceId, string logFile, IEnumerable<(long Offset, LogEvent Event)> events, TimeZoneInfo timeZone, DateTime? lastEntryAt, bool closed)
     {
-        var source = "log:" + logFile;
+        var source = Source(deviceId, logFile);
         var visits = new List<Visit>();
         var encounters = new List<Encounter>();
         var activity = new List<ActivityEvent>();
@@ -66,7 +67,7 @@ public static class LogProjector
                 case RoomJoining j:
                     if (visit != null) CloseVisit(moving ?? at, "moved");
                     var info = InstanceInfo.Parse(j.Instance);
-                    visit = new Visit(StableId.Of("visit", logFile, offset), source, j.WorldId, pendingName, j.Instance,
+                    visit = new Visit(StableId.Of("visit", deviceId, logFile, offset), source, j.WorldId, pendingName, j.Instance,
                         info.Number, info.Access, info.OwnerId, info.GroupId, info.Region, at, null, null);
                     pendingName = null;
                     break;
@@ -79,7 +80,7 @@ public static class LogProjector
                     if (visit == null || IsSelf(p.Name, p.UserId)) break;
                     var key = p.UserId ?? "name:" + p.Name;
                     if (open.ContainsKey(key)) break;
-                    open[key] = new Encounter(StableId.Of("encounter", logFile, offset), visit.Id, p.UserId, p.Name, at, null);
+                    open[key] = new Encounter(StableId.Of("encounter", deviceId, logFile, offset), visit.Id, p.UserId, p.Name, at, null);
                     break;
                 case PlayerLeft p:
                     if (visit == null) break;
@@ -137,12 +138,15 @@ public static class LogProjector
         }
 
         var started = LogReader.StartedAt(logFile) is { } st ? Utc(st) : (DateTime?)null;
-        var session = new LogSession(logFile, started, endedAt, endReason, selfId, selfName, vr, hmd);
-        return new Projection(session, visits, encounters, activity);
+        var session = new LogSession(deviceId, logFile, started, endedAt, endReason, selfId, selfName, vr, hmd);
+        return new Projection(deviceId, session, visits, encounters, activity);
 
         ActivityEvent Event(long offset, DateTime at, string kind, string? userId, string? name, Dictionary<string, string?> data) =>
-            new(StableId.Of("activity", logFile, offset), source, visit?.Id, at, kind, userId, name, data);
+            new(StableId.Of("activity", deviceId, logFile, offset), source, visit?.Id, at, kind, userId, name, data);
     }
+
+    /// <summary>記録の出どころ（log:&lt;端末&gt;/&lt;ファイル名&gt;）。</summary>
+    public static string Source(string deviceId, string logFile) => $"log:{deviceId}/{logFile}";
 
     /// <summary>ローカル時刻を UTC に直す。夏時間で飛んだ時刻は 1 時間後として扱う。</summary>
     public static DateTime ToUtc(DateTime local, TimeZoneInfo timeZone)

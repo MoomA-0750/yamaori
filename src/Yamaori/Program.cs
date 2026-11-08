@@ -21,7 +21,7 @@ var rest = command == "run" ? args : args[1..];
 
 var config = new ConfigurationBuilder()
     .AddJsonFile(Path.Combine(new YamaoriOptions().DataDir, "yamaori.json"), optional: true)
-    .AddCommandLine(rest, new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database", ["--archive-dir"] = "ArchiveDir" })
+    .AddCommandLine(rest, new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database", ["--archive-dir"] = "ArchiveDir", ["--device-name"] = "DeviceName" })
     .Build();
 var options = new YamaoriOptions();
 config.Bind(options);
@@ -45,7 +45,7 @@ switch (command)
     case "ingest":
     {
         using var db = Database.Open(options.DatabasePath);
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, db.SelfDevice(options.DeviceName));
         foreach (var (file, r) in LogWatcher.IngestAll(ingestor, new LogArchive(options.ArchivePath), options.LogDir))
             Console.WriteLine($"{file}: {(r.Changed ? $"{r.NewEvents.Count} 件" : "変わりなし")}");
         Summary.Print(db);
@@ -60,7 +60,7 @@ switch (command)
     case "rebuild":
     {
         using var db = Database.Open(options.DatabasePath);
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, db.SelfDevice(options.DeviceName));
         foreach (var name in ingestor.LogFiles()) ingestor.Rebuild(name);
         Summary.Print(db);
         return 0;
@@ -68,7 +68,7 @@ switch (command)
     case "reparse":
     {
         using var db = Database.Open(options.DatabasePath);
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, db.SelfDevice(options.DeviceName));
         foreach (var (name, open, closed) in new LogArchive(options.ArchivePath).List())
         {
             using var stream = open();
@@ -107,6 +107,7 @@ static class Summary
         {
             ("出来事", "SELECT kind || ' ' || COUNT(*) FROM events GROUP BY kind"),
             ("通知", "SELECT k || ' ' || COUNT(*) FROM (SELECT json_extract(data, '$.direction') || ' ' || json_extract(data, '$.type') AS k FROM events WHERE kind = 'notification') GROUP BY k"),
+            ("端末", "SELECT name || ' (' || id || ')' FROM devices"),
             ("起動", "SELECT log_file || ' ' || COALESCE(self_name, '?') || ' vr=' || COALESCE(vr, '?') || ' ' || COALESCE(hmd, '') || ' end=' || COALESCE(end_reason, '（動いている）') FROM sessions ORDER BY log_file"),
         })
         {

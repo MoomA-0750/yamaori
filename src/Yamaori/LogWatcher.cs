@@ -20,7 +20,7 @@ public sealed class LogWatcher(IOptions<YamaoriOptions> options, ILogger<LogWatc
     {
         var o = options.Value;
         using var db = Database.Open(o.DatabasePath);
-        var ingestor = new LogIngestor(db);
+        var ingestor = new LogIngestor(db, db.SelfDevice(o.DeviceName));
         var archive = new LogArchive(o.ArchivePath);
         logger.LogInformation("ログ {LogDir} を見張る。DB は {Db}、生のログは {Archive} に残す", o.LogDir, o.DatabasePath, o.ArchivePath);
         var first = true;

@@ -9,7 +9,7 @@ namespace Yamaori.Store;
 /// ログのファイルを、前に読んだ位置から読んで DB に入れ、そのログの記録を組み立て直す。
 /// 止めて起こしても続きから読み、同じ件を 2 度入れない。
 /// </summary>
-public sealed class LogIngestor(Database db)
+public sealed class LogIngestor(Database db, string deviceId)
 {
     static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
@@ -62,21 +62,21 @@ public sealed class LogIngestor(Database db)
         foreach (var (at, e) in newEvents)
         {
             using var cmd = db.Command(
-                "INSERT OR IGNORE INTO log_events (log_file, offset, at_local, kind, data) VALUES ($f, $o, $at, $k, $d)", tx,
-                ("$f", name), ("$o", at), ("$at", Database.Local(e.At)), ("$k", Kind(e)), ("$d", JsonSerializer.Serialize(e, Json)));
+                "INSERT OR IGNORE INTO log_events (device_id, log_file, offset, at_local, kind, data) VALUES ($dev, $f, $o, $at, $k, $d)", tx,
+                ("$dev", deviceId), ("$f", name), ("$o", at), ("$at", Database.Local(e.At)), ("$k", Kind(e)), ("$d", JsonSerializer.Serialize(e, Json)));
             cmd.ExecuteNonQuery();
         }
         using (var cmd = db.Command(
             """
-            INSERT INTO log_files (name, path, length, offset, time_zone, last_entry_local, closed) VALUES ($n, $p, $l, $o, $tz, $last, $c)
-            ON CONFLICT (name) DO UPDATE SET path = $p, length = $l, offset = $o, last_entry_local = $last, closed = $c
+            INSERT INTO log_files (device_id, name, path, length, offset, time_zone, last_entry_local, closed) VALUES ($dev, $n, $p, $l, $o, $tz, $last, $c)
+            ON CONFLICT (device_id, name) DO UPDATE SET path = $p, length = $l, offset = $o, last_entry_local = $last, closed = $c
             """, tx,
-            ("$n", name), ("$p", path), ("$l", length), ("$o", read.NextOffset), ("$tz", tzId),
+            ("$dev", deviceId), ("$n", name), ("$p", path), ("$l", length), ("$o", read.NextOffset), ("$tz", tzId),
             ("$last", lastLocal is { } ll ? Database.Local(ll) : null), ("$c", closed ? 1 : 0)))
             cmd.ExecuteNonQuery();
 
-        var projection = LogProjector.Project(name, LoadEvents(name, tx), tz, lastLocal, closed);
-        ProjectionWriter.Replace(db, "log:" + name, projection, tx);
+        var projection = LogProjector.Project(deviceId, name, LoadEvents(name, tx), tz, lastLocal, closed);
+        ProjectionWriter.Replace(db, LogProjector.Source(deviceId, name), projection, tx);
         tx.Commit();
         return new Result(name, newEvents.Select(x => x.Event).ToList(), true);
     }
@@ -86,14 +86,14 @@ public sealed class LogIngestor(Database db)
     {
         var state = LoadState(name) ?? throw new InvalidOperationException($"{name} は読んでいない");
         using var tx = db.Connection.BeginTransaction();
-        var projection = LogProjector.Project(name, LoadEvents(name, tx), FindTimeZone(state.TimeZone), state.LastEntryLocal, state.Closed);
-        ProjectionWriter.Replace(db, "log:" + name, projection, tx);
+        var projection = LogProjector.Project(deviceId, name, LoadEvents(name, tx), FindTimeZone(state.TimeZone), state.LastEntryLocal, state.Closed);
+        ProjectionWriter.Replace(db, LogProjector.Source(deviceId, name), projection, tx);
         tx.Commit();
     }
 
     public IReadOnlyList<string> LogFiles()
     {
-        using var cmd = db.Command("SELECT name FROM log_files ORDER BY name");
+        using var cmd = db.Command("SELECT name FROM log_files WHERE device_id = $dev ORDER BY name", null, ("$dev", deviceId));
         using var r = cmd.ExecuteReader();
         var list = new List<string>();
         while (r.Read()) list.Add(r.GetString(0));
@@ -104,7 +104,7 @@ public sealed class LogIngestor(Database db)
 
     State? LoadState(string name)
     {
-        using var cmd = db.Command("SELECT length, offset, time_zone, last_entry_local, closed FROM log_files WHERE name = $n", null, ("$n", name));
+        using var cmd = db.Command("SELECT length, offset, time_zone, last_entry_local, closed FROM log_files WHERE device_id = $dev AND name = $n", null, ("$dev", deviceId), ("$n", name));
         using var r = cmd.ExecuteReader();
         if (!r.Read()) return null;
         return new State(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.IsDBNull(3) ? null : Database.ParseLocal(r.GetString(3)), r.GetInt64(4) != 0);
@@ -112,7 +112,7 @@ public sealed class LogIngestor(Database db)
 
     List<(long, LogEvent)> LoadEvents(string name, SqliteTransaction tx)
     {
-        using var cmd = db.Command("SELECT offset, data FROM log_events WHERE log_file = $f ORDER BY offset", tx, ("$f", name));
+        using var cmd = db.Command("SELECT offset, data FROM log_events WHERE device_id = $dev AND log_file = $f ORDER BY offset", tx, ("$dev", deviceId), ("$f", name));
         using var r = cmd.ExecuteReader();
         var list = new List<(long, LogEvent)>();
         while (r.Read())
@@ -123,9 +123,9 @@ public sealed class LogIngestor(Database db)
     void Delete(string name)
     {
         using var tx = db.Connection.BeginTransaction();
-        foreach (var sql in new[] { "DELETE FROM log_events WHERE log_file = $f", "DELETE FROM log_files WHERE name = $f" })
+        foreach (var sql in new[] { "DELETE FROM log_events WHERE device_id = $dev AND log_file = $f", "DELETE FROM log_files WHERE device_id = $dev AND name = $f" })
         {
-            using var cmd = db.Command(sql, tx, ("$f", name));
+            using var cmd = db.Command(sql, tx, ("$dev", deviceId), ("$f", name));
             cmd.ExecuteNonQuery();
         }
         tx.Commit();

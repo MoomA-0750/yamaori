@@ -37,37 +37,49 @@ public sealed class Database : IDisposable
         }
     }
 
-    /// <summary>表の版ごとの SQL。足すときは末尾に足し、前のものは変えない。</summary>
+    /// <summary>表の版ごとの SQL。足すときは末尾に足し、前のものは変えない（公開前の 2026-11-08 に、端末を入れるため 1 版目だけ書き換えた）。</summary>
     static readonly string[] Migrations =
     [
         """
+        -- 記録を集めた端末。is_self はこの DB を持つ端末
+        CREATE TABLE devices (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            is_self INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
         CREATE TABLE log_files (
-            name TEXT PRIMARY KEY,         -- output_log_….txt（パスでなく名前）
+            device_id TEXT NOT NULL,
+            name TEXT NOT NULL,            -- output_log_….txt（パスでなく名前）
             path TEXT NOT NULL,
             length INTEGER NOT NULL,       -- 前に読んだときのファイルの長さ
             offset INTEGER NOT NULL,       -- 次に読む位置
             time_zone TEXT NOT NULL,       -- ログの時刻を UTC に直すタイムゾーン
             last_entry_local TEXT,         -- 最後の件の時刻（ローカル）
-            closed INTEGER NOT NULL DEFAULT 0
+            closed INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (device_id, name)
         );
         -- ログから読んだ出来事のそのまま。読み方を直したら、ここから組み立て直す
         CREATE TABLE log_events (
+            device_id TEXT NOT NULL,
             log_file TEXT NOT NULL,
             offset INTEGER NOT NULL,
             at_local TEXT NOT NULL,
             kind TEXT NOT NULL,
             data TEXT NOT NULL,            -- JSON
-            PRIMARY KEY (log_file, offset)
+            PRIMARY KEY (device_id, log_file, offset)
         );
         CREATE TABLE sessions (
-            log_file TEXT PRIMARY KEY,
+            device_id TEXT NOT NULL,
+            log_file TEXT NOT NULL,
             started_at TEXT,
             ended_at TEXT,
             end_reason TEXT,
             self_id TEXT,
             self_name TEXT,
             vr INTEGER,
-            hmd TEXT
+            hmd TEXT,
+            PRIMARY KEY (device_id, log_file)
         );
         CREATE TABLE worlds (
             id TEXT PRIMARY KEY,
@@ -75,7 +87,8 @@ public sealed class Database : IDisposable
         );
         CREATE TABLE visits (
             id TEXT PRIMARY KEY,
-            source TEXT NOT NULL,          -- log:<ファイル名>、vat:…、vrcx:…
+            source TEXT NOT NULL,          -- log:<端末>/<ファイル名>、vat:…、vrcx:…
+            device_id TEXT,                -- どの端末の記録か
             world_id TEXT NOT NULL,
             world_name TEXT,
             instance TEXT NOT NULL,
@@ -94,6 +107,7 @@ public sealed class Database : IDisposable
         CREATE TABLE encounters (
             id TEXT PRIMARY KEY,
             source TEXT NOT NULL,
+            device_id TEXT,
             visit_id TEXT NOT NULL,
             user_id TEXT,
             name TEXT NOT NULL,
@@ -106,6 +120,7 @@ public sealed class Database : IDisposable
         CREATE TABLE events (
             id TEXT PRIMARY KEY,
             source TEXT NOT NULL,
+            device_id TEXT,
             visit_id TEXT,
             at TEXT NOT NULL,
             kind TEXT NOT NULL,            -- video・avatar・notification・screenshot
@@ -128,6 +143,22 @@ public sealed class Database : IDisposable
             GROUP BY user_id;
         """,
     ];
+
+    /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
+    public string SelfDevice(string name)
+    {
+        if (Scalar("SELECT id FROM devices WHERE is_self = 1") is string id)
+        {
+            using var u = Command("UPDATE devices SET name = $n WHERE id = $id", null, ("$n", name), ("$id", id));
+            u.ExecuteNonQuery();
+            return id;
+        }
+        id = "d_" + Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8));
+        using var cmd = Command("INSERT INTO devices (id, name, is_self, created_at) VALUES ($id, $n, 1, $at)", null,
+            ("$id", id), ("$n", name), ("$at", Time(DateTime.UtcNow)));
+        cmd.ExecuteNonQuery();
+        return id;
+    }
 
     public object? Scalar(string sql, params (string Name, object? Value)[] args)
     {

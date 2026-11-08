@@ -19,6 +19,7 @@ public static class StableId
 
 /// <summary>VRChat を 1 回起こしてから閉じるまで（ログ 1 本）。時刻は UTC。</summary>
 public sealed record LogSession(
+    string DeviceId,
     string LogFile,
     DateTime? StartedAt,
     DateTime? EndedAt,
@@ -72,6 +73,7 @@ public sealed record ActivityEvent(
 
 /// <summary>ログ 1 本から組み立てた記録の全部。</summary>
 public sealed record Projection(
+    string DeviceId,
     LogSession Session,
     IReadOnlyList<Visit> Visits,
     IReadOnlyList<Encounter> Encounters,

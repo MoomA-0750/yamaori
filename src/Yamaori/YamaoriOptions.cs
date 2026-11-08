@@ -12,6 +12,9 @@ public sealed class YamaoriOptions
     /// <summary>DB のファイル。空なら DataDir の yamaori.sqlite3。</summary>
     public string? Database { get; set; }
 
+    /// <summary>この端末の名前（どの端末の記録かを見分けるのに使う）。既定は PC の名前。</summary>
+    public string DeviceName { get; set; } = Environment.MachineName;
+
     /// <summary>ログを見る間隔（秒）。</summary>
     public double PollSeconds { get; set; } = 2;
 
