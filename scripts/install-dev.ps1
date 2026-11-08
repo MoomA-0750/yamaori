@@ -17,6 +17,16 @@ if ($Uninstall) {
     return
 }
 
+# 画面: Node があれば web/ をビルドする。なければ、すでにある src\Yamaori\wwwroot を使う
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+    Push-Location web
+    npm ci --no-audit --no-fund
+    npm run build
+    Pop-Location
+} elseif (-not (Test-Path src\Yamaori\wwwroot\index.html)) {
+    Write-Warning "Node がなく、ビルドした画面（src\Yamaori\wwwroot）もない。API だけで動く"
+}
+
 dotnet publish src\Yamaori -c Release -r win-x64 --self-contained false -o $dest --nologo
 if ($LASTEXITCODE -ne 0) { throw "発行に失敗した" }
 $exe = Join-Path $dest 'Yamaori.exe'

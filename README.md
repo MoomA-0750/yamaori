@@ -4,9 +4,22 @@ VRChat で過ごした時間を自動で記録し、あとから振り返った�
 
 名前は「山折り」から。旅先で過ごした時間・訪れた場所・会った人・撮った写真を、一枚の紙に折りたたむようにしまっておき、あとで開いて振り返る。
 
-> 作り始めたところ（2026-11-08）。ログを読んで DB に入れるところまで。段階の計画は [docs/plan.md](docs/plan.md)。
->
-> 試すには .NET 10 の SDK で `dotnet test`、`dotnet run --project src/Yamaori -- ingest`（ログを一度読んで DB に入れ、まとめを出す）。引数なしで常駐して見張る。
+> 作っているところ（2026-11-09）。ログを読んで記録し、生のログを残し、WebUI・REST API・SSE・MCP で見る・メモを書くところまで。段階の計画は [docs/plan.md](docs/plan.md)。
+
+### 試す
+
+.NET 10 の SDK と Node（画面のビルド）が要る。
+
+```sh
+(cd web && npm ci && npm run build)    # 画面を src/Yamaori/wwwroot へ
+dotnet test
+dotnet run --project src/Yamaori       # 常駐して見張る。http://localhost:47800 を開く
+```
+
+- コマンド: `ingest`（ログを一度読んで DB に入れる）・`summary`・`rebuild`（DB の出来事から組み立て直す）・`reparse`（残した生のログから読み直す）・`export --out <dir>`（日記を日ごとの Markdown に）
+- 引数: `--log-dir`・`--data-dir`・`--database`・`--archive-dir`・`--device-name`・`--port`・`--listen`（`local`・`lan`・`tailscale`）。データのフォルダの `yamaori.json` でも決められる
+- API の定義は `/openapi/v1.json`、今の出来事は `/api/stream`（SSE）、AI のエージェント向けは `/mcp`（例: `claude mcp add --transport http yamaori http://localhost:47800/mcp`）
+- Windows で開発中の版を入れる: `scripts/install-dev.ps1`（ログオン時に起こす。`-Uninstall` で外す）
 
 ## できるようにすること
 

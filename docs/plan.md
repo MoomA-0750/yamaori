@@ -46,6 +46,8 @@ tests/               xUnit。実際のログから作った小さな見本（名
 
 ### 3. API と WebUI
 
+> 2026-11-09: to-fu に入れる前まで、できた。REST API（OpenAPI）・メモ・SSE・認証と見せ方・WebUI（Svelte）・MCP・Markdown の書き出し。手元で本物の行を読ませ、PC とスマホの幅、明るい・暗い表示で画面を確かめた。to-fu に入れて確かめるのは、本人の確認のあと
+
 - ASP.NET Core の REST API と OpenAPI、SSE（今の出来事）、MCP（公式の C# SDK）
 - メモ・日記（Markdown）を訪問・ワールド・人・日に付ける
 - WebUI: 日ごとの訪問の一覧、訪問の詳細（会った人・動画・写真）、ワールド、人、メモ。スマホの幅でも使える
