@@ -19,7 +19,8 @@ public sealed class Database : IDisposable
         if (dir != null) Directory.CreateDirectory(dir);
         var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
         c.Open();
-        Exec(c, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=OFF;");
+        // 常駐の見張りと Web の要求が別々の接続で同時に使うので、書き込みが重なったら少し待つ
+        Exec(c, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=OFF; PRAGMA busy_timeout=5000;");
         var db = new Database(c);
         db.Migrate();
         return db;
@@ -168,6 +169,20 @@ public sealed class Database : IDisposable
             FROM sessions
             WHERE self_id IS NOT NULL AND self_name IS NOT NULL
             GROUP BY self_id, self_name;
+        """,
+        // 3 版目: メモ・日記。訪問・ワールド・人・日のどれかに付く（1 つに何件でも）
+        """
+        CREATE TABLE notes (
+            id TEXT PRIMARY KEY,
+            target_type TEXT NOT NULL,     -- visit・world・person・day
+            target_id TEXT NOT NULL,       -- 訪問の ID、wrld_…、usr_…、yyyy-MM-dd
+            body TEXT NOT NULL,            -- Markdown
+            device_id TEXT,                -- 書いた端末
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX notes_target ON notes (target_type, target_id);
+        CREATE INDEX notes_updated ON notes (updated_at);
         """,
     ];
 

@@ -15,6 +15,14 @@ public sealed class YamaoriOptions
     /// <summary>この端末の名前（どの端末の記録かを見分けるのに使う）。既定は PC の名前。</summary>
     public string DeviceName { get; set; } = Environment.MachineName;
 
+    /// <summary>WebUI と API の番号。</summary>
+    public int Port { get; set; } = 47800;
+
+    /// <summary>
+    /// 見せ方。local（この PC だけ。既定）・lan（同じネットワークの端末から。認証が要る）・tailscale（tailscale serve 越し。Tailscale の本人の情報で通す）。
+    /// </summary>
+    public string Listen { get; set; } = "local";
+
     /// <summary>ログを見る間隔（秒）。</summary>
     public double PollSeconds { get; set; } = 2;
 

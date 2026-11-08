@@ -33,13 +33,7 @@ switch (command)
         using (var mutex = new Mutex(true, @"Local\Yamaori", out var first))
         {
             if (!first) return 1;
-            var builder = Host.CreateApplicationBuilder(rest);
-            builder.Configuration.AddConfiguration(config);
-            builder.Logging.AddProvider(new FileLoggerProvider(Path.Combine(options.DataDir, "yamaori.log")));
-            builder.Services.Configure<YamaoriOptions>(config);
-            builder.Services.AddSingleton<LogWatcher>();
-            builder.Services.AddHostedService(s => s.GetRequiredService<LogWatcher>());
-            await builder.Build().RunAsync().ConfigureAwait(false);
+            await Server.Build(rest, config, options).RunAsync().ConfigureAwait(false);
             return 0;
         }
     case "ingest":
