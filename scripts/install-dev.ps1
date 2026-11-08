@@ -1,4 +1,4 @@
-# 開発中の Yamaori を、この PC の本人のアカウントに入れる（管理者権限は要らない）。
+﻿# 開発中の Yamaori を、この PC の本人のアカウントに入れる（管理者権限は要らない）。
 # 動いているものを止め、発行し、ログオン時に起こすよう登録して、起こす。
 # 使い方: リポジトリの一番上で  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-dev.ps1
 # 外すとき:  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-dev.ps1 -Uninstall
@@ -17,7 +17,7 @@ if ($Uninstall) {
     return
 }
 
-dotnet publish src\Yamaori -c Release -r win-x64 --self-contained false -o $dest --nologo -v quiet
+dotnet publish src\Yamaori -c Release -r win-x64 --self-contained false -o $dest --nologo
 if ($LASTEXITCODE -ne 0) { throw "発行に失敗した" }
 $exe = Join-Path $dest 'Yamaori.exe'
 Set-ItemProperty -Path $runKey -Name Yamaori -Value "`"$exe`""
