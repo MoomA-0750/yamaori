@@ -121,7 +121,8 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         {
             if (from is { } f && g.Key < f) continue;
             if (to is { } t && g.Key > t) continue;
-            var minutes = g.Sum(v => v.Left is { } l ? (int)Math.Round((l - v.Joined).TotalMinutes) : 0);
+            // 足してから丸める（訪問ごとに丸めると、その日のページの合計とずれる）
+            var minutes = (int)Math.Round(g.Sum(v => v.Left is { } l ? (l - v.Joined).TotalMinutes : 0));
             var key = g.Key.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             result.Add(new DaySummary(key, g.Count(), minutes, g.Select(v => v.World).Distinct().Count(),
                 g.SelectMany(v => people[v.Id]).Distinct().Count(), dayNotes.GetValueOrDefault(key)));

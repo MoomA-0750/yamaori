@@ -35,7 +35,12 @@ public static class Server
         builder.Services.AddScoped(_ => Database.Open(options.DatabasePath));
         builder.Services.AddScoped(s => new Queries(s.GetRequiredService<Database>()));
         builder.Services.AddOpenApi();
-        builder.Services.ConfigureHttpJsonOptions(j => j.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
+        builder.Services.ConfigureHttpJsonOptions(j =>
+        {
+            j.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+            // 数は数として受ける（定義でも number になる）
+            j.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict;
+        });
 
         var app = builder.Build();
         var hub = app.Services.GetRequiredService<LiveHub>();
@@ -44,6 +49,13 @@ public static class Server
             if (LiveHub.From(file, e) is { } live) hub.Publish(live);
         };
         Auth.UseAccess(app);
+        // 画面（web/ をビルドしたもの）。index.html は毎回確かめさせ、名前にハッシュの付いたものは長く持たせる
+        app.UseDefaultFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = c =>
+                c.Context.Response.Headers.CacheControl = c.File.Name.EndsWith(".html", StringComparison.Ordinal) ? "no-cache" : "public, max-age=31536000, immutable",
+        });
         app.MapOpenApi();
         Auth.Map(app);
         Api.Map(app);

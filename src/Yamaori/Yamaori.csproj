@@ -1,5 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <!-- 画面は web/ で npm run build すると wwwroot に出る（git には入れない） -->
+  <ItemGroup>
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Yamaori.Core\Yamaori.Core.csproj" />
     <ProjectReference Include="..\Yamaori.Store\Yamaori.Store.csproj" />

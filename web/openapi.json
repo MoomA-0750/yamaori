@@ -1,0 +1,1943 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Yamaori | v1",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:47804/"
+    }
+  ],
+  "paths": {
+    "/api/auth/state": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ログインの状態（通るか、パスワードが決まっているか）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "パスワードでログインする（Cookie を返す）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ログアウトする",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "パスワードを決める・変える（変えると、ほかのログインは切れる）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/tokens": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ほかのアプリ用の API のトークンの一覧",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiToken"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/tokens/{id}": {
+      "delete": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "API のトークンを消す",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "設定（見せ方・認証）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "設定を変える（見せ方・番号は起こし直すと効く）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/restart": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "Yamaori を起こし直す",
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "Yamaori の状態",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/days": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "日ごとのまとめ（新しい順）",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DaySummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/days/{date}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "その日の訪問とメモ",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/visits": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "訪問の一覧（新しい順）",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "world",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "person",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfVisitSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/visits/{id}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "訪問の詳細（会った人・出来事・メモ）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "出来事の一覧（動画・通知・スクショ・アバター）",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfEventView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/worlds": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name）",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfWorldSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/worlds/{id}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ワールドの詳細（訪問・メモ）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorldDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/people": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "会った人の一覧（q で名前を検索。前の名前も見る）",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfPersonSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/people/{id}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "人の詳細（名前の移り変わり・一緒にいた訪問・メモ）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/accounts": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "自分が遊んだアカウント",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "記録を集めた端末",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notes": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メモの一覧",
+        "parameters": [
+          {
+            "name": "targetType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Note"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メモを書く（訪問・ワールド・人・日に付ける。本文は Markdown）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notes/{id}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メモを書き換える",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メモを消す",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/stream": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "今の出来事を SSE で流す（入った・出た・人が来た・動画・スクショ・通知）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseItemOfLiveEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountView": {
+        "required": [
+          "id",
+          "name",
+          "firstSeenAt",
+          "lastSeenAt",
+          "visitCount",
+          "names"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "visitCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NameSpan"
+            }
+          }
+        }
+      },
+      "ApiToken": {
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "lastUsedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AuthState": {
+        "required": [
+          "allowed",
+          "reason",
+          "passwordSet",
+          "loggedIn",
+          "local",
+          "tailscaleLogin",
+          "listen"
+        ],
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "passwordSet": {
+            "type": "boolean"
+          },
+          "loggedIn": {
+            "type": "boolean"
+          },
+          "local": {
+            "type": "boolean"
+          },
+          "tailscaleLogin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "listen": {
+            "type": "string"
+          }
+        }
+      },
+      "DaySummary": {
+        "required": [
+          "date",
+          "visitCount",
+          "minutes",
+          "worldCount",
+          "peopleCount",
+          "noteCount"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "visitCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "worldCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "peopleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "noteCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DayView": {
+        "required": [
+          "date",
+          "visits",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitSummary"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          }
+        }
+      },
+      "DeviceView": {
+        "required": [
+          "id",
+          "name",
+          "isSelf",
+          "createdAt",
+          "visitCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isSelf": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "visitCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "EncounterView": {
+        "required": [
+          "userId",
+          "name",
+          "joinedAt",
+          "leftAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leftAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "EventView": {
+        "required": [
+          "id",
+          "at",
+          "kind",
+          "userId",
+          "name",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "LiveEvent": {
+        "required": [
+          "kind",
+          "at",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "LoginInput": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "NameSpan": {
+        "required": [
+          "name",
+          "firstSeenAt",
+          "lastSeenAt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "firstSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Note": {
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "body",
+          "deviceId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoteInput": {
+        "required": [
+          "targetType",
+          "targetId",
+          "body"
+        ],
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        }
+      },
+      "NoteUpdate": {
+        "required": [
+          "body"
+        ],
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          }
+        }
+      },
+      "PageOfEventView": {
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageOfPersonSummary": {
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageOfVisitSummary": {
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageOfWorldSummary": {
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorldSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PasswordInput": {
+        "required": [
+          "current",
+          "new"
+        ],
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "new": {
+            "type": "string"
+          }
+        }
+      },
+      "PersonDetail": {
+        "required": [
+          "person",
+          "names",
+          "visits",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "person": {
+            "$ref": "#/components/schemas/PersonSummary"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NameSpan"
+            }
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitSummary"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          }
+        }
+      },
+      "PersonSummary": {
+        "required": [
+          "userId",
+          "name",
+          "firstMetAt",
+          "lastMetAt",
+          "visitCount",
+          "noteCount"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstMetAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastMetAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "visitCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "noteCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SettingsInput": {
+        "required": [
+          "listen",
+          "port",
+          "tailscaleLogins",
+          "localRequiresLogin",
+          "allowUnauthenticatedRemote",
+          "confirmUnauthenticatedRemote",
+          "deviceName"
+        ],
+        "type": "object",
+        "properties": {
+          "listen": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "port": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "tailscaleLogins": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "localRequiresLogin": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "allowUnauthenticatedRemote": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "confirmUnauthenticatedRemote": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "deviceName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SettingsResult": {
+        "required": [
+          "settings",
+          "restartRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/SettingsView"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SettingsView": {
+        "required": [
+          "listen",
+          "port",
+          "tailscaleLogins",
+          "localRequiresLogin",
+          "allowUnauthenticatedRemote",
+          "passwordSet",
+          "deviceName"
+        ],
+        "type": "object",
+        "properties": {
+          "listen": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tailscaleLogins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "localRequiresLogin": {
+            "type": "boolean"
+          },
+          "allowUnauthenticatedRemote": {
+            "type": "boolean"
+          },
+          "passwordSet": {
+            "type": "boolean"
+          },
+          "deviceName": {
+            "type": "string"
+          }
+        }
+      },
+      "SseItemOfLiveEvent": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LiveEvent"
+          },
+          "eventType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reconnectionInterval": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "Status": {
+        "required": [
+          "version",
+          "deviceId",
+          "deviceName",
+          "listen",
+          "timeZone",
+          "now"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "listen": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TokenCreated": {
+        "required": [
+          "token",
+          "secret"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/ApiToken"
+          },
+          "secret": {
+            "type": "string"
+          }
+        }
+      },
+      "TokenInput": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "VisitDetail": {
+        "required": [
+          "visit",
+          "instance",
+          "ownerId",
+          "groupId",
+          "people",
+          "events",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "visit": {
+            "$ref": "#/components/schemas/VisitSummary"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EncounterView"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          }
+        }
+      },
+      "VisitSummary": {
+        "required": [
+          "id",
+          "worldId",
+          "worldName",
+          "instanceNumber",
+          "access",
+          "region",
+          "joinedAt",
+          "leftAt",
+          "leftReason",
+          "accountId",
+          "deviceId",
+          "peopleCount",
+          "videoCount",
+          "screenshotCount",
+          "noteCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "worldId": {
+            "type": "string"
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instanceNumber": {
+            "type": "string"
+          },
+          "access": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leftAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "leftReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deviceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "peopleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "videoCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "screenshotCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "noteCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "WorldDetail": {
+        "required": [
+          "world",
+          "visits",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "world": {
+            "$ref": "#/components/schemas/WorldSummary"
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitSummary"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          }
+        }
+      },
+      "WorldSummary": {
+        "required": [
+          "id",
+          "name",
+          "visitCount",
+          "minutes",
+          "firstVisitAt",
+          "lastVisitAt",
+          "noteCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "visitCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstVisitAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastVisitAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "noteCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Yamaori"
+    }
+  ]
+}
