@@ -10,6 +10,8 @@ using Yamaori.Store;
 // yamaori summary            DB のまとめを出す
 // yamaori rebuild            DB に残した出来事から、記録を全部組み立て直す
 // 共通の引数: --log-dir <フォルダ> --data-dir <フォルダ> --database <ファイル>
+// 出力を別のファイルへ向けたときも、日本語が化けないようにする
+Console.OutputEncoding = System.Text.Encoding.UTF8;
 var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
 var rest = command == "run" ? args : args[1..];
 
@@ -62,7 +64,6 @@ static class Summary
 {
     public static void Print(Database db)
     {
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
         using var cmd = db.Command("""
             SELECT v.joined_at, v.left_at, v.left_reason, COALESCE(v.world_name, v.world_id), v.access, v.region,
                    (SELECT COUNT(DISTINCT COALESCE(e.user_id, e.name)) FROM encounters e WHERE e.visit_id = v.id),
