@@ -12,6 +12,9 @@ public static class Server
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
         builder.Configuration.AddConfiguration(config);
         builder.Logging.AddProvider(new FileLoggerProvider(Path.Combine(options.DataDir, "yamaori.log")));
+        // 要求 1 つごとの行（ASP.NET・MCP の内部）は、画面（コンテナの記録）にも警告以上だけ出す
+        builder.Logging.AddFilter("Microsoft.AspNetCore", Microsoft.Extensions.Logging.LogLevel.Warning);
+        builder.Logging.AddFilter("ModelContextProtocol", Microsoft.Extensions.Logging.LogLevel.Warning);
         builder.Services.Configure<YamaoriOptions>(config);
 
         // 既定はこの PC からだけ。lan のときだけ外のアドレスでも待つ（tailscale serve は localhost へつなぐので local のままでよい）
