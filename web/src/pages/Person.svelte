@@ -36,6 +36,19 @@
     void total
   }
 
+  // 忘れる（押すと確かめの欄を出し、もう一度押して忘れる）
+  let forgetOpen = $state(false)
+  let forgetMsg = $state('')
+  async function forget() {
+    if (!data) return
+    try {
+      await api.forgetPerson(data.person.userId, data.person.name ?? null)
+      location.hash = href.people()
+    } catch (e) {
+      forgetMsg = (e as Error).message
+    }
+  }
+
   $effect(() => {
     more = []
     api.person(id).then((d) => (data = d)).catch((e) => (error = (e as Error).message))
@@ -95,11 +108,32 @@
         <button class="more" onclick={() => loadMore(p.userId, p.visitCount)} disabled={loadingMore}>もっと見る</button>
       {/if}
     </section>
+
+    <section class="forget">
+      {#if !forgetOpen}
+        <button class="ghost danger" onclick={() => (forgetOpen = true)}>この人を忘れる</button>
+      {:else}
+        <div class="card pad stack">
+          <h2>この人を忘れますか</h2>
+          <p class="muted">会った記録・この人の出来事（動画・通知・フレンドの記録）・この人へのメモを消し、あとからログを読み直したり取り込み直したりしても、この人は入れません。</p>
+          <p class="faint">VRChat の生のログ（Yamaori のデータのフォルダの logs）には残ります。忘れるのは設定の「忘れた人」でやめられますが、消したメモは戻りません。</p>
+          <div class="row">
+            <button class="danger" onclick={forget}>忘れる</button>
+            <button onclick={() => (forgetOpen = false)}>やめる</button>
+          </div>
+          {#if forgetMsg}<p class="error">{forgetMsg}</p>{/if}
+        </div>
+      {/if}
+    </section>
   </div>
 {/if}
 
 <style>
   .more { margin-top: .75rem; }
+  .forget { margin-top: 1rem; }
+  .forget p { margin: 0; }
+  .pad { padding: 1rem 1.2rem; }
+  .error { color: var(--danger); }
   .head { gap: .35rem; }
   .head p { margin: 0; }
   .names { list-style: none; margin: 0; padding: .25rem 0; }

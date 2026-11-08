@@ -66,6 +66,18 @@ public static class Api
             q.Person(id) is { } p ? TypedResults.Ok(p) : TypedResults.NotFound())
             .WithSummary("人の詳細（名前の移り変わり・一緒にいた訪問・メモ）");
 
+        api.MapPost("/people/{id}/forget", Results<Ok<ForgetResult>, BadRequest<string>> (Database db, string id, ForgetInput? input) =>
+        {
+            try { return TypedResults.Ok(new ForgetResult(new ForgetStore(db).Forget(id, input?.Label))); }
+            catch (ArgumentException ex) { return TypedResults.BadRequest(ex.Message); }
+        }).WithSummary("人を忘れる（会った記録・出来事・メモを消し、あとから読み直しても入れない。生のログには残る）");
+
+        api.MapGet("/people/forgotten", (Database db) => new ForgetStore(db).List()).WithSummary("忘れた人");
+
+        api.MapDelete("/people/forgotten/{key}", Results<NoContent, NotFound> (Database db, string key) =>
+            new ForgetStore(db).Unforget(key) ? TypedResults.NoContent() : TypedResults.NotFound())
+            .WithSummary("忘れるのをやめる（消した記録は、次に読み直す・取り込み直すと戻る。メモは戻らない）");
+
         api.MapGet("/accounts", (Queries q) => q.Accounts()).WithSummary("自分が遊んだアカウント");
         api.MapGet("/devices", (Queries q) => q.Devices()).WithSummary("記録を集めた端末");
 
@@ -188,6 +200,9 @@ public static class Api
     public sealed record SaveWorldInput(string? Url, string? Text, string? WorldId, string? Name, string? List);
     public sealed record SavedWorld(string WorldId, string List);
     public sealed record FavoriteList(string Name, int Count);
+    public sealed record ForgetInput(string? Label);
+    public sealed record ForgetResult(int Removed);
+
     /// <summary>メモの長さの上限（文字）。</summary>
     public const int MaxNote = 100_000;
 

@@ -6,6 +6,11 @@
 
   let settings = $state<SettingsView | null>(null)
   let tokens = $state<ApiToken[]>([])
+  let forgotten = $state<{ key: string; label?: string | null; forgottenAt: string }[]>([])
+  async function unforget(key: string) {
+    await api.unforget(key)
+    forgotten = await api.forgotten()
+  }
   let devices = $state<DeviceView[]>([])
   let accounts = $state<AccountView[]>([])
   let error = $state('')
@@ -29,7 +34,7 @@
       tailscaleLogins = s.tailscaleLogins.join('\n')
       localRequiresLogin = s.localRequiresLogin
       openRemote = s.allowUnauthenticatedRemote
-      ;[tokens, devices, accounts] = await Promise.all([api.tokens(), api.devices(), api.accounts()])
+      ;[tokens, devices, accounts, forgotten] = await Promise.all([api.tokens(), api.devices(), api.accounts(), api.forgotten()])
     } catch (e) { error = (e as Error).message }
   }
   load()
@@ -325,6 +330,19 @@
         {/each}
       </ul>
     </section>
+
+    {#if forgotten.length}
+      <section class="card pad stack">
+        <h2>忘れた人</h2>
+        <p class="faint">この人たちの記録は入れません。忘れるのをやめると、次にログを読み直す・取り込み直すときに記録が戻ります（消したメモは戻りません）。</p>
+        <ul class="tokens">
+          {#each forgotten as f (f.key)}
+            <li class="spread"><span><b>{f.label ?? f.key}</b> <span class="faint">{dateTime(f.forgottenAt)}</span></span>
+              <button class="ghost" onclick={() => unforget(f.key)}>忘れるのをやめる</button></li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
 
     {#if auth?.loggedIn}
       <div><button onclick={logout}>ログアウト</button></div>

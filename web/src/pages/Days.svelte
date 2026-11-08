@@ -38,8 +38,8 @@
         <h2>はじめに</h2>
         <ol>
           <li><b>VRChat を起こす。</b>ログが書かれるそばから記録に入ります（この画面は自動で変わります）。</li>
-          <li><b>前の記録を入れる（あれば）。</b>VRChat は 1 日より古いログを消すので、それより前の分は VRChatActivityTools や VRCX の記録から取り込めます:
-            <code>yamaori import-vat --file &lt;VRChatActivityLog.db&gt;</code>・<code>yamaori import-vrcx</code></li>
+          <li><b>前の記録を入れる（あれば）。</b>VRChat は 1 日より古いログを消すので、それより前の分は VRChatActivityTools や VRCX の記録から取り込めます。
+            <span class="cmds"><code>yamaori import-vat --file &lt;VRChatActivityLog.db&gt;</code><code>yamaori import-vrcx</code></span></li>
           <li><b>写真を見せる。</b>VRChat の写真のフォルダは最初から見ています。NAS に移した写真は <a href={href.settings()}>設定</a> で足します。</li>
           <li><b>ワールドの詳しい情報（任意）。</b>ブラウザの拡張機能を入れると、vrchat.com で開いたワールドの説明や人数の上限を保存できます。</li>
           <li><b>スマホや別の PC から見る（任意）。</b><a href={href.settings()}>設定</a> でパスワードを決めてから、見せ方を変えます。</li>
@@ -85,6 +85,8 @@
   .start { text-align: left; max-width: 40rem; margin: 0 auto; }
   .start h2 { font-size: 1rem; margin-bottom: .3rem; }
   .start ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: .4rem; }
-  .start code { font-family: var(--mono); font-size: .82em; background: var(--surface-2); padding: .05em .35em; border-radius: 5px; overflow-wrap: anywhere; }
+  .empty { word-break: auto-phrase; text-wrap: pretty; }
+  .cmds { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; margin-top: .3rem; }
+  .start code { white-space: nowrap; max-width: 100%; overflow-x: auto; display: inline-block; font-family: var(--mono); font-size: .82em; background: var(--surface-2); padding: .05em .35em; border-radius: 5px; overflow-wrap: anywhere; }
   .start a { color: var(--accent); text-decoration: underline; }
 </style>

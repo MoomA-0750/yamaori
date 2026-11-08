@@ -326,6 +326,23 @@ public sealed class Database : IDisposable
         ALTER TABLE api_tokens ADD COLUMN scope TEXT NOT NULL DEFAULT 'full';
         ALTER TABLE api_tokens ADD COLUMN device_id TEXT;
         """,
+        // 11 版目: 忘れた人。ログの読み直し・取り込み・子からの同期・拡張機能のどこから入っても、その人の記録は入れない（トリガーで消す）
+        """
+        CREATE TABLE forgotten_people (
+            key TEXT PRIMARY KEY,          -- usr_…、名前だけの人は name:<名前>
+            label TEXT,                    -- 忘れたときの名前（一覧に出すため）
+            forgotten_at TEXT NOT NULL
+        );
+        CREATE TRIGGER forget_encounters AFTER INSERT ON encounters
+            WHEN NEW.user_id IN (SELECT key FROM forgotten_people) OR ('name:' || NEW.name) IN (SELECT key FROM forgotten_people)
+            BEGIN DELETE FROM encounters WHERE id = NEW.id; END;
+        CREATE TRIGGER forget_events AFTER INSERT ON events
+            WHEN NEW.user_id IN (SELECT key FROM forgotten_people) OR ('name:' || NEW.name) IN (SELECT key FROM forgotten_people)
+            BEGIN DELETE FROM events WHERE id = NEW.id; END;
+        CREATE TRIGGER forget_friends AFTER INSERT ON friend_snapshots
+            WHEN NEW.user_id IN (SELECT key FROM forgotten_people)
+            BEGIN DELETE FROM friend_snapshots WHERE account_id = NEW.account_id AND user_id = NEW.user_id; END;
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

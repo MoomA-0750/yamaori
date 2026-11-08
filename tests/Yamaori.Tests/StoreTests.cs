@@ -83,11 +83,35 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 忘れた人は_組み立て直しても戻らず_忘れるのをやめると戻る()
+    {
+        File.WriteAllBytes(LogPath, Fixture());
+        using var db = Database.Open(Path.Combine(_dir, "f.sqlite3"));
+        var ingestor = new LogIngestor(db, "d_test");
+        ingestor.Ingest(LogPath, closed: true, Tokyo);
+        var who = (string)db.Scalar("SELECT user_id FROM encounters WHERE user_id IS NOT NULL GROUP BY user_id ORDER BY COUNT(*) DESC LIMIT 1")!;
+        long Met() => (long)db.Scalar("SELECT COUNT(*) FROM encounters WHERE user_id = $u", ("$u", who))!;
+        Assert.True(Met() > 0);
+        var others = (long)db.Scalar("SELECT COUNT(*) FROM encounters WHERE user_id IS NOT $u", ("$u", who))!;
+
+        var forget = new ForgetStore(db);
+        Assert.True(forget.Forget(who, "誰か") > 0);
+        Assert.Equal(0, Met());
+        ingestor.Rebuild(FileName);
+        Assert.Equal(0, Met());
+        Assert.Equal(others, (long)db.Scalar("SELECT COUNT(*) FROM encounters WHERE user_id IS NOT $u", ("$u", who))!);
+
+        Assert.True(forget.Unforget(who));
+        ingestor.Rebuild(FileName);
+        Assert.True(Met() > 0);
+    }
+
+    [Fact]
     public void 表の版を上げる前に写しを取り_新しい版の_DB_は開かない()
     {
         var path = Path.Combine(_dir, "m.sqlite3");
         using (var db = Database.Open(path))
-        using (var cmd = db.Command($"ALTER TABLE api_tokens DROP COLUMN scope; ALTER TABLE api_tokens DROP COLUMN device_id; PRAGMA user_version = {Database.SchemaVersion - 1};"))
+        using (var cmd = db.Command($"DROP TRIGGER forget_encounters; DROP TRIGGER forget_events; DROP TRIGGER forget_friends; DROP TABLE forgotten_people; PRAGMA user_version = {Database.SchemaVersion - 1};"))
             cmd.ExecuteNonQuery();
         using (Database.Open(path)) { }
         Assert.True(File.Exists(path + $".bak-v{Database.SchemaVersion - 1}"));
