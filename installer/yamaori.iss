@@ -33,7 +33,8 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=force
+; 窓を持たない Yamaori は Windows の閉じる合図（Restart Manager）に応えないので、それに頼らず PrepareToInstall で止める
+CloseApplications=no
 RestartApplications=no
 UninstallDisplayName=Yamaori
 UninstallDisplayIcon={app}\Yamaori.exe
@@ -67,14 +68,20 @@ begin
   Result := ExpandConstant('{param:PORT|47800}');
 end;
 
+// 入れ替える前に、動いている Yamaori を止める
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM Yamaori.exe /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1500);
+  Result := '';
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   DataDir, Config: String;
-  ResultCode: Integer;
 begin
-  if CurStep = ssInstall then
-    // 動いている Yamaori を止めてから入れ替える
-    Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM Yamaori.exe /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   if CurStep = ssPostInstall then
   begin
     DataDir := ExpandConstant('{localappdata}\Yamaori');
