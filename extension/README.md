@@ -16,7 +16,7 @@ VRChat の利用規約は、VRChat が出していない道具でデータを取
 
 ## 入れ方（開発中）
 
-1. Yamaori の WebUI の設定で「ほかのアプリ用のトークン」を作る
+1. Yamaori の WebUI の設定で「ほかのアプリ用のトークン」を、範囲を「拡張機能・スマホの保存」にして作る
 2. Chrome: `chrome://extensions` →「デベロッパー モード」→「パッケージ化されていない拡張機能を読み込む」でこのフォルダ。Firefox: `about:debugging` →「一時的なアドオンを読み込む」で `manifest.json`
 3. 拡張機能の設定で、Yamaori のアドレス（既定 `http://localhost:47800`）とトークンを入れる
 

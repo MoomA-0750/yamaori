@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, ApiError, type AccountView, type ApiToken, type AuthState, type DeviceView, type SettingsView } from '../api'
+  import { api, ApiError, type AccountView, type ApiToken, type AuthState, type DeviceView, type SettingsView, type TokenScope } from '../api'
   import { dateTime } from '../format'
 
   let { auth, onLogout }: { auth: AuthState | null; onLogout: () => void } = $props()
@@ -77,10 +77,12 @@
 
   // API のトークン
   let tokenName = $state('')
+  let tokenScope = $state<TokenScope>('extension')
+  const scopeLabels: Record<string, string> = { full: '全部（設定は除く）', extension: '拡張機能・スマホの保存', sync: '子の端末' }
   let newSecret = $state('')
   async function createToken() {
     if (!tokenName.trim()) return
-    const r = await api.createToken(tokenName.trim())
+    const r = await api.createToken(tokenName.trim(), tokenScope)
     newSecret = r.secret
     tokenName = ''
     tokens = await api.tokens()
@@ -186,7 +188,7 @@
 
       <details class="danger-zone" open={openRemote}>
         <summary>認証なしで外から見せる（勧めません）</summary>
-        <p class="faint">自分で公開したアドレスから、だれでもログインなしで記録（会った人の名前を含む）を見られるようになります。公開するときは、パスワードか Tailscale を使ってください。</p>
+        <p class="faint">自分で公開したアドレスから、だれでもログインなしで記録（会った人の名前を含む）を読めるようになります（書き換え・設定・止めることは、これまでどおりログインが要ります）。公開するときは、パスワードか Tailscale を使ってください。</p>
         <label class="check"><input type="checkbox" bind:checked={openRemote} /> 認証なしで外から見せる</label>
         {#if openRemote && !settings.allowUnauthenticatedRemote}
           <label class="check"><input type="checkbox" bind:checked={confirmOpen} /> 記録がだれにでも見えることを分かった上で開く</label>
@@ -251,9 +253,9 @@
         {#if role === 'child'}
           <label class="stack field">親のアドレス<input type="text" bind:value={parentUrl} placeholder="http://desktop:47800" /></label>
           <label class="stack field">親で作ったトークン{sync.parentTokenSet ? '（決めてあります。変えるときだけ入れる）' : ''}<input type="password" bind:value={parentToken} autocomplete="off" /></label>
-          <p class="faint">親の端末では、見せ方を「家の中の端末からも」か「Tailscale から」にし、設定の「ほかのアプリ用のトークン」でこの端末用のトークンを作ります。</p>
+          <p class="faint">親の端末では、見せ方を「家の中の端末からも」か「Tailscale から」にし、設定の「ほかのアプリ用のトークン」で、範囲を「子の端末」にしてこの端末用のトークンを作ります。</p>
         {:else}
-          <p class="faint">この端末を親にするときは、見せ方を「家の中の端末からも」か「Tailscale から」にし、子の端末ごとにトークンを作って渡します。</p>
+          <p class="faint">この端末を親にするときは、見せ方を「家の中の端末からも」か「Tailscale から」にし、子の端末ごとに範囲が「子の端末」のトークンを作って渡します。</p>
         {/if}
         <div class="row">
           {#if role === 'child'}<button onclick={testParent}>試しにつなぐ</button>{/if}
@@ -283,17 +285,23 @@
 
     <section class="card pad stack">
       <h2>ほかのアプリ用のトークン</h2>
-      <p class="faint">ほかのアプリから API（/api/…）を使うときに、<code>Authorization: Bearer トークン</code> で渡します。API の定義は <a href="/openapi/v1.json" target="_blank">/openapi/v1.json</a>。</p>
+      <p class="faint">ほかのアプリから API（/api/…）を使うときに、<code>Authorization: Bearer トークン</code> で渡します。API の定義は <a href="/openapi/v1.json" target="_blank">/openapi/v1.json</a>。
+        渡す先に要る範囲だけにしてください。どのトークンでも、設定・トークン・パスワード・止めることには触れません（ログインした画面かこの PC からだけ）。子の端末のトークンは、最初に送ってきた端末に結び付きます。</p>
       {#if tokens.length}
         <ul class="tokens">
           {#each tokens as t (t.id)}
-            <li class="spread"><span><b>{t.name}</b> <span class="faint">作成 {dateTime(t.createdAt)}{t.lastUsedAt ? ` · 最後に使った ${dateTime(t.lastUsedAt)}` : ''}</span></span>
+            <li class="spread"><span><b>{t.name}</b> <span class="chip">{scopeLabels[t.scope ?? 'full'] ?? t.scope}</span> <span class="faint">作成 {dateTime(t.createdAt)}{t.lastUsedAt ? ` · 最後に使った ${dateTime(t.lastUsedAt)}` : ''}</span></span>
               <button class="ghost danger" onclick={() => deleteToken(t.id)}>消す</button></li>
           {/each}
         </ul>
       {/if}
       <div class="row">
         <input type="text" placeholder="名前（どのアプリに渡すか）" bind:value={tokenName} class="grow" />
+        <select bind:value={tokenScope} class="scope" aria-label="範囲">
+          <option value="extension">{scopeLabels.extension}</option>
+          <option value="sync">{scopeLabels.sync}</option>
+          <option value="full">{scopeLabels.full}</option>
+        </select>
         <button onclick={createToken} disabled={!tokenName.trim()}>作る</button>
       </div>
       {#if newSecret}
@@ -339,6 +347,7 @@
   .danger-zone { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: .6rem .8rem; }
   .danger-zone summary { cursor: pointer; color: var(--ink-2); }
   .danger-zone p { margin: .5rem 0; }
+  .scope { width: auto; }
   .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
   .grow { flex: 1; min-width: 10rem; width: auto; }
   .choice > span.inline { display: inline; }

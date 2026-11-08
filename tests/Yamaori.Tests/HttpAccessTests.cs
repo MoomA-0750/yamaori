@@ -1,6 +1,7 @@
 namespace Yamaori.Tests;
 
 /// <summary>入口の見張りを、HTTP の経路まで通して試す。</summary>
+[Collection("http")]
 public sealed class HttpAccessTests
 {
     [Theory]

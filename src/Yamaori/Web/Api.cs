@@ -95,14 +95,21 @@ public static class Api
 
         // ---- 子の端末から（親で受ける）
 
-        api.MapPost("/sync/projection", Results<NoContent, BadRequest<string>> (Database db, SyncProjection input) =>
+        api.MapPost("/sync/projection", Results<NoContent, BadRequest<string>, ProblemHttpResult> (HttpContext ctx, Database db, SyncProjection input) =>
         {
+            // 子の端末のトークンは、最初に送ってきた端末に結び付け、ほかの端末の記録は入れ替えさせない
+            if (Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t && !new AuthStore(db).BindTokenDevice(t.Id, input.DeviceId))
+                return TypedResults.Problem("このトークンは、ほかの端末に結び付いている", statusCode: StatusCodes.Status403Forbidden);
             try { new SyncStore(db).Apply(input); }
             catch (ArgumentException ex) { return TypedResults.BadRequest(ex.Message); }
             return TypedResults.NoContent();
         }).WithSummary("子の端末から、出どころ 1 つ分の記録を受け取って入れ替える");
 
-        api.MapPost("/sync/notes", (Database db, IReadOnlyList<SyncNote> notes) => new { applied = new SyncStore(db).ApplyNotes(notes) })
+        api.MapPost("/sync/notes", (HttpContext ctx, Database db, IReadOnlyList<SyncNote> notes) =>
+            {
+                var only = Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t ? t.DeviceId ?? "" : null;
+                return new { applied = new SyncStore(db).ApplyNotes(notes, only) };
+            })
             .WithSummary("子の端末から、メモを受け取る（後から直した方を残す）");
 
         // ---- 拡張機能から

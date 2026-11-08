@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:47813/"
+      "url": "http://localhost:47840/"
     }
   ],
   "paths": {
@@ -125,7 +125,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う）",
+        "summary": "API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲: full（設定以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末）",
         "requestBody": {
           "content": {
             "application/json": {
@@ -240,6 +240,19 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/settings/shutdown": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "Yamaori を止める（インストーラーが使う）",
+        "responses": {
+          "202": {
+            "description": "Accepted"
           }
         }
       }
@@ -715,7 +728,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name）",
+        "summary": "ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name・saved、list でお気に入り・保存の一覧に絞る。* はどれか）",
         "parameters": [
           {
             "name": "q",
@@ -746,6 +759,13 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "list",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -755,6 +775,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PageOfWorldSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/worlds/lists": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "お気に入り・保存の一覧の名前と数",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FavoriteList"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/worlds/save": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ワールドを保存の一覧に入れる（スマホの共有・ショートカットから。url・text・worldId のどれかに wrld_… があればよい）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveWorldInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedWorld"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -1639,6 +1722,16 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "scope": {
+            "type": "string",
+            "default": "full"
+          },
+          "deviceId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1893,6 +1986,22 @@
             "additionalProperties": {
               "type": "string"
             }
+          }
+        }
+      },
+      "FavoriteList": {
+        "required": [
+          "name",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -2641,6 +2750,63 @@
           }
         }
       },
+      "SaveWorldInput": {
+        "required": [
+          "url",
+          "text",
+          "worldId",
+          "name",
+          "list"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "list": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SavedWorld": {
+        "required": [
+          "worldId",
+          "list"
+        ],
+        "type": "object",
+        "properties": {
+          "worldId": {
+            "type": "string"
+          },
+          "list": {
+            "type": "string"
+          }
+        }
+      },
       "SettingsInput": {
         "required": [
           "listen",
@@ -2963,6 +3129,12 @@
         "properties": {
           "name": {
             "type": "string"
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

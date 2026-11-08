@@ -60,7 +60,7 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
         {
             using var res = await http.PostAsJsonAsync("api/sync/notes", pending, Web, cancel).ConfigureAwait(false);
             res.EnsureSuccessStatusCode();
-            sync.MarkPushed(parent, "notes", Database.Time(pending.Max(n => n.UpdatedAt)));
+            sync.MarkPushed(parent, "notes", sync.NotesMark(parent, pending));
             notes = pending.Count;
         }
         return new PushResult(sources, notes);

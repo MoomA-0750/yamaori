@@ -3,7 +3,7 @@
 #   docker compose up -d --build
 #   docker compose exec yamaori yamaori set-password --data-dir /data   # 最初にパスワードを決める
 #
-# そのあと http://<サーバー>:47800 を開いてログインし、設定でトークンを作って、子の端末の設定（親のアドレスとトークン）に入れる。
+# そのあと http://<サーバー>:47800 を開いてログインし、設定で範囲が「子の端末」のトークンを作って、子の端末の設定（親のアドレスとトークン）に入れる。
 services:
   yamaori:
     build: .

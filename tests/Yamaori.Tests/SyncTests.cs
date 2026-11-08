@@ -75,8 +75,13 @@ public sealed class SyncTests : IDisposable
         var pending = c.NotesToPush("http://desktop/", dev);
         Assert.Single(pending);
         Assert.Equal(1, new SyncStore(parent).ApplyNotes(pending));
-        c.MarkPushed("http://desktop/", "notes", Database.Time(pending.Max(n => n.UpdatedAt)));
+        c.MarkPushed("http://desktop/", "notes", c.NotesMark("http://desktop/", pending));
         Assert.Empty(c.NotesToPush("http://desktop/", dev));
+
+        // 同じ秒にあとから書いたメモも、次に送る
+        var later = new Queries(child).AddNote("day", "2026-11-08", "同じ秒に書いた", dev);
+        using (var cmd = child.Command("UPDATE notes SET updated_at = (SELECT updated_at FROM notes WHERE id = $a) WHERE id = $b", null, ("$a", note.Id), ("$b", later.Id))) cmd.ExecuteNonQuery();
+        Assert.Equal(later.Id, Assert.Single(c.NotesToPush("http://desktop/", dev)).Id);
 
         // 親であとから直した → 子の古い版を送っても上書きしない
         using (var cmd = parent.Command("UPDATE notes SET body = '親で直した', updated_at = '2099-01-01T00:00:00Z' WHERE id = $id", null, ("$id", note.Id))) cmd.ExecuteNonQuery();

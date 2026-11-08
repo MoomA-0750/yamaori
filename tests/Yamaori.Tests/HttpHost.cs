@@ -12,8 +12,14 @@ namespace Yamaori.Tests;
 /// Yamaori を TestServer に載せて、HTTP の入口（認証・経路）まで通して試す。
 /// 既定の相手は外（LAN）から来た要求。loopback: true でこの PC からの要求にする。
 /// </summary>
+[CollectionDefinition("http", DisableParallelization = true)]
+public sealed class HttpCollection;
+
 public sealed class HttpHost : IAsyncDisposable
 {
+    // 設定のファイルの見張りを切る（試験で何十も起こすと、ファイルの見張りの数の上限に当たる）
+    static HttpHost() => Environment.SetEnvironmentVariable("DOTNET_hostBuilder__reloadConfigOnChange", "false");
+
     readonly string _dir = Path.Combine(Path.GetTempPath(), "yamaori-http-" + Guid.NewGuid().ToString("N"));
     public WebApplication App { get; }
     public TestServer Server { get; }
@@ -60,16 +66,19 @@ public sealed class HttpHost : IAsyncDisposable
             foreach (var (k, v) in headers ?? []) c.Request.Headers[k] = v;
             if (body != null)
             {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(body);
                 c.Request.ContentType = "application/json";
-                c.Request.Body = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(body));
+                c.Request.ContentLength = bytes.Length;
+                c.Request.Body = new MemoryStream(bytes);
+                // TestServer は、組み立てた要求に本文があることを知らせない（知らせないと、API は本文がないとみなす）
+                c.Features.Set<Microsoft.AspNetCore.Http.Features.IHttpRequestBodyDetectionFeature>(new HasBody());
             }
         });
     }
 
-    public static async Task<string> ReadAsync(HttpContext c)
+    sealed class HasBody : Microsoft.AspNetCore.Http.Features.IHttpRequestBodyDetectionFeature
     {
-        c.Response.Body.Position = 0;
-        return await new StreamReader(c.Response.Body).ReadToEndAsync();
+        public bool CanHaveBody => true;
     }
 
     public async ValueTask DisposeAsync()

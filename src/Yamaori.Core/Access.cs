@@ -10,7 +10,8 @@ public sealed record AccessRequest(
     string? Origin,             // Origin（ブラウザが付ける）
     string ExpectedHost,        // 自分のホストの名前（プロキシ越しなら X-Forwarded-Host、なければ Host。ポートを除く）
     bool HasValidSession,       // ログインの Cookie が有効か
-    bool HasValidToken);        // API のトークンが有効か
+    bool HasValidToken,         // API のトークンが有効か
+    int? ExpectedPort = null);  // 自分の番号（プロキシを通っていないときだけ。Origin の番号と比べる）
 
 /// <summary>設定のうち、判断に要るもの。</summary>
 public sealed record AccessSettings(
@@ -18,7 +19,7 @@ public sealed record AccessSettings(
     bool PasswordSet,
     IReadOnlyCollection<string> TailscaleLogins,
     bool LocalRequiresLogin,                // この PC からでもログインを求めるか（既定は求めない）
-    bool AllowUnauthenticatedRemote);       // 認証なしで外から見せる（危ない。既定は切る）
+    bool AllowUnauthenticatedRemote);       // 認証なしで外から見せる（読むだけ。危ない。既定は切る）
 
 public enum AccessResult
 {
@@ -42,10 +43,11 @@ public static class AccessPolicy
     public static AccessResult Decide(AccessRequest r, AccessSettings s)
     {
         // 書き換える要求は、ほかのサイトから来たら断る（ログインの Cookie を悪用させない）
-        // （tailscale serve 越しでは scheme と番号がずれるので、ホストの名前で比べる）
+        // （プロキシを通っていなければ番号まで比べる。同じ PC のほかの番号のサイトからのなりすましを断る。
+        //   tailscale serve 越しでは scheme と番号がずれるので、ホストの名前だけで比べる）
         // 正しいトークンを持つ要求は見ない。トークンはブラウザが勝手に付けないので、なりすまし（CSRF）にならない（拡張機能が使う）
         var writes = r.Method is not ("GET" or "HEAD" or "OPTIONS");
-        if (writes && !r.HasValidToken && r.Origin != null && !SameHost(r.Origin, r.ExpectedHost))
+        if (writes && !r.HasValidToken && r.Origin != null && !SameOrigin(r.Origin, r.ExpectedHost, r.ExpectedPort))
             return AccessResult.BadOrigin;
 
         var authenticated = r.HasValidSession || r.HasValidToken;
@@ -55,7 +57,7 @@ public static class AccessPolicy
         {
             if (authenticated) return AccessResult.Allow;
             if (s.Listen == "tailscale" && s.TailscaleLogins.Contains(r.TailscaleLogin, StringComparer.OrdinalIgnoreCase)) return AccessResult.Allow;
-            return s.Listen == "tailscale" ? AccessResult.TailscaleDenied : Remote(s);
+            return s.Listen == "tailscale" ? AccessResult.TailscaleDenied : Remote(s, writes);
         }
 
         // この PC から直接
@@ -68,15 +70,18 @@ public static class AccessPolicy
 
         // 外から（家の中の端末、リバースプロキシ越し）
         if (authenticated) return AccessResult.Allow;
-        return Remote(s);
+        return Remote(s, writes);
     }
 
-    static bool SameHost(string origin, string host) =>
-        Uri.TryCreate(origin, UriKind.Absolute, out var u) && string.Equals(u.Host.Trim('[', ']'), host.Trim('[', ']'), StringComparison.OrdinalIgnoreCase);
+    static bool SameOrigin(string origin, string host, int? port) =>
+        Uri.TryCreate(origin, UriKind.Absolute, out var u)
+        && string.Equals(u.Host.Trim('[', ']'), host.Trim('[', ']'), StringComparison.OrdinalIgnoreCase)
+        && (port == null || u.Port == port);
 
-    static AccessResult Remote(AccessSettings s)
+    static AccessResult Remote(AccessSettings s, bool writes)
     {
-        if (s.AllowUnauthenticatedRemote) return AccessResult.Allow;
+        // 認証なしで見せるのは読むことだけ（書き換え・設定・止めることは、これまでどおり認証が要る）
+        if (s.AllowUnauthenticatedRemote && !writes) return AccessResult.Allow;
         return s.PasswordSet ? AccessResult.NeedLogin : AccessResult.NeedPassword;
     }
 }

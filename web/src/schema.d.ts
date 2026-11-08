@@ -188,7 +188,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う） */
+        /** API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲: full（設定以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末） */
         post: {
             parameters: {
                 query?: never;
@@ -334,6 +334,40 @@ export interface paths {
             };
         };
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/shutdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Yamaori を止める（インストーラーが使う） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -853,7 +887,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name） */
+        /** ワールドの一覧（q で名前を検索、sort は last・visits・minutes・name・saved、list でお気に入り・保存の一覧に絞る。* はどれか） */
         get: {
             parameters: {
                 query?: {
@@ -861,6 +895,7 @@ export interface paths {
                     sort?: string;
                     limit?: number;
                     offset?: number;
+                    list?: string;
                 };
                 header?: never;
                 path?: never;
@@ -881,6 +916,91 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worlds/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** お気に入り・保存の一覧の名前と数 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FavoriteList"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worlds/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ワールドを保存の一覧に入れる（スマホの共有・ショートカットから。url・text・worldId のどれかに wrld_… があればよい） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveWorldInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SavedWorld"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1765,6 +1885,9 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             lastUsedAt: null | string;
+            /** @default full */
+            scope: string;
+            deviceId?: null | string;
         };
         AuthState: {
             allowed: boolean;
@@ -1834,6 +1957,11 @@ export interface components {
             data: {
                 [key: string]: string;
             };
+        };
+        FavoriteList: {
+            name: string;
+            /** Format: int32 */
+            count: number;
         };
         FriendInput: {
             id: string;
@@ -2007,6 +2135,17 @@ export interface components {
             encounters: components["schemas"]["Encounter"][];
             events: components["schemas"]["ActivityEvent"][];
         };
+        SaveWorldInput: {
+            url: null | string;
+            text: null | string;
+            worldId: null | string;
+            name: null | string;
+            list: null | string;
+        };
+        SavedWorld: {
+            worldId: string;
+            list: string;
+        };
         SettingsInput: {
             listen: null | string;
             /** Format: int32 */
@@ -2083,6 +2222,7 @@ export interface components {
         };
         TokenInput: {
             name: string;
+            scope?: null | string;
         };
         Visit: {
             id: string;

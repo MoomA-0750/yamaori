@@ -77,12 +77,27 @@ public sealed class SyncStore(Database db)
     /// <summary>この端末で書いた・直したメモのうち、前に送ってから変わったもの。</summary>
     public IReadOnlyList<SyncNote> NotesToPush(string parent, string deviceId)
     {
-        var since = PushedHash(parent, "notes") ?? "";
+        // 送った印は「最後の時刻|その時刻に送ったメモの ID」。時刻は秒までなので、同じ秒にあとから書いたメモも拾う
+        var mark = (PushedHash(parent, "notes") ?? "").Split('|', 2);
+        var since = mark[0];
+        var sent = mark.Length > 1 ? mark[1].Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet() : [];
         return Rows("""
             SELECT id, target_type, target_id, body, device_id, created_at, updated_at FROM notes
-            WHERE device_id = $d AND source IS NULL AND updated_at > $since ORDER BY updated_at
+            WHERE device_id = $d AND source IS NULL AND updated_at >= $since ORDER BY updated_at
             """, r => new SyncNote(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), S(r, 4), Database.ParseTime(r.GetString(5)), Database.ParseTime(r.GetString(6))),
-            ("$d", deviceId), ("$since", since));
+            ("$d", deviceId), ("$since", since))
+            .Where(n => Database.Time(n.UpdatedAt) != since || !sent.Contains(n.Id))
+            .ToList();
+    }
+
+    /// <summary>送ったメモの印（最後の時刻と、その時刻のメモの ID）。前の印と同じ時刻なら、前に送った ID も残す。</summary>
+    public string NotesMark(string parent, IReadOnlyList<SyncNote> pushed)
+    {
+        var last = Database.Time(pushed.Max(n => n.UpdatedAt));
+        var ids = pushed.Where(n => Database.Time(n.UpdatedAt) == last).Select(n => n.Id);
+        var prev = (PushedHash(parent, "notes") ?? "").Split('|', 2);
+        if (prev[0] == last && prev.Length > 1) ids = ids.Concat(prev[1].Split(',', StringSplitOptions.RemoveEmptyEntries));
+        return last + "|" + string.Join(",", ids.Distinct());
     }
 
     // ---- 親
@@ -91,6 +106,9 @@ public sealed class SyncStore(Database db)
     {
         if (!p.Source.StartsWith($"log:{p.DeviceId}/", StringComparison.Ordinal))
             throw new ArgumentException("出どころは、その端末のログ（log:<端末>/…）だけ受け取る");
+        // 親そのものの端末の記録は、子から入れ替えさせない
+        if (db.Scalar("SELECT is_self FROM devices WHERE id = $id", ("$id", p.DeviceId)) is long self && self != 0)
+            throw new ArgumentException("親そのものの端末の記録は受け取らない");
         using var tx = db.Connection.BeginTransaction();
         using (var cmd = db.Command("""
             INSERT INTO devices (id, name, is_self, created_at) VALUES ($id, $n, 0, $now)
@@ -101,16 +119,20 @@ public sealed class SyncStore(Database db)
         tx.Commit();
     }
 
-    /// <summary>メモを入れる。親にもっと新しく直したものがあれば、そちらを残す。入れた数。</summary>
-    public int ApplyNotes(IReadOnlyList<SyncNote> notes)
+    /// <summary>
+    /// メモを入れる。親にもっと新しく直したものがあれば、そちらを残す。入れた数。
+    /// onlyDevice を渡すと（端末に結び付いたトークンから来たとき）、その端末のメモだけを入れ、ほかの端末のメモは書き換えない。
+    /// </summary>
+    public int ApplyNotes(IReadOnlyList<SyncNote> notes, string? onlyDevice = null)
     {
         var n = 0;
         using var tx = db.Connection.BeginTransaction();
         foreach (var x in notes)
         {
+            if (onlyDevice != null && x.DeviceId != onlyDevice) continue;
             using var cmd = db.Command("""
                 INSERT INTO notes (id, target_type, target_id, body, device_id, created_at, updated_at) VALUES ($id, $t, $i, $b, $d, $c, $u)
-                ON CONFLICT (id) DO UPDATE SET body = $b, updated_at = $u WHERE notes.updated_at < $u
+                ON CONFLICT (id) DO UPDATE SET body = $b, updated_at = $u WHERE notes.updated_at < $u AND notes.device_id IS $d
                 """, tx, ("$id", x.Id), ("$t", x.TargetType), ("$i", x.TargetId), ("$b", x.Body), ("$d", x.DeviceId),
                 ("$c", Database.Time(x.CreatedAt)), ("$u", Database.Time(x.UpdatedAt)));
             n += cmd.ExecuteNonQuery();

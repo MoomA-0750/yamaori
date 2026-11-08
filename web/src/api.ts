@@ -12,6 +12,8 @@ export type PersonSummary = S['PersonSummary']
 export type PersonDetail = S['PersonDetail']
 export type AccountView = S['AccountView']
 export type DeviceView = S['DeviceView']
+/** トークンの範囲。full は設定以外の全部、extension は拡張機能とスマホの保存、sync は子の端末。 */
+export type TokenScope = 'full' | 'extension' | 'sync'
 export type Note = S['Note']
 export type EventView = S['EventView']
 export type AuthState = S['AuthState']
@@ -88,7 +90,7 @@ export const api = {
   logout: () => call<void>('POST', '/api/auth/logout'),
   setPassword: (current: string | null, next: string) => call<void>('POST', '/api/auth/password', { current, new: next }),
   tokens: () => call<ApiToken[]>('GET', '/api/auth/tokens'),
-  createToken: (name: string) => call<S['TokenCreated']>('POST', '/api/auth/tokens', { name }),
+  createToken: (name: string, scope: TokenScope = 'full') => call<S['TokenCreated']>('POST', '/api/auth/tokens', { name, scope }),
   deleteToken: (id: string) => call<void>('DELETE', `/api/auth/tokens/${id}`),
   settings: () => call<SettingsView>('GET', '/api/settings/'),
   saveSettings: (s: Partial<S['SettingsInput']>) => call<S['SettingsResult']>('PUT', '/api/settings/', s),

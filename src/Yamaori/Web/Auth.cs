@@ -33,7 +33,10 @@ public static class Auth
             var isOpen = OpenApiPaths.Any(o => string.Equals(path.Value?.TrimEnd('/'), o, StringComparison.OrdinalIgnoreCase));
             var db = ctx.RequestServices.GetRequiredService<Database>();
             var store = new AuthStore(db);
-            var result = AccessPolicy.Decide(Describe(ctx, store), Settings(ctx, store));
+            var token = store.FindToken(Bearer(ctx));
+            var request = Describe(ctx, store, token != null);
+            var settings = Settings(ctx, store);
+            var result = AccessPolicy.Decide(request, settings);
             ctx.Items[AccessKey] = result;
 
             if (result is AccessResult.BadHost or AccessResult.BadOrigin)
@@ -43,9 +46,25 @@ public static class Auth
                 return;
             }
             // 画面（静的なファイル）は誰にでも出す。中身は API で取るので、ここでは記録は見えない
-            if (result == AccessResult.Allow || !isApi || isOpen)
+            if (!isApi || isOpen)
             {
                 await next(ctx).ConfigureAwait(false);
+                return;
+            }
+            if (result == AccessResult.Allow)
+            {
+                // 本人として通るか（ログイン・この PC・許した Tailscale の人）。トークンだけ・認証なしの公開だけで通るなら、できることを絞る
+                var asUser = AccessPolicy.Decide(request with { HasValidToken = false }, settings with { AllowUnauthenticatedRemote = false }) == AccessResult.Allow;
+                var denied = asUser ? null : Forbidden(path, ctx.Request.Method,
+                    AccessPolicy.Decide(request with { HasValidToken = false }, settings) == AccessResult.Allow ? null : token);
+                if (denied == null)
+                {
+                    if (!asUser && token != null) ctx.Items[TokenKey] = token;
+                    await next(ctx).ConfigureAwait(false);
+                    return;
+                }
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await ctx.Response.WriteAsJsonAsync(new { error = denied }).ConfigureAwait(false);
                 return;
             }
             ctx.Response.StatusCode = result == AccessResult.TailscaleDenied ? StatusCodes.Status403Forbidden : StatusCodes.Status401Unauthorized;
@@ -53,15 +72,51 @@ public static class Auth
         });
     }
 
-    static AccessRequest Describe(HttpContext ctx, AuthStore store)
+    const string TokenKey = "yamaori.token";
+
+    /// <summary>トークンで通った要求なら、そのトークン（同期の口で端末と照らし合わせる）。</summary>
+    public static ApiToken? TokenOf(HttpContext ctx) => ctx.Items[TokenKey] as ApiToken;
+
+    // 本人だけ（ログイン・この PC から）が触れる口。トークンや認証なしの公開では触れない（トークンを作り足して居座る、設定を変える、止める、を防ぐ）
+    static readonly string[] AdminPaths = ["/api/auth/tokens", "/api/auth/password", "/api/settings"];
+
+    // 範囲ごとに通す口（方法と道の頭）
+    static readonly (string Scope, string Method, string Path, bool Prefix)[] ScopedPaths =
+    [
+        (TokenScopes.Extension, "GET", "/api/status", false),
+        (TokenScopes.Extension, "PUT", "/api/worlds/", true),          // /api/worlds/{id}/details
+        (TokenScopes.Extension, "GET", "/api/worlds/missing-details", false),
+        (TokenScopes.Extension, "POST", "/api/worlds/save", false),
+        (TokenScopes.Extension, "POST", "/api/friends/snapshot", false),
+        (TokenScopes.Sync, "GET", "/api/status", false),
+        (TokenScopes.Sync, "POST", "/api/sync/", true),
+    ];
+
+    /// <summary>本人でない要求が、この口を使えないなら理由を返す。token が null なら認証なしの公開（読むだけ）で通った要求。</summary>
+    static string? Forbidden(PathString path, string method, ApiToken? token)
+    {
+        if (AdminPaths.Any(a => path.StartsWithSegments(a, StringComparison.OrdinalIgnoreCase))) return "AdminOnly";
+        if (token == null || token.Scope == TokenScopes.Full) return null;
+        var p = path.Value ?? "";
+        var ok = ScopedPaths.Any(x => x.Scope == token.Scope && string.Equals(x.Method, method, StringComparison.OrdinalIgnoreCase)
+            && (x.Prefix ? p.StartsWith(x.Path, StringComparison.OrdinalIgnoreCase) && (x.Path != "/api/worlds/" || p.EndsWith("/details", StringComparison.OrdinalIgnoreCase))
+                         : string.Equals(p.TrimEnd('/'), x.Path, StringComparison.OrdinalIgnoreCase)));
+        return ok ? null : "OutOfScope";
+    }
+
+    static string? Bearer(HttpContext ctx)
+    {
+        var authz = ctx.Request.Headers.Authorization.FirstOrDefault();
+        return authz != null && authz.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authz[7..].Trim() : null;
+    }
+
+    static AccessRequest Describe(HttpContext ctx, AuthStore store, bool hasValidToken)
     {
         var h = ctx.Request.Headers;
         var proxied = h.ContainsKey("X-Forwarded-For") || h.ContainsKey("Forwarded") || h.ContainsKey("X-Real-IP") || h.ContainsKey("X-Forwarded-Host");
         var forwardedHost = h["X-Forwarded-Host"].FirstOrDefault()?.Split(',')[0].Trim();
         var expectedHost = forwardedHost is { Length: > 0 } fh ? StripPort(fh) : ctx.Request.Host.Host;
-        string? bearer = null;
-        var authz = h.Authorization.FirstOrDefault();
-        if (authz != null && authz.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) bearer = authz[7..].Trim();
+        var expectedPort = proxied ? (int?)null : ctx.Request.Host.Port ?? (ctx.Request.IsHttps ? 443 : 80);
         return new AccessRequest(
             FromLoopback: ctx.Connection.RemoteIpAddress is { } ip && System.Net.IPAddress.IsLoopback(ip),
             HasProxyHeaders: proxied,
@@ -71,7 +126,8 @@ public static class Auth
             Origin: h.Origin.FirstOrDefault(),
             ExpectedHost: expectedHost,
             HasValidSession: store.ValidSession(ctx.Request.Cookies[CookieName]),
-            HasValidToken: store.ValidToken(bearer));
+            HasValidToken: hasValidToken,
+            ExpectedPort: expectedPort);
     }
 
     static string StripPort(string host) =>
@@ -87,7 +143,7 @@ public static class Auth
     public sealed record AuthState(bool Allowed, string Reason, bool PasswordSet, bool LoggedIn, bool Local, string? TailscaleLogin, string Listen);
     public sealed record LoginInput(string Password);
     public sealed record PasswordInput(string? Current, string New);
-    public sealed record TokenInput(string Name);
+    public sealed record TokenInput(string Name, string? Scope = null);
     public sealed record TokenCreated(ApiToken Token, string Secret);
     public sealed record SettingsView(string Listen, int Port, IReadOnlyList<string> TailscaleLogins, bool LocalRequiresLogin, bool AllowUnauthenticatedRemote, bool PasswordSet, string DeviceName);
     public sealed record SettingsInput(string? Listen, int? Port, IReadOnlyList<string>? TailscaleLogins, bool? LocalRequiresLogin, bool? AllowUnauthenticatedRemote, bool? ConfirmUnauthenticatedRemote, string? DeviceName);
@@ -175,9 +231,11 @@ public static class Auth
         auth.MapPost("/tokens", Results<Ok<TokenCreated>, BadRequest<string>> (Database db, TokenInput input) =>
         {
             if (string.IsNullOrWhiteSpace(input.Name)) return TypedResults.BadRequest("名前を付ける");
-            var (token, secret) = new AuthStore(db).CreateToken(input.Name.Trim());
+            var scope = input.Scope ?? TokenScopes.Full;
+            if (!TokenScopes.All.Contains(scope)) return TypedResults.BadRequest($"範囲は {string.Join("・", TokenScopes.All)}");
+            var (token, secret) = new AuthStore(db).CreateToken(input.Name.Trim(), scope);
             return TypedResults.Ok(new TokenCreated(token, secret));
-        }).WithSummary("API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う）");
+        }).WithSummary("API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲: full（設定以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末）") ;
 
         auth.MapDelete("/tokens/{id}", Results<NoContent, NotFound> (Database db, string id) =>
             new AuthStore(db).DeleteToken(id) ? TypedResults.NoContent() : TypedResults.NotFound())
@@ -273,7 +331,9 @@ public static class Auth
         g.MapPost("/test", async (IOptions<YamaoriOptions> o, SyncSettingsInput input, CancellationToken cancel) =>
         {
             var url = input.ParentUrl ?? o.Value.ParentUrl;
-            var token = input.ParentToken is { Length: > 0 } t ? t.Trim() : Photos.Secrets.Unprotect(o.Value.ParentToken);
+            // 置いてあるトークンは、置いてある親のアドレスへ試すときだけ使う（ほかのアドレスへ送らせない）
+            var sameParent = string.Equals(url?.Trim().TrimEnd('/'), o.Value.ParentUrl?.Trim().TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+            var token = input.ParentToken is { Length: > 0 } t ? t.Trim() : sameParent ? Photos.Secrets.Unprotect(o.Value.ParentToken) : null;
             if (string.IsNullOrEmpty(url)) return new ConnectionTest(false, "親のアドレスが決まっていない");
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             if (token != null) http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -326,16 +386,22 @@ public static class Auth
             return TypedResults.Ok(PhotoView(next));
         }).WithSummary("写真の設定を変える（起こし直すと効く。パスワードは暗号化して置く）");
 
-        g.MapPost("/test", async (IOptions<YamaoriOptions> o, PhotoSettingsInput input, CancellationToken cancel) =>
+        g.MapPost("/test", async (IOptions<YamaoriOptions> o, Database db, PhotoSettingsInput input, CancellationToken cancel) =>
         {
+            var saved = o.Value.PhotoUpload;
+            var kind = input.Kind ?? saved.Kind;
+            var targetUrl = input.Target ?? saved.Target;
+            // 置いてあるユーザー名とパスワードは、置いてある送り先へ試すときだけ使う（ほかの送り先へ送らせない）
+            var sameTarget = kind == saved.Kind && string.Equals(targetUrl.Trim(), saved.Target.Trim(), StringComparison.OrdinalIgnoreCase);
             var opt = new PhotoUploadOptions
             {
-                Kind = input.Kind ?? o.Value.PhotoUpload.Kind,
-                Target = input.Target ?? o.Value.PhotoUpload.Target,
-                Username = input.Username ?? o.Value.PhotoUpload.Username,
-                Password = input.Password is { Length: > 0 } pw ? Photos.Secrets.Protect(pw) : o.Value.PhotoUpload.Password,
+                Kind = kind,
+                Target = targetUrl,
+                Username = input.Username ?? (sameTarget ? saved.Username : null),
+                Password = input.Password is { Length: > 0 } pw ? Photos.Secrets.Protect(pw) : sameTarget ? saved.Password : null,
             };
-            using var target = Photos.PhotoSync.Create(opt);
+            // SFTP は覚えている相手の鍵で確かめる（鍵が変わった相手へパスワードを送らない）
+            using var target = Photos.PhotoSync.Create(opt, new AuthStore(db));
             if (target == null) return new ConnectionTest(false, "送り先が決まっていない");
             try
             {

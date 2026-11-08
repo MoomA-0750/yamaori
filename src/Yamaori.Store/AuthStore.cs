@@ -3,7 +3,16 @@ using System.Text;
 
 namespace Yamaori.Store;
 
-public sealed record ApiToken(string Id, string Name, DateTime CreatedAt, DateTime? LastUsedAt);
+public sealed record ApiToken(string Id, string Name, DateTime CreatedAt, DateTime? LastUsedAt, string Scope = "full", string? DeviceId = null);
+
+/// <summary>トークンの範囲。full は設定・トークン・止める以外の全部、extension は拡張機能の口だけ、sync は子の端末の口だけ。</summary>
+public static class TokenScopes
+{
+    public const string Full = "full";
+    public const string Extension = "extension";
+    public const string Sync = "sync";
+    public static readonly string[] All = [Full, Extension, Sync];
+}
 
 /// <summary>
 /// パスワード・ログインの Cookie・API のトークン・設定を DB に持つ。
@@ -98,30 +107,50 @@ public sealed class AuthStore(Database db)
     // ---- API のトークン
 
     /// <summary>トークンを作る。中身はこのときしか返さない。</summary>
-    public (ApiToken Token, string Secret) CreateToken(string name)
+    public (ApiToken Token, string Secret) CreateToken(string name, string scope = TokenScopes.Full)
     {
+        if (!TokenScopes.All.Contains(scope)) throw new ArgumentException($"範囲は {string.Join("・", TokenScopes.All)}", nameof(scope));
         var secret = "ymt_" + NewSecret();
         var id = "t_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6));
         var now = DateTime.UtcNow;
-        using var cmd = db.Command("INSERT INTO api_tokens (id, name, hash, created_at) VALUES ($id, $n, $h, $now)", null,
-            ("$id", id), ("$n", name), ("$h", Hash(secret)), ("$now", Database.Time(now)));
+        using var cmd = db.Command("INSERT INTO api_tokens (id, name, hash, created_at, scope) VALUES ($id, $n, $h, $now, $s)", null,
+            ("$id", id), ("$n", name), ("$h", Hash(secret)), ("$now", Database.Time(now)), ("$s", scope));
         cmd.ExecuteNonQuery();
-        return (new ApiToken(id, name, now, null), secret);
+        return (new ApiToken(id, name, now, null, scope), secret);
     }
 
-    public bool ValidToken(string? secret)
+    public bool ValidToken(string? secret) => FindToken(secret) != null;
+
+    /// <summary>トークンを探す（見つかれば使った時刻を記録する）。</summary>
+    public ApiToken? FindToken(string? secret)
     {
-        if (string.IsNullOrEmpty(secret)) return false;
-        using var cmd = db.Command("UPDATE api_tokens SET last_used_at = $now WHERE hash = $h", null, ("$h", Hash(secret)), ("$now", Database.Time(DateTime.UtcNow)));
-        return cmd.ExecuteNonQuery() > 0;
+        if (string.IsNullOrEmpty(secret)) return null;
+        var h = Hash(secret);
+        using (var up = db.Command("UPDATE api_tokens SET last_used_at = $now WHERE hash = $h", null, ("$h", h), ("$now", Database.Time(DateTime.UtcNow))))
+            if (up.ExecuteNonQuery() == 0) return null;
+        using var cmd = db.Command("SELECT id, name, created_at, last_used_at, scope, device_id FROM api_tokens WHERE hash = $h", null, ("$h", h));
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? ReadToken(r) : null;
     }
+
+    /// <summary>sync のトークンを端末に結び付ける（まだなら結び付けて true、結び付いた端末と同じなら true）。</summary>
+    public bool BindTokenDevice(string tokenId, string deviceId)
+    {
+        using (var cmd = db.Command("UPDATE api_tokens SET device_id = $d WHERE id = $id AND device_id IS NULL", null, ("$id", tokenId), ("$d", deviceId)))
+            cmd.ExecuteNonQuery();
+        return db.Scalar("SELECT device_id FROM api_tokens WHERE id = $id", ("$id", tokenId)) as string == deviceId;
+    }
+
+    static ApiToken ReadToken(Microsoft.Data.Sqlite.SqliteDataReader r) =>
+        new(r.GetString(0), r.GetString(1), Database.ParseTime(r.GetString(2)), r.IsDBNull(3) ? null : Database.ParseTime(r.GetString(3)),
+            r.GetString(4), r.IsDBNull(5) ? null : r.GetString(5));
 
     public IReadOnlyList<ApiToken> Tokens()
     {
-        using var cmd = db.Command("SELECT id, name, created_at, last_used_at FROM api_tokens ORDER BY created_at");
+        using var cmd = db.Command("SELECT id, name, created_at, last_used_at, scope, device_id FROM api_tokens ORDER BY created_at");
         using var r = cmd.ExecuteReader();
         var list = new List<ApiToken>();
-        while (r.Read()) list.Add(new ApiToken(r.GetString(0), r.GetString(1), Database.ParseTime(r.GetString(2)), r.IsDBNull(3) ? null : Database.ParseTime(r.GetString(3))));
+        while (r.Read()) list.Add(ReadToken(r));
         return list;
     }
 

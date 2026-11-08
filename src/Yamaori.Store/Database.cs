@@ -297,6 +297,11 @@ public sealed class Database : IDisposable
             PRIMARY KEY (parent, source)
         );
         """,
+        // 10 版目: API のトークンの範囲（full・extension・sync）。sync は最初に送ってきた端末に結び付ける
+        """
+        ALTER TABLE api_tokens ADD COLUMN scope TEXT NOT NULL DEFAULT 'full';
+        ALTER TABLE api_tokens ADD COLUMN device_id TEXT;
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
