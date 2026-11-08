@@ -2,8 +2,10 @@
   import type { VisitSummary } from '../api'
   import { accessLabel, between, day, localDate, time, worldName } from '../format'
   import { href } from '../router.svelte'
+  import { deviceLabel, loadDevices } from '../devices.svelte'
 
   let { visits, showDate = false, showWorld = true }: { visits: VisitSummary[]; showDate?: boolean; showWorld?: boolean } = $props()
+  loadDevices()
 </script>
 
 <ol class="visits">
@@ -23,6 +25,7 @@
             {#if v.peopleCount}<span class="chip">{v.peopleCount}人</span>{/if}
             {#if v.videoCount}<span class="chip">動画 {v.videoCount}</span>{/if}
             {#if v.screenshotCount}<span class="chip">写真 {v.screenshotCount}</span>{/if}
+            {#if deviceLabel(v.deviceId)}<span class="chip" title="記録した端末">{deviceLabel(v.deviceId)}</span>{/if}
             {#if v.noteCount}<span class="chip accent">メモ {v.noteCount}</span>{/if}
           </div>
         </div>

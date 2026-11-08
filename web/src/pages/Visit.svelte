@@ -8,6 +8,7 @@
   import PhotoGrid from '../components/PhotoGrid.svelte'
   import type { PhotoView } from '../api'
   import Loading from '../components/Loading.svelte'
+  import { deviceLabel, loadDevices } from '../devices.svelte'
 
   let { id }: { id: string } = $props()
   let data = $state<VisitDetail | null>(null)
@@ -23,6 +24,7 @@
     api.photos({ visit: target, limit: 500 }).then((p) => (photos = p.items)).catch(() => {})
   })
   let photos = $state<PhotoView[]>([])
+  loadDevices()
 
   const videos = $derived(data?.events.filter((e) => e.kind === 'video') ?? [])
   const shots = $derived(data?.events.filter((e) => e.kind === 'screenshot') ?? [])
@@ -53,6 +55,7 @@
         <span class="chip">{accessLabel(v.access)}</span>
         <span class="chip">#{v.instanceNumber} · {v.region.toUpperCase()}</span>
         {#if !v.leftAt}<span class="chip live">いる</span>{/if}
+        {#if deviceLabel(v.deviceId)}<span class="chip" title="記録した端末">{deviceLabel(v.deviceId)}</span>{/if}
       </div>
       <p class="muted when">
         {dateTime(v.joinedAt)} – {v.leftAt ? time(v.leftAt) : 'いま'}（{between(v.joinedAt, v.leftAt)}）
