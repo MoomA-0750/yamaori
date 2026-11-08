@@ -65,7 +65,12 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         if (from is { } f) { where.Add("v.joined_at >= $from"); args.Add(("$from", Database.Time(f))); }
         if (to is { } t) { where.Add("v.joined_at < $to"); args.Add(("$to", Database.Time(t))); }
         if (worldId != null) { where.Add("v.world_id = $world"); args.Add(("$world", worldId)); }
-        if (userId != null) { where.Add("v.id IN (SELECT visit_id FROM encounters WHERE user_id = $user)"); args.Add(("$user", userId)); }
+        if (userId != null && userId.StartsWith(NamePrefix, StringComparison.Ordinal))
+        {
+            where.Add("v.id IN (SELECT visit_id FROM encounters WHERE user_id IS NULL AND name = $user)");
+            args.Add(("$user", userId[NamePrefix.Length..]));
+        }
+        else if (userId != null) { where.Add("v.id IN (SELECT visit_id FROM encounters WHERE user_id = $user)"); args.Add(("$user", userId)); }
         if (accountId != null) { where.Add("v.account_id = $account"); args.Add(("$account", accountId)); }
         if (deviceId != null) { where.Add("v.device_id = $device"); args.Add(("$device", deviceId)); }
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
@@ -168,8 +173,22 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     {
         var w = List($"SELECT {WorldColumns} FROM worlds w WHERE w.id = $id", ReadWorld, ("$id", id));
         if (w.Count == 0) return null;
-        return new WorldDetail(w[0], Visits(worldId: id, limit: 500).Items, Notes("world", id));
+        // 訪問は新しい方から 100 件（続きは Visits(worldId) で読む。全部の数は World.VisitCount）
+        return new WorldDetail(w[0], Visits(worldId: id, limit: 100).Items, Notes("world", id));
     }
+
+    /// <summary>名前だけの人（ID が分からない人。VAT の取り込みなど）の ID の頭。「name:名前」の形にする。</summary>
+    public const string NamePrefix = "name:";
+
+    // ID の分かる人（people）と、名前だけの人を合わせた一覧
+    const string AllPeople = """
+        WITH all_people AS (
+            SELECT user_id, name, first_met_at, last_met_at, visit_count FROM people
+            UNION ALL
+            SELECT 'name:' || name, name, MIN(joined_at), MAX(COALESCE(left_at, joined_at)), COUNT(DISTINCT visit_id)
+            FROM encounters WHERE user_id IS NULL GROUP BY name
+        )
+        """;
 
     const string PersonColumns = """
         p.user_id, p.name, p.first_met_at, p.last_met_at, p.visit_count,
@@ -178,25 +197,35 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
 
     static PersonSummary ReadPerson(SqliteDataReader r) => new(r.GetString(0), Str(r, 1), Time(r, 2), Time(r, 3), r.GetInt32(4), r.GetInt32(5));
 
-    /// <summary>会った人の一覧。sort は last（最後に会った順）・visits（会った回数）・name。名前の検索は前の名前も見る。</summary>
-    public Page<PersonSummary> People(string? q = null, string sort = "last", int limit = 50, int offset = 0)
+    /// <summary>
+    /// 会った人の一覧。sort は last（最後に会った順）・visits（会った回数）・name。名前の検索は前の名前も見る。
+    /// kind は all（既定）・id（ID の分かる人だけ）・name（名前だけの人だけ）。名前だけの人の ID は「name:名前」。
+    /// </summary>
+    public Page<PersonSummary> People(string? q = null, string sort = "last", int limit = 50, int offset = 0, string kind = "all")
     {
-        var w = q != null ? "WHERE p.user_id IN (SELECT user_id FROM person_names WHERE name LIKE $q) OR p.user_id = $exact" : "";
+        var where = new List<string>();
+        if (q != null) where.Add("(p.user_id IN (SELECT user_id FROM person_names WHERE name LIKE $q) OR p.user_id = $exact OR (p.user_id LIKE 'name:%' AND p.name LIKE $q))");
+        if (kind == "id") where.Add("p.user_id NOT LIKE 'name:%'");
+        if (kind == "name") where.Add("p.user_id LIKE 'name:%'");
+        var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
         var args = new List<(string, object?)> { ("$q", $"%{q}%"), ("$exact", q) };
-        var total = Convert.ToInt32(db.Scalar($"SELECT COUNT(*) FROM people p {w}", [.. args]), CultureInfo.InvariantCulture);
+        var total = Convert.ToInt32(db.Scalar($"{AllPeople} SELECT COUNT(*) FROM all_people p {w}", [.. args]), CultureInfo.InvariantCulture);
         var order = sort switch { "visits" => "5 DESC", "name" => "2 COLLATE NOCASE", _ => "4 DESC" };
         args.Add(("$limit", Math.Clamp(limit, 1, 500)));
         args.Add(("$offset", Math.Max(0, offset)));
-        return new Page<PersonSummary>(List($"SELECT {PersonColumns} FROM people p {w} ORDER BY {order} LIMIT $limit OFFSET $offset", ReadPerson, [.. args]), total);
+        return new Page<PersonSummary>(List($"{AllPeople} SELECT {PersonColumns} FROM all_people p {w} ORDER BY {order} LIMIT $limit OFFSET $offset", ReadPerson, [.. args]), total);
     }
 
     public PersonDetail? Person(string userId)
     {
-        var p = List($"SELECT {PersonColumns} FROM people p WHERE p.user_id = $id", ReadPerson, ("$id", userId));
+        var p = List($"{AllPeople} SELECT {PersonColumns} FROM all_people p WHERE p.user_id = $id", ReadPerson, ("$id", userId));
         if (p.Count == 0) return null;
-        var names = List("SELECT name, first_seen_at, last_seen_at FROM person_names WHERE user_id = $id ORDER BY first_seen_at",
-            r => new NameSpan(r.GetString(0), Time(r, 1), Time(r, 2)), ("$id", userId));
-        return new PersonDetail(p[0], names, Visits(userId: userId, limit: 500).Items, Notes("person", userId));
+        var names = userId.StartsWith(NamePrefix, StringComparison.Ordinal)
+            ? [new NameSpan(userId[NamePrefix.Length..], p[0].FirstMetAt, p[0].LastMetAt)]
+            : List("SELECT name, first_seen_at, last_seen_at FROM person_names WHERE user_id = $id ORDER BY first_seen_at",
+                r => new NameSpan(r.GetString(0), Time(r, 1), Time(r, 2)), ("$id", userId));
+        // 訪問は新しい方から 100 件（続きは Visits(userId) で読む。全部の数は Person.VisitCount）
+        return new PersonDetail(p[0], names, Visits(userId: userId, limit: 100).Items, Notes("person", userId));
     }
 
     public IReadOnlyList<AccountView> Accounts()
@@ -259,7 +288,9 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     {
         "visit" => db.Scalar("SELECT 1 FROM visits WHERE id = $i", ("$i", targetId)) != null,
         "world" => db.Scalar("SELECT 1 FROM worlds WHERE id = $i", ("$i", targetId)) != null || targetId.StartsWith("wrld_", StringComparison.Ordinal),
-        "person" => db.Scalar("SELECT 1 FROM encounters WHERE user_id = $i LIMIT 1", ("$i", targetId)) != null || targetId.StartsWith("usr_", StringComparison.Ordinal),
+        "person" => targetId.StartsWith(NamePrefix, StringComparison.Ordinal)
+            ? db.Scalar("SELECT 1 FROM encounters WHERE user_id IS NULL AND name = $i LIMIT 1", ("$i", targetId[NamePrefix.Length..])) != null
+            : db.Scalar("SELECT 1 FROM encounters WHERE user_id = $i LIMIT 1", ("$i", targetId)) != null || targetId.StartsWith("usr_", StringComparison.Ordinal),
         "day" => DateOnly.TryParseExact(targetId, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _),
         _ => false,
     };

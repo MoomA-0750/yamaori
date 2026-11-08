@@ -65,6 +65,13 @@ public sealed class VatImportTests : IDisposable
         var b = q.Visit(visits[1].Id)!;
         Assert.Equal("usr_bob", b.People.Single(p => p.Name == "Bob").UserId);
         Assert.Null(b.People.Single(p => p.Name == "Carol").UserId);
+        // 名前だけの人も、一覧と詳細に出る
+        var carol = q.People(q: "Carol").Items.Single();
+        Assert.Equal("name:Carol", carol.UserId);
+        Assert.Single(q.Person("name:Carol")!.Visits);
+        Assert.Equal(1, q.People(kind: "id").Total);
+        Assert.Equal(1, q.People(kind: "name").Total);
+        Assert.True(q.TargetExists("person", "name:Carol"));
         Assert.Equal(1, q.Visit(visits[0].Id)!.Events.Count(e => e.Kind == "video"));
         Assert.Equal("friendRequest", b.Events.Single(e => e.Kind == "notification").Data["type"]);
     }

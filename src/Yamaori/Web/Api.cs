@@ -50,8 +50,8 @@ public static class Api
             q.World(id) is { } w ? TypedResults.Ok(w) : TypedResults.NotFound())
             .WithSummary("ワールドの詳細（訪問・メモ）");
 
-        api.MapGet("/people", (Queries queries, string? q, string? sort, int? limit, int? offset) => queries.People(q, sort ?? "last", limit ?? 50, offset ?? 0))
-            .WithSummary("会った人の一覧（q で名前を検索。前の名前も見る）");
+        api.MapGet("/people", (Queries queries, string? q, string? sort, int? limit, int? offset, string? kind) => queries.People(q, sort ?? "last", limit ?? 50, offset ?? 0, kind ?? "all"))
+            .WithSummary("会った人の一覧（q で名前を検索。前の名前も見る。kind は all・id・name。名前だけの人の ID は name:名前）");
 
         api.MapGet("/people/{id}", Results<Ok<PersonDetail>, NotFound> (Queries q, string id) =>
             q.Person(id) is { } p ? TypedResults.Ok(p) : TypedResults.NotFound())

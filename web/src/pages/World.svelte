@@ -10,7 +10,20 @@
   let data = $state<WorldDetail | null>(null)
   let error = $state('')
 
+  let more = $state<import('../api').VisitSummary[]>([])
+  let loadingMore = $state(false)
+  async function loadMore(id: string, total: number) {
+    if (!data) return
+    loadingMore = true
+    const shown = data.visits.length + more.length
+    const page = await api.visits({ world: id, offset: shown, limit: 100 })
+    more = [...more, ...page.items]
+    loadingMore = false
+    void total
+  }
+
   $effect(() => {
+    more = []
     api.world(id).then((d) => (data = d)).catch((e) => (error = (e as Error).message))
   })
 </script>
@@ -34,13 +47,17 @@
     </header>
     <Notes targetType="world" targetId={w.id} notes={data.notes} placeholder="このワールドのことを書く（Markdown が使える）" />
     <section>
-      <h2 class="section-title">行ったとき <span class="faint">{data.visits.length}</span></h2>
-      <VisitList visits={data.visits} showDate showWorld={false} />
+      <h2 class="section-title">行ったとき <span class="faint">{w.visitCount}</span></h2>
+      <VisitList visits={[...data.visits, ...more]} showDate showWorld={false} />
+      {#if data.visits.length + more.length < w.visitCount}
+        <button class="more" onclick={() => loadMore(w.id, w.visitCount)} disabled={loadingMore}>もっと見る</button>
+      {/if}
     </section>
   </div>
 {/if}
 
 <style>
+  .more { margin-top: .75rem; }
   .head { gap: .35rem; }
   .head p { margin: 0; }
 </style>

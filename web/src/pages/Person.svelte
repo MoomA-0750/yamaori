@@ -10,7 +10,20 @@
   let data = $state<PersonDetail | null>(null)
   let error = $state('')
 
+  let more = $state<import('../api').VisitSummary[]>([])
+  let loadingMore = $state(false)
+  async function loadMore(id: string, total: number) {
+    if (!data) return
+    loadingMore = true
+    const shown = data.visits.length + more.length
+    const page = await api.visits({ person: id, offset: shown, limit: 100 })
+    more = [...more, ...page.items]
+    loadingMore = false
+    void total
+  }
+
   $effect(() => {
+    more = []
     api.person(id).then((d) => (data = d)).catch((e) => (error = (e as Error).message))
   })
 </script>
@@ -27,10 +40,14 @@
         {p.visitCount} 回
         {#if p.firstMetAt}· はじめて {dateTime(p.firstMetAt)}{/if}
       </p>
-      <p class="row">
-        <a class="chip" href={`https://vrchat.com/home/user/${p.userId}`} target="_blank" rel="noopener noreferrer">vrchat.com で開く ↗</a>
-        <span class="faint mono break">{p.userId}</span>
-      </p>
+      {#if p.userId.startsWith('name:')}
+        <p class="faint">ID の分からない古い記録の人です。同じ名前の別人や、名前を変えた同じ人が混ざることがあります。</p>
+      {:else}
+        <p class="row">
+          <a class="chip" href={`https://vrchat.com/home/user/${p.userId}`} target="_blank" rel="noopener noreferrer">vrchat.com で開く ↗</a>
+          <span class="faint mono break">{p.userId}</span>
+        </p>
+      {/if}
     </header>
 
     {#if data.names.length > 1}
@@ -47,13 +64,17 @@
     <Notes targetType="person" targetId={p.userId} notes={data.notes} placeholder="この人のことを書く（Markdown が使える）" />
 
     <section>
-      <h2 class="section-title">一緒にいたとき <span class="faint">{data.visits.length}</span></h2>
-      <VisitList visits={data.visits} showDate />
+      <h2 class="section-title">一緒にいたとき <span class="faint">{p.visitCount}</span></h2>
+      <VisitList visits={[...data.visits, ...more]} showDate />
+      {#if data.visits.length + more.length < p.visitCount}
+        <button class="more" onclick={() => loadMore(p.userId, p.visitCount)} disabled={loadingMore}>もっと見る</button>
+      {/if}
     </section>
   </div>
 {/if}
 
 <style>
+  .more { margin-top: .75rem; }
   .head { gap: .35rem; }
   .head p { margin: 0; }
   .names { list-style: none; margin: 0; padding: .25rem 0; }

@@ -6,13 +6,14 @@
 
   let query = $state('')
   let sort = $state('last')
+  let kind = $state('all')
   let page = $state<Page<PersonSummary> | null>(null)
   let error = $state('')
   let limit = $state(100)
 
   $effect(() => {
-    const q = query, s = sort, l = limit
-    const t = setTimeout(() => api.people({ q: q || undefined, sort: s, limit: l }).then((p) => (page = p)).catch((e) => (error = (e as Error).message)), q ? 200 : 0)
+    const q = query, s = sort, l = limit, k = kind
+    const t = setTimeout(() => api.people({ q: q || undefined, sort: s, limit: l, kind: k }).then((p) => (page = p)).catch((e) => (error = (e as Error).message)), q ? 200 : 0)
     return () => clearTimeout(t)
   })
 </script>
@@ -26,7 +27,13 @@
       <option value="visits">会った回数</option>
       <option value="name">名前</option>
     </select>
+    <select bind:value={kind} aria-label="どの人を出すか">
+      <option value="all">全員</option>
+      <option value="id">ID の分かる人</option>
+      <option value="name">名前だけの人</option>
+    </select>
   </div>
+  <p class="faint note">「名前だけ」の人は、ID の分からない古い記録（VRChatActivityTools から取り込んだもの）の人です。同じ名前の別人や、名前を変えた同じ人が混ざることがあります。</p>
   {#if !page}
     <Loading {error} />
   {:else}
@@ -39,6 +46,7 @@
             <span class="row faint nums">
               <span>{p.visitCount} 回</span>
               {#if p.lastMetAt}<span>{day(localDate(p.lastMetAt))}</span>{/if}
+              {#if p.userId.startsWith('name:')}<span class="chip">名前だけ</span>{/if}
               {#if p.noteCount}<span class="chip accent">メモ</span>{/if}
             </span>
           </a>
@@ -52,7 +60,8 @@
 </div>
 
 <style>
-  .tools { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+  .tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; }
+  .note { margin: 0; }
   .tools select { width: auto; }
   .list { list-style: none; margin: 0; padding: .25rem 0; }
   .list li { border-top: 1px solid var(--line); }

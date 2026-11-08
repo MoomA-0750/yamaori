@@ -64,7 +64,7 @@
         <ul class="people card">
           {#each people as p (p.key)}
             <li>
-              {#if p.userId}<a href={href.person(p.userId)} class="break">{p.name}</a>{:else}<span class="break">{p.name}</span>{/if}
+              <a href={href.person(p.userId ?? `name:${p.name}`)} class="break">{p.name}</a>
               <span class="faint nowrap">{p.spans.map((s) => `${time(s.joinedAt)}–${s.leftAt ? time(s.leftAt) : 'いま'}`).join(', ')}</span>
             </li>
           {/each}

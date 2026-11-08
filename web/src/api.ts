@@ -68,7 +68,7 @@ export const api = {
   visit: (id: string) => call<VisitDetail>('GET', `/api/visits/${encodeURIComponent(id)}`),
   worlds: (p: { q?: string; sort?: string; limit?: number; offset?: number } = {}) => call<Page<WorldSummary>>('GET', '/api/worlds' + q(p)),
   world: (id: string) => call<WorldDetail>('GET', `/api/worlds/${encodeURIComponent(id)}`),
-  people: (p: { q?: string; sort?: string; limit?: number; offset?: number } = {}) => call<Page<PersonSummary>>('GET', '/api/people' + q(p)),
+  people: (p: { q?: string; sort?: string; limit?: number; offset?: number; kind?: string } = {}) => call<Page<PersonSummary>>('GET', '/api/people' + q(p)),
   person: (id: string) => call<PersonDetail>('GET', `/api/people/${encodeURIComponent(id)}`),
   accounts: () => call<AccountView[]>('GET', '/api/accounts'),
   devices: () => call<DeviceView[]>('GET', '/api/devices'),
