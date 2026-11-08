@@ -69,8 +69,9 @@ begin
 end;
 
 // 入れ替える前に、動いている Yamaori を止める
-// 止める指示のあと、プロセスが消え切り、部品のファイル（clrjit.dll）が実際に動かせる（名前を変えられる）ようになるまで 20 秒まで待つ。
-// 止めた直後は、Windows（ウイルス対策の検査など）がまだ掴んでいて、入れ替えがアクセス拒否で失敗することがある
+// 入れ替える前に Yamaori を止める。まず頼んで止まってもらい（読み込みの途中でも区切って止まる）、止まらなければ強制的に止める。
+// そのあと、部品のファイル（clrjit.dll）が書き込み用に開けるようになるまで 60 秒まで待つ。
+// 強制的に止めた直後は、NAS（SMB）との読み書きが片付くまで Windows の中で後始末が続き、ファイルが放されない
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
@@ -79,10 +80,13 @@ begin
   Log('Yamaori を止める');
   Dll := ExpandConstant('{app}\clrjit.dll');
   Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-    '-NoProfile -Command "Get-Process Yamaori -ErrorAction SilentlyContinue | Stop-Process -Force; ' +
+    '-NoProfile -Command "' +
+    'try { Invoke-RestMethod -Method Post -Uri http://localhost:' + GetPort('') + '/api/settings/shutdown -TimeoutSec 5 | Out-Null } catch { }; ' +
+    'Wait-Process -Name Yamaori -Timeout 20 -ErrorAction SilentlyContinue; ' +
+    'Get-Process Yamaori -ErrorAction SilentlyContinue | Stop-Process -Force; ' +
     'Wait-Process -Name Yamaori -Timeout 15 -ErrorAction SilentlyContinue; ' +
-    '$f = ''' + Dll + '''; for ($i = 0; $i -lt 40; $i++) { if (-not (Test-Path $f)) { break }; ' +
-    'try { Rename-Item $f ''clrjit.dll.yamaori-check'' -ErrorAction Stop; Rename-Item ($f + ''.yamaori-check'') ''clrjit.dll''; break } catch { Start-Sleep -Milliseconds 500 } }"',
+    '$f = ''' + Dll + '''; for ($i = 0; $i -lt 120; $i++) { if (-not (Test-Path $f)) { break }; ' +
+    'try { $s = [IO.File]::Open($f, ''Open'', ''ReadWrite'', ''None''); $s.Close(); break } catch { Start-Sleep -Milliseconds 500 } }"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Log('Yamaori を止めた: ' + IntToStr(ResultCode));
   Result := '';

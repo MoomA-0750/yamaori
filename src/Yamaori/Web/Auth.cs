@@ -203,6 +203,13 @@ public static class Auth
             return TypedResults.Ok(new SettingsResult(View(store, o.Value) with { Listen = listen, Port = input.Port ?? o.Value.Port, DeviceName = input.DeviceName ?? o.Value.DeviceName }, restart));
         }).WithSummary("設定を変える（見せ方・番号は起こし直すと効く）");
 
+        settings.MapPost("/shutdown", (IHostApplicationLifetime life) =>
+        {
+            // インストーラーが入れ替える前に呼ぶ。読み込みの途中でも区切って止まる（強制的に止めると、NAS との読み書きが片付くまでファイルが放されない）
+            _ = Task.Run(async () => { await Task.Delay(200).ConfigureAwait(false); life.StopApplication(); });
+            return TypedResults.Accepted((string?)null);
+        }).WithSummary("Yamaori を止める（インストーラーが使う）");
+
         settings.MapPost("/restart", (IHostApplicationLifetime life) =>
         {
             // 新しい自分を起こしてから止まる（新しい方は、こちらが止まるのを待ってから動き出す）
