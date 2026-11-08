@@ -127,6 +127,24 @@ public class LogTests
         Assert.Equal(a.Encounters.Select(v => v.Id), b.Encounters.Select(v => v.Id));
     }
 
+    static IEnumerable<(long, LogEvent)> Events(params LogEvent[] events) => events.Select((e, i) => ((long)i, e));
+    static DateTime T(int h, int m) => new(2026, 11, 8, h, m, 0);
+
+    [Fact]
+    public void 起こしたままアカウントを切り替えると_そこから先はそのアカウントの訪問()
+    {
+        var p = LogProjector.Project("d_test", FileName, Events(
+            new SelfIdentified("Main", "usr_main") { At = T(1, 0) },
+            new RoomJoining("wrld_a", "1~region(jp)") { At = T(1, 1) },
+            new RoomLeft { At = T(1, 30) },
+            new SelfIdentified("Alt", "usr_alt") { At = T(1, 40) },
+            new RoomJoining("wrld_b", "2~region(jp)") { At = T(1, 41) },
+            new PlayerJoined("Main", "usr_main") { At = T(1, 42) }), Tokyo, T(2, 0), true);
+        Assert.Equal(["usr_main", "usr_alt"], p.Visits.Select(v => v.AccountId));
+        // 切り替えたあとは、前のアカウントもほかの人として会った人に入る
+        Assert.Equal("usr_main", Assert.Single(p.Encounters).UserId);
+    }
+
     [Theory]
     [InlineData("12976~private(usr_x)~canRequestInvite~region(jp)", "invite_plus", "jp")]
     [InlineData("1~hidden(usr_x)~region(eu)", "friends_plus", "eu")]

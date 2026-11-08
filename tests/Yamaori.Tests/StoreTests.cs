@@ -140,6 +140,27 @@ public sealed class StoreTests : IDisposable
         }
     }
 
+    [Fact]
+    public void 名前を変えた人も同じ人として束ね_名前の移り変わりが残る()
+    {
+        // 同じ ID の人が、1 本目と 2 本目のログで違う名前で出る
+        var bytes = Fixture();
+        var first = Path.Combine(_dir, "output_log_2026-11-08_02-36-41.txt");
+        var second = Path.Combine(_dir, "output_log_2026-11-09_02-36-41.txt");
+        File.WriteAllBytes(first, bytes);
+        File.WriteAllText(second, System.Text.Encoding.UTF8.GetString(bytes).Replace("2026.11.08", "2026.11.09").Replace("Carol (usr_", "Carol2 (usr_"));
+        using var db = Database.Open(Path.Combine(_dir, "n.sqlite3"));
+        var ingestor = new LogIngestor(db, "d_test");
+        ingestor.Ingest(first, closed: true, Tokyo);
+        ingestor.Ingest(second, closed: true, Tokyo);
+        const string carol = "usr_00000000-0000-0000-0000-000000000004";
+        Assert.Equal("Carol2", db.Scalar("SELECT name FROM people WHERE user_id = $u", ("$u", carol)));
+        Assert.Equal(2L, (long)db.Scalar("SELECT visit_count FROM people WHERE user_id = $u", ("$u", carol))!);
+        Assert.Equal(2L, (long)db.Scalar("SELECT COUNT(*) FROM person_names WHERE user_id = $u", ("$u", carol))!);
+        Assert.Equal(4L, (long)db.Scalar("SELECT COUNT(*) FROM visits WHERE account_id = 'usr_00000000-0000-0000-0000-000000000001'")!);
+        Assert.Equal("自分。", db.Scalar("SELECT name FROM accounts"));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

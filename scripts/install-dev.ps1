@@ -21,5 +21,5 @@ dotnet publish src\Yamaori -c Release -r win-x64 --self-contained false -o $dest
 if ($LASTEXITCODE -ne 0) { throw "発行に失敗した" }
 $exe = Join-Path $dest 'Yamaori.exe'
 Set-ItemProperty -Path $runKey -Name Yamaori -Value "`"$exe`""
-Start-Process $exe
+Start-Process $exe -WorkingDirectory $dest
 Write-Output "入れて起こした: $exe"

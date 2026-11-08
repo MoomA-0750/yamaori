@@ -31,6 +31,7 @@ public sealed record LogSession(
 
 /// <summary>
 /// インスタンスにいた 1 回。LeftAt が null ならまだいる。
+/// AccountId は、どのアカウントで行ったか（ログインしたときの本人の usr_…）。
 /// LeftReason: left（OnLeftRoom）・moved（移動を始めた時刻で代えた）・quit（終了）・log_end（ログの最後の行で代えた）・estimated（取り込み元に出た時刻がなく推定した）。
 /// </summary>
 public sealed record Visit(
@@ -46,7 +47,8 @@ public sealed record Visit(
     string Region,
     DateTime JoinedAt,
     DateTime? LeftAt,
-    string? LeftReason);
+    string? LeftReason,
+    string? AccountId = null);
 
 /// <summary>訪問の中で、ある人と同じインスタンスにいた間。</summary>
 public sealed record Encounter(
@@ -69,7 +71,8 @@ public sealed record ActivityEvent(
     string Kind,
     string? UserId,
     string? Name,
-    IReadOnlyDictionary<string, string?> Data);
+    IReadOnlyDictionary<string, string?> Data,
+    string? AccountId = null);
 
 /// <summary>ログ 1 本から組み立てた記録の全部。</summary>
 public sealed record Projection(

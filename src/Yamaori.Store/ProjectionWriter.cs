@@ -32,10 +32,10 @@ public static class ProjectionWriter
         foreach (var v in p.Visits)
         {
             Exec("""
-                INSERT INTO visits (id, source, device_id, world_id, world_name, instance, instance_number, access, owner_id, group_id, region, joined_at, left_at, left_reason)
-                VALUES ($id, $s, $dev, $w, $wn, $i, $n, $a, $o, $g, $r, $j, $l, $lr)
+                INSERT INTO visits (id, source, device_id, account_id, world_id, world_name, instance, instance_number, access, owner_id, group_id, region, joined_at, left_at, left_reason)
+                VALUES ($id, $s, $dev, $acc, $w, $wn, $i, $n, $a, $o, $g, $r, $j, $l, $lr)
                 """,
-                ("$id", v.Id), ("$s", source), ("$dev", p.DeviceId), ("$w", v.WorldId), ("$wn", v.WorldName), ("$i", v.Instance), ("$n", v.InstanceNumber), ("$a", v.Access),
+                ("$id", v.Id), ("$s", source), ("$dev", p.DeviceId), ("$acc", v.AccountId), ("$w", v.WorldId), ("$wn", v.WorldName), ("$i", v.Instance), ("$n", v.InstanceNumber), ("$a", v.Access),
                 ("$o", v.OwnerId), ("$g", v.GroupId), ("$r", v.Region), ("$j", Database.Time(v.JoinedAt)), ("$l", Database.Time(v.LeftAt)), ("$lr", v.LeftReason));
             // ワールドの名前は、まだ持っていなければ入れる（拡張機能などで詳しい情報が入ったら、そちらを残す）
             Exec("""
@@ -54,9 +54,9 @@ public static class ProjectionWriter
         {
             // 通知は別のログにも同じものが出るので、先に入ったものを残す
             Exec("""
-                INSERT OR IGNORE INTO events (id, source, device_id, visit_id, at, kind, user_id, name, data) VALUES ($id, $s, $dev, $v, $at, $k, $u, $n, $d)
+                INSERT OR IGNORE INTO events (id, source, device_id, account_id, visit_id, at, kind, user_id, name, data) VALUES ($id, $s, $dev, $acc, $v, $at, $k, $u, $n, $d)
                 """,
-                ("$id", e.Id), ("$s", source), ("$dev", p.DeviceId), ("$v", e.VisitId), ("$at", Database.Time(e.At)), ("$k", e.Kind), ("$u", e.UserId), ("$n", e.Name),
+                ("$id", e.Id), ("$s", source), ("$dev", p.DeviceId), ("$acc", e.AccountId), ("$v", e.VisitId), ("$at", Database.Time(e.At)), ("$k", e.Kind), ("$u", e.UserId), ("$n", e.Name),
                 ("$d", JsonSerializer.Serialize(e.Data)));
         }
     }

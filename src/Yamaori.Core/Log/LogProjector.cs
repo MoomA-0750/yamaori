@@ -50,6 +50,7 @@ public static class LogProjector
             switch (e)
             {
                 case SelfIdentified s:
+                    // 起こしたままほかのアカウントに切り替えると、またこの行が出る。そこから先はそのアカウントの記録
                     selfId = s.UserId;
                     selfName = s.Name;
                     break;
@@ -68,7 +69,7 @@ public static class LogProjector
                     if (visit != null) CloseVisit(moving ?? at, "moved");
                     var info = InstanceInfo.Parse(j.Instance);
                     visit = new Visit(StableId.Of("visit", deviceId, logFile, offset), source, j.WorldId, pendingName, j.Instance,
-                        info.Number, info.Access, info.OwnerId, info.GroupId, info.Region, at, null, null);
+                        info.Number, info.Access, info.OwnerId, info.GroupId, info.Region, at, null, null, selfId);
                     pendingName = null;
                     break;
                 case RoomEntered r:
@@ -110,7 +111,7 @@ public static class LogProjector
                         ["message"] = n.Message,
                     };
                     activity.Add(new ActivityEvent(StableId.Of("activity", "notification", n.Direction, n.NotificationId), source,
-                        visit?.Id, n.CreatedUtc ?? at, "notification", n.SenderId, n.SenderName, data));
+                        visit?.Id, n.CreatedUtc ?? at, "notification", n.SenderId, n.SenderName, data, n.ReceiverId ?? selfId));
                     break;
                 case ApplicationQuit:
                     endedAt = at;
@@ -142,7 +143,7 @@ public static class LogProjector
         return new Projection(deviceId, session, visits, encounters, activity);
 
         ActivityEvent Event(long offset, DateTime at, string kind, string? userId, string? name, Dictionary<string, string?> data) =>
-            new(StableId.Of("activity", deviceId, logFile, offset), source, visit?.Id, at, kind, userId, name, data);
+            new(StableId.Of("activity", deviceId, logFile, offset), source, visit?.Id, at, kind, userId, name, data, selfId);
     }
 
     /// <summary>記録の出どころ（log:&lt;端末&gt;/&lt;ファイル名&gt;）。</summary>

@@ -142,6 +142,33 @@ public sealed class Database : IDisposable
             WHERE user_id IS NOT NULL
             GROUP BY user_id;
         """,
+        // 2 版目: どのアカウントで行ったか（複数のアカウントで遊ぶ人のため）。入れたあと rebuild で埋まる
+        """
+        ALTER TABLE visits ADD COLUMN account_id TEXT;
+        ALTER TABLE events ADD COLUMN account_id TEXT;
+        CREATE INDEX visits_account ON visits (account_id);
+        -- 遊んだアカウントの一覧（名前は最後にログインしたときのもの）
+        CREATE VIEW accounts AS
+            SELECT self_id AS id,
+                   (SELECT s2.self_name FROM sessions s2 WHERE s2.self_id = s.self_id ORDER BY s2.started_at DESC LIMIT 1) AS name,
+                   MIN(started_at) AS first_seen_at,
+                   MAX(COALESCE(ended_at, started_at)) AS last_seen_at
+            FROM sessions s
+            WHERE self_id IS NOT NULL
+            GROUP BY self_id;
+        -- 会った人の名前の移り変わり（表示名を変えた人も、ID で同じ人として束ねる）
+        CREATE VIEW person_names AS
+            SELECT user_id, name, MIN(joined_at) AS first_seen_at, MAX(COALESCE(left_at, joined_at)) AS last_seen_at
+            FROM encounters
+            WHERE user_id IS NOT NULL
+            GROUP BY user_id, name;
+        -- 自分のアカウントの名前の移り変わり
+        CREATE VIEW account_names AS
+            SELECT self_id AS id, self_name AS name, MIN(started_at) AS first_seen_at, MAX(COALESCE(ended_at, started_at)) AS last_seen_at
+            FROM sessions
+            WHERE self_id IS NOT NULL AND self_name IS NOT NULL
+            GROUP BY self_id, self_name;
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

@@ -108,6 +108,7 @@ static class Summary
             ("出来事", "SELECT kind || ' ' || COUNT(*) FROM events GROUP BY kind"),
             ("通知", "SELECT k || ' ' || COUNT(*) FROM (SELECT json_extract(data, '$.direction') || ' ' || json_extract(data, '$.type') AS k FROM events WHERE kind = 'notification') GROUP BY k"),
             ("端末", "SELECT name || ' (' || id || ')' FROM devices"),
+            ("アカウント", "SELECT COALESCE(a.name, '?') || ' (' || a.id || ') 訪問 ' || (SELECT COUNT(*) FROM visits v WHERE v.account_id = a.id) FROM accounts a"),
             ("起動", "SELECT log_file || ' ' || COALESCE(self_name, '?') || ' vr=' || COALESCE(vr, '?') || ' ' || COALESCE(hmd, '') || ' end=' || COALESCE(end_reason, '（動いている）') FROM sessions ORDER BY log_file"),
         })
         {
