@@ -69,12 +69,16 @@ begin
 end;
 
 // 入れ替える前に、動いている Yamaori を止める
+// 止める指示のあと、プロセスが消え切る（部品のファイルが放される）まで待つ。消え切る前に入れ替えると、使用中で失敗する
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM Yamaori.exe /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(1500);
+  Log('Yamaori を止める');
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -Command "Get-Process Yamaori -ErrorAction SilentlyContinue | Stop-Process -Force; Wait-Process -Name Yamaori -Timeout 15 -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Log('Yamaori を止めた: ' + IntToStr(ResultCode));
   Result := '';
 end;
 
