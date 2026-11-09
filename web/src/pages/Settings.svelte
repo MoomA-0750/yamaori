@@ -83,7 +83,7 @@
   // API のトークン
   let tokenName = $state('')
   let tokenScope = $state<TokenScope>('extension')
-  const scopeLabels: Record<string, string> = { full: '全部（設定は除く）', extension: '拡張機能・スマホの保存', sync: '子の端末' }
+  const scopeLabels: Record<string, string> = { full: '全部（設定と子の端末の口は除く）', extension: '拡張機能・スマホの保存', sync: '子の端末' }
   let newSecret = $state('')
   async function createToken() {
     if (!tokenName.trim()) return
