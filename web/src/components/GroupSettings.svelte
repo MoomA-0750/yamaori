@@ -143,6 +143,7 @@
   .who { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
   .roles { display: flex; gap: .35rem 1rem; flex-wrap: wrap; align-items: center; }
   .invite { display: flex; flex-direction: column; gap: .35rem; background: var(--accent-soft); border-radius: var(--radius-sm); padding: .75rem; }
+  .invite .faint { color: var(--ink-2); }
   .code { font-size: 1.5rem; letter-spacing: .15em; font-weight: 700; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
   .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }

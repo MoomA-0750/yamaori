@@ -66,8 +66,8 @@
     <div class="stack block">
       <h3>VRChatActivityTools から移る</h3>
       <p class="faint">VRChatActivityTools の記録（<code>VRChatActivityLog.db</code>）を選ぶと、訪問・会った人・動画・通知を取り込みます。ログの記録がある期間とは重ねません。</p>
-      <input type="file" bind:files={vatFile} accept=".db,.sqlite,.sqlite3" aria-label="VRChatActivityLog.db" />
-      <label class="stack field narrow">自分のアカウントの ID（分かれば。usr_…）<input type="text" bind:value={account} placeholder="usr_…" /></label>
+      <label class="pickfile"><input type="file" bind:files={vatFile} accept=".db,.sqlite,.sqlite3" /><span class="btn">ファイルを選ぶ</span><span class="faint break">{vatFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
+      <label class="stack field narrow">自分のアカウントの ID（分かれば、usr_…）<input type="text" bind:value={account} placeholder="usr_…" /></label>
       <div><button class="primary" onclick={() => send('vat', vatFile)} disabled={!vatFile?.length || sending || view.job.running}>取り込む</button></div>
       {#if view.vat.at}<p class="faint">前に取り込んだ: {dateTime(view.vat.at)} — {view.vat.message}</p>{/if}
     </div>
@@ -79,7 +79,7 @@
       <div class="row">
         <button onclick={local} disabled={!view.vrcxLocal.exists || view.job.running}>この端末の VRCX を今取り込む</button>
       </div>
-      <label class="check"><input type="checkbox" bind:checked={vrcxAuto} /> 決まった間隔で取り込み続ける（VRCX が書き足した分が入ります）</label>
+      {#if !member}<label class="check"><input type="checkbox" bind:checked={vrcxAuto} /> 決まった間隔で取り込み続ける（VRCX が書き足した分が入ります）</label>{/if}
       <div class="grid2">
         <label class="stack field">間隔（分）<input type="number" min="5" max="1440" bind:value={vrcxMinutes} /></label>
         <label class="stack field">VRCX の DB の場所（空なら標準の場所）<input type="text" bind:value={vrcxPath} placeholder={view.vrcxLocal.path} /></label>
@@ -89,7 +89,7 @@
       <details>
         <summary class="faint">ほかの PC の VRCX の DB を選んで取り込む</summary>
         <div class="stack">
-          <input type="file" bind:files={vrcxFile} accept=".sqlite3,.sqlite,.db" aria-label="VRCX.sqlite3" />
+          <label class="pickfile"><input type="file" bind:files={vrcxFile} accept=".sqlite3,.sqlite,.db" /><span class="btn">ファイルを選ぶ</span><span class="faint break">{vrcxFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
           <div><button onclick={() => send('vrcx', vrcxFile)} disabled={!vrcxFile?.length || sending || view.job.running}>取り込む</button></div>
         </div>
       </details>
@@ -109,6 +109,10 @@
   .status { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .5rem .75rem; }
   .status.bad, .warn { color: var(--danger, #b3261e); }
   .narrow { max-width: 24rem; }
+  .pickfile { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; cursor: pointer; }
+  .pickfile input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .pickfile .btn { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .45rem .9rem; background: var(--surface); }
+  .pickfile:focus-within .btn { outline: 2px solid var(--accent); }
   .grid2 { display: grid; grid-template-columns: 8rem 1fr; gap: .5rem .75rem; }
   @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
 </style>
