@@ -15,6 +15,8 @@ using Yamaori.Store;
 // yamaori import-vat --file <VRChatActivityLog.db>  VRChatActivityTools の記録を取り込む
 // yamaori import-vrcx [--file <VRCX.sqlite3>]        VRCX の記録を取り込む
 // yamaori set-password                               パスワードを決める（標準入力から）
+// yamaori backup [--out <ファイル>]                  DB の写しを作る（動いている間でもよい）
+// yamaori resync                                     子の端末: 次の回に、記録とメモを全部親へ送り直す
 // 共通の引数: --log-dir <フォルダ> --data-dir <フォルダ> --database <ファイル>
 var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "run";
 // Windows では窓を出さない形（WinExe）で作るので、コマンドのときは呼んだ側のコンソールにつなぐ
@@ -136,6 +138,15 @@ switch (command)
         Console.WriteLine("パスワードを決めた");
         return 0;
     }
+    case "resync":
+    {
+        // yamaori resync  子の端末で、親へ送った印を消す（親で忘れるのをやめたあと・親の DB を戻したあとに、全部送り直す）
+        using var db = Database.Open(options.DatabasePath);
+        using var cmd = db.Command("DELETE FROM sync_state");
+        var n = cmd.ExecuteNonQuery();
+        Console.WriteLine($"親へ送った印を消した（{n} 件）。次に送る回に、記録とメモを全部送り直す（消したメモの印も送り直す）");
+        return 0;
+    }
     case "export":
     {
         // yamaori export --out <フォルダ>  日ごとの Markdown を書き出す
@@ -152,7 +163,7 @@ switch (command)
         return 0;
     }
     default:
-        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・import-vat・import-vrcx・set-password）");
+        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・backup・resync・import-vat・import-vrcx・set-password）");
         return 2;
 }
 
