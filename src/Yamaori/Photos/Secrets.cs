@@ -16,12 +16,22 @@ public static class Secrets
         return "plain:" + secret;
     }
 
+    /// <summary>
+    /// 戻せないとき（ほかのユーザー・ほかの PC で暗号化したもの、壊れたもの）は null。
+    /// PC を買い替えてデータのフォルダを戻したときに、ここで落ちて Yamaori が起きなくなるのを防ぐ（設定で入れ直せばよい）。
+    /// </summary>
     public static string? Unprotect(string? stored)
     {
         if (string.IsNullOrEmpty(stored)) return null;
         if (stored.StartsWith("dpapi:", StringComparison.Ordinal) && OperatingSystem.IsWindows())
-            return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(stored[6..]), null, DataProtectionScope.CurrentUser));
+        {
+            try { return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(stored[6..]), null, DataProtectionScope.CurrentUser)); }
+            catch (Exception ex) when (ex is CryptographicException or FormatException) { return null; }
+        }
         if (stored.StartsWith("plain:", StringComparison.Ordinal)) return stored[6..];
         return null;
     }
+
+    /// <summary>置いてあるのに戻せない（入れ直しが要る）。</summary>
+    public static bool Unreadable(string? stored) => !string.IsNullOrEmpty(stored) && Unprotect(stored) == null;
 }

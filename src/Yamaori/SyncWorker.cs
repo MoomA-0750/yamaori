@@ -20,6 +20,8 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
         logger.LogInformation("子の端末として、記録を {Parent} へ送る", o.ParentUrl);
         using var http = new HttpClient { BaseAddress = new Uri(o.ParentUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(2) };
         if (Photos.Secrets.Unprotect(o.ParentToken) is { } token) http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        else if (Photos.Secrets.Unreadable(o.ParentToken))
+            logger.LogWarning("親のトークンを読めない（ほかの PC かユーザーで置いたもの）。設定の「この端末の役割」でトークンを入れ直す");
         // 起きた直後はログを読み終えるのを少し待つ
         try { await Task.Delay(TimeSpan.FromSeconds(20), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
         while (!stoppingToken.IsCancellationRequested)

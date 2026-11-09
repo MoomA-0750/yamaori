@@ -26,6 +26,9 @@ var rest = command == "run" ? args : args[1..];
 var switches = new Dictionary<string, string> { ["--log-dir"] = "LogDir", ["--data-dir"] = "DataDir", ["--database"] = "Database", ["--archive-dir"] = "ArchiveDir", ["--device-name"] = "DeviceName" };
 // データのフォルダは引数で変えられるので、先にそれを決めてから、そこの yamaori.json を読む（引数の方が強い）
 var dataDir = new ConfigurationBuilder().AddCommandLine(rest, switches).Build()["DataDir"] ?? new YamaoriOptions().DataDir;
+// 読めない yamaori.json は退けて既定で起きる（窓がないので、黙って起きなくなるのを防ぐ）
+var brokenConfig = ConfigFile.Recover(Path.GetFullPath(dataDir));
+if (brokenConfig != null) Console.Error.WriteLine($"yamaori.json を読めなかったので {brokenConfig} へ退けた。既定の設定で起きる");
 var config = new ConfigurationBuilder()
     .AddJsonFile(Path.Combine(Path.GetFullPath(dataDir), "yamaori.json"), optional: true)
     .AddCommandLine(rest, switches)

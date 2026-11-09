@@ -340,16 +340,13 @@ public static class Auth
             if (input.ParentUrl is { Length: > 0 } u && !(Uri.TryCreate(u.Trim(), UriKind.Absolute, out var pu) && (pu.Scheme == Uri.UriSchemeHttp || pu.Scheme == Uri.UriSchemeHttps)))
                 return TypedResults.BadRequest("親のアドレスは http://… か https://… の形");
             if (input.SyncMinutes is { } sm && (!double.IsFinite(sm) || sm < 1 || sm > 1440)) return TypedResults.BadRequest("送る間隔は 1〜1440 分");
-            var path = Path.Combine(o.Value.DataDir, "yamaori.json");
-            JsonObject json;
-            try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
-            catch (JsonException) { json = []; }
-            if (input.Role != null) json["Role"] = input.Role;
-            if (input.ParentUrl != null) json["ParentUrl"] = input.ParentUrl.Trim();
-            if (input.ParentToken is { Length: > 0 } t) json["ParentToken"] = Photos.Secrets.Protect(t.Trim());
-            if (input.SyncMinutes is { } m) json["SyncMinutes"] = Math.Max(1, m);
-            Directory.CreateDirectory(o.Value.DataDir);
-            File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            var json = ConfigFile.Update(o.Value.DataDir, json =>
+            {
+                if (input.Role != null) json["Role"] = input.Role;
+                if (input.ParentUrl != null) json["ParentUrl"] = input.ParentUrl.Trim();
+                if (input.ParentToken is { Length: > 0 } t) json["ParentToken"] = Photos.Secrets.Protect(t.Trim());
+                if (input.SyncMinutes is { } m) json["SyncMinutes"] = Math.Max(1, m);
+            });
             return TypedResults.Ok(new SyncSettingsView((string?)json["Role"] ?? "standalone", (string?)json["ParentUrl"], json["ParentToken"] != null, (double?)json["SyncMinutes"] ?? 10));
         }).WithSummary("端末の役割を変える（起こし直すと効く。トークンは暗号化して置く）");
         g.MapPost("/test", async (IOptions<YamaoriOptions> o, SyncSettingsInput input, CancellationToken cancel) =>
@@ -392,25 +389,29 @@ public static class Auth
             if (input.PhotoDirs != null)
                 foreach (var pd in input.PhotoDirs.Where(x => x.Trim().Length > 0))
                     if (CheckPhotoDir(pd.Trim(), o.Value.DataDir) is { } badDir) return TypedResults.BadRequest(badDir);
-            var path = Path.Combine(o.Value.DataDir, "yamaori.json");
-            JsonObject json;
-            try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
-            catch (JsonException) { json = []; }
-            if (input.PhotoDirs != null) json["PhotoDirs"] = new JsonArray(input.PhotoDirs.Where(d => d.Trim().Length > 0).Select(d => (JsonNode)d.Trim()).ToArray());
-            var up = json["PhotoUpload"] as JsonObject ?? [];
-            if (input.Kind != null) up["Kind"] = input.Kind;
-            if (input.Target != null) up["Target"] = input.Target.Trim();
-            if (input.Username != null) up["Username"] = input.Username;
-            if (input.Password is { Length: > 0 } pw) up["Password"] = Photos.Secrets.Protect(pw);
-            if (input.Retention != null) up["Retention"] = input.Retention;
-            if (input.RetentionDays is { } d) up["RetentionDays"] = Math.Max(1, d);
-            if (input.IntervalMinutes is { } m) up["IntervalMinutes"] = Math.Max(1, m);
-            json["PhotoUpload"] = up;
-            Directory.CreateDirectory(o.Value.DataDir);
-            File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-            // 保存し直したら、SFTP の相手の鍵は次につないだときに覚え直す（送り先の鍵を変えたとき用）
-            using (var del = db.Command("DELETE FROM settings WHERE key LIKE $p", null, ("$p", Photos.PhotoSync.HostKeyPrefix + "%")))
-                del.ExecuteNonQuery();
+            var before = o.Value.PhotoUpload;
+            ConfigFile.Update(o.Value.DataDir, json =>
+            {
+                if (input.PhotoDirs != null) json["PhotoDirs"] = new JsonArray(input.PhotoDirs.Where(d => d.Trim().Length > 0).Select(d => (JsonNode)d.Trim()).ToArray());
+                var up = json["PhotoUpload"] as JsonObject ?? [];
+                if (input.Kind != null) up["Kind"] = input.Kind;
+                if (input.Target != null) up["Target"] = input.Target.Trim();
+                if (input.Username != null) up["Username"] = input.Username;
+                if (input.Password is { Length: > 0 } pw) up["Password"] = Photos.Secrets.Protect(pw);
+                if (input.Retention != null) up["Retention"] = input.Retention;
+                if (input.RetentionDays is { } d) up["RetentionDays"] = Math.Max(1, d);
+                if (input.IntervalMinutes is { } m) up["IntervalMinutes"] = Math.Max(1, m);
+                json["PhotoUpload"] = up;
+            });
+            // 送り先（種類・アドレス・ユーザー名）を変えたときだけ、SFTP の相手の鍵を忘れ、次につないだときに覚え直す。
+            // 残す日数などを変えただけでは忘れない（覚え直す隙を作らない）
+            var targetChanged = (input.Kind != null && input.Kind != before.Kind)
+                || (input.Target != null && !string.Equals(input.Target.Trim(), before.Target.Trim(), StringComparison.Ordinal))
+                || (input.Username != null && input.Username != (before.Username ?? ""));
+            if (targetChanged)
+                using (var del = db.Command("DELETE FROM settings WHERE key LIKE $p", null, ("$p", Photos.PhotoSync.HostKeyPrefix + "%")))
+                    del.ExecuteNonQuery();
+            var path = ConfigFile.PathIn(o.Value.DataDir);
             // 書いた内容を読み直して返す（効くのは起こし直したあと）
             var next = new YamaoriOptions();
             new ConfigurationBuilder().AddJsonFile(path, optional: true).Build().Bind(next);
@@ -481,15 +482,12 @@ public static class Auth
     static bool WriteConfig(YamaoriOptions o, string? listen, int? port, string? deviceName)
     {
         if (listen == null && port == null && deviceName == null) return false;
-        var path = Path.Combine(o.DataDir, "yamaori.json");
-        JsonObject json;
-        try { json = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : []; }
-        catch (JsonException) { json = []; }
-        if (listen != null) json["Listen"] = listen;
-        if (port != null) json["Port"] = port;
-        if (deviceName != null) json["DeviceName"] = deviceName;
-        Directory.CreateDirectory(o.DataDir);
-        File.WriteAllText(path, json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        ConfigFile.Update(o.DataDir, json =>
+        {
+            if (listen != null) json["Listen"] = listen;
+            if (port != null) json["Port"] = port;
+            if (deviceName != null) json["DeviceName"] = deviceName;
+        });
         return (listen != null && listen != o.Listen) || (port != null && port != o.Port) || (deviceName != null && deviceName != o.DeviceName);
     }
 }
