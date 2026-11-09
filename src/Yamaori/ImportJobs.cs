@@ -139,6 +139,13 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
                 result = r;
                 message = $"訪問 {r.Visits}・会った人 {r.Encounters}（うち ID が分かった {r.Resolved}）・出来事 {r.Events}・ログと重なって飛ばした行 {r.Skipped}";
             }
+            else if (kind == "move")
+            {
+                var r = new MoveImport(db, deviceId ?? state.DeviceId).Import(file);
+                result = r;
+                message = $"取り込んだ訪問 {r.Visits}・会った人 {r.Encounters}・出来事 {r.Events}・メモ {r.Notes}・ワールド {r.Worlds}・お気に入り {r.Favorites}・"
+                    + $"アルバム {r.Albums}（写真 {r.AlbumPhotos}）・写真の直し {r.Edits}・ゴミ箱 {r.Trash}・忘れた人 {r.Forgotten}・フレンドの写し {r.FriendAccounts} アカウント";
+            }
             else
             {
                 var r = new VrcxImport(db, deviceId ?? state.DeviceId).Import(file, replace);
@@ -159,7 +166,7 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
         }
         catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
         {
-            message = $"取り込めなかった（{(kind == "vat" ? "VRChatActivityLog.db" : "VRCX.sqlite3")} か確かめる）: {ex.Message}";
+            message = $"取り込めなかった（{kind switch { "vat" => "VRChatActivityLog.db か確かめる", "move" => "移す端末とまとめ役の版を確かめる", _ => "VRCX.sqlite3 か確かめる" }}）: {ex.Message}";
             logger.LogWarning("{Kind} を取り込めなかった: {Message}", kind, ex.Message);
         }
         finally

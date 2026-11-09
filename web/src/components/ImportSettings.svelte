@@ -28,7 +28,7 @@
   load()
   // 取り込んでいる間は様子を読み直す
   $effect(() => {
-    if (view?.job.running && !timer) timer = setInterval(async () => { try { const v = await api.importState(); if (view) { view.job = v.job; view.vat = v.vat; view.vrcx = v.vrcx } } catch { /* 次の回 */ } }, 2000)
+    if (view?.job.running && !timer) timer = setInterval(async () => { try { const v = await api.importState(); if (view) { view.job = v.job; view.vat = v.vat; view.vrcx = v.vrcx; view.move = v.move } } catch { /* 次の回 */ } }, 2000)
     if (!view?.job.running && timer) { clearInterval(timer); timer = undefined }
     return () => { if (timer) { clearInterval(timer); timer = undefined } }
   })
@@ -48,6 +48,10 @@
     msg = ''
     try { const r = await api.importVrcxLocal(replace); msg = r.message; await load() } catch (e) { msg = (e as Error).message }
   }
+  async function move() {
+    sending = true; msg = 'この端末の DB を写して、まとめ役へ送っています…'
+    try { const r = await api.importMove(); msg = r.message; await load() } catch (e) { msg = (e as Error).message } finally { sending = false }
+  }
   async function save() {
     try { apply(await api.saveImportSettings({ vrcxPath, vrcxAuto, vrcxMinutes })); msg = '保存しました' } catch (e) { msg = (e as Error).message }
   }
@@ -58,7 +62,7 @@
     <h2>取り込み</h2>
     {#if member}<p class="faint">この端末はグループのメンバーなので、取り込む DB はまとめ役へ送って、まとめ役で取り込みます。</p>{/if}
     {#if view.job.running}
-      <p class="status" role="status">{view.job.kind === 'vat' ? 'VRChatActivityTools' : 'VRCX'} を取り込んでいます…（何年分もあると数分かかります）</p>
+      <p class="status" role="status">{view.job.kind === 'vat' ? 'VRChatActivityTools' : view.job.kind === 'move' ? 'メンバーの端末から移す記録' : 'VRCX'} を取り込んでいます…（何年分もあると数分かかります）</p>
     {:else if view.job.finishedAt}
       <p class="status" class:bad={!view.job.ok} role="status">{view.job.ok ? '取り込みました' : '取り込めませんでした'}: {view.job.message}</p>
     {/if}
@@ -95,6 +99,16 @@
       </details>
       {#if view.vrcx.at}<p class="faint">前に取り込んだ: {dateTime(view.vrcx.at)} — {view.vrcx.message}</p>{/if}
     </div>
+
+    {#if member}
+      <div class="stack block">
+        <h3>この端末の記録をまとめ役へ移す</h3>
+        <p class="faint">グループに入る前からこの端末にあった記録を、まとめ役へ送ります。取り込んだ訪問（VRChatActivityTools・VRCX）、アルバム、写真の直し、ゴミ箱、お気に入り、忘れた人、フレンドの写し、メモが対象です。ログの記録はふだんどおり送られます。</p>
+        <p class="faint">まとめ役にあるものは消さず、足りないものだけ足します。何度送っても二重にはなりません。この端末の記録も消しません。</p>
+        <div><button class="primary" onclick={move} disabled={sending || view.job.running}>まとめ役へ移す</button></div>
+        {#if view.move.at}<p class="faint">前に送った: {dateTime(view.move.at)} — {view.move.message}</p>{/if}
+      </div>
+    {/if}
 
     <label class="check"><input type="checkbox" bind:checked={replace} /> 前に取り込んだものと別の DB なら、入れ替える（前の取り込みの分は消えます）</label>
     {#if view.job.needsReplace && !view.job.running}<p class="warn">前に取り込んだものと別の DB です。入れ替えてよければ、上の印を付けてもう一度取り込みます。</p>{/if}

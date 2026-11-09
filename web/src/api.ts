@@ -133,6 +133,7 @@ export const api = {
   leaveGroup: () => call<S['JoinResult']>('POST', '/api/settings/group/leave'),
   importState: () => call<S['ImportView']>('GET', '/api/settings/import/'),
   saveImportSettings: (s: Partial<S['ImportSettingsInput']>) => call<S['ImportView']>('PUT', '/api/settings/import/', s),
+  importMove: () => call<S['ImportStarted']>('POST', '/api/settings/import/move'),
   importVrcxLocal: (replace: boolean) => call<S['ImportStarted']>('POST', `/api/settings/import/vrcx/local?replace=${replace}`),
   /** ファイルをそのまま本文で送る（大きな DB でも、形を変えずに送る） */
   importFile: async (kind: 'vat' | 'vrcx', file: File, replace: boolean, account?: string) => {

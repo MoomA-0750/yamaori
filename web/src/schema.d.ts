@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** メンバーの端末から、VAT・VRCX の DB を受け取って取り込む（まとめ役で） */
+        /** メンバーの端末から、VAT・VRCX の DB か、その端末の Yamaori の DB の写し（move。手元に持っていた記録を移す）を受け取って取り込む（まとめ役で。その端末の記録として入れる） */
         post: {
             parameters: {
                 query?: {
@@ -1272,6 +1272,51 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ImportStarted"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/import/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** この端末が手元に持っていた記録（取り込んだ訪問・アルバム・写真の直し・ゴミ箱・お気に入り・忘れた人・フレンドの写し・メモ）を、まとめ役へ移す（メンバーで。手元は消さない） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportStarted"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
                     };
                 };
             };
@@ -4058,6 +4103,7 @@ export interface components {
             vat: components["schemas"]["LastImport"];
             vrcx: components["schemas"]["LastImport"];
             vrcxLocal: components["schemas"]["VrcxView"];
+            move: components["schemas"]["LastImport"];
         };
         JoinInput: {
             hubUrl: string;

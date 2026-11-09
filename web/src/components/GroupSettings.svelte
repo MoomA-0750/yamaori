@@ -92,6 +92,7 @@
       <p class="muted"><b>{view.member.groupName}</b> に入っています。記録はまとめ役に集まるので、まとめ役の画面で見ます。</p>
       <div class="row"><a class="chip accent" href={view.member.hubUrl} target="_blank" rel="noopener">まとめ役の画面を開く ↗</a><span class="faint break">{view.member.hubUrl}</span></div>
       <p class="faint">この端末の役: {view.member.roles.length ? view.member.roles.map((r) => roleLabels[r] ?? r).join('・') : 'なし'}（まとめ役の画面で変えます）</p>
+      <p class="faint">グループに入る前からこの端末にあった記録（取り込んだ訪問・アルバム・写真の直しなど）は、下の「取り込み」の「まとめ役へ移す」で移せます。</p>
       {#if !view.member.tokenReadable}<p class="warn">まとめ役のトークンを読めません。抜けてから、もう一度入ってください。</p>{/if}
       <div><button class="danger-text" onclick={leave}>グループから抜ける</button></div>
     {:else}

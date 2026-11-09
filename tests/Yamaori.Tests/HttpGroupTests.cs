@@ -119,4 +119,55 @@ public sealed class HttpGroupTests
         // まとめ役そのものは入れない
         Assert.Null(g.Accept(g.Invite().Code, "d_hub", "hub", null, "d_hub"));
     }
+    [Fact]
+    public async Task メンバーは手元の記録の写しをまとめ役へ移せる()
+    {
+        await using var hub = new HttpHost();
+        Assert.Equal(200, (await hub.SendAsync("POST", "/api/settings/group/create", loopback: true, body: """{"name":"家"}""")).Response.StatusCode);
+        var code = (await Json(await hub.SendAsync("POST", "/api/settings/group/invite", loopback: true))).GetProperty("code").GetString()!;
+        var token = (await Json(await hub.SendAsync("POST", "/api/group/accept", body: JsonSerializer.Serialize(new { code, deviceId = "d_laptop", deviceName = "laptop" })))).GetProperty("token").GetString()!;
+
+        // メンバーの DB の写し（VAT から取り込んだ訪問とアルバム）
+        var dir = Directory.CreateTempSubdirectory("yamaori-move-http-").FullName;
+        var copy = Path.Combine(dir, "copy.sqlite3");
+        using (var member = Database.Open(Path.Combine(dir, "member.sqlite3")))
+        {
+            using (var cmd = member.Command("""
+                INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at, left_at)
+                VALUES ('v_vat', 'vat:abc', NULL, 'wrld_a', '1', '1', 'public', 'jp', '2020-01-01T10:00:00Z', '2020-01-01T11:00:00Z');
+                INSERT INTO albums (id, name, created_at, updated_at) VALUES ('a_1', '夏', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z');
+                """)) cmd.ExecuteNonQuery();
+            using var vac = member.Command("VACUUM INTO $f", null, ("$f", copy));
+            vac.ExecuteNonQuery();
+        }
+        var sent = await hub.Server.SendAsync(c =>
+        {
+            c.Request.Method = "POST";
+            c.Request.Path = "/api/sync/import/move";
+            c.Request.Host = new Microsoft.AspNetCore.Http.HostString("localhost", 47899);
+            c.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.1.50");
+            c.Request.Headers.Authorization = "Bearer " + token;
+            c.Request.Body = new MemoryStream(File.ReadAllBytes(copy));
+        });
+        Assert.Equal(200, sent.Response.StatusCode);
+        for (var i = 0; i < 100; i++)
+        {
+            var job = (await Json(await hub.SendAsync("GET", "/api/settings/import/", loopback: true))).GetProperty("job");
+            if (!job.GetProperty("running").GetBoolean() && job.GetProperty("finishedAt").ValueKind != JsonValueKind.Null)
+            {
+                Assert.True(job.GetProperty("ok").GetBoolean(), job.GetProperty("message").GetString());
+                break;
+            }
+            await Task.Delay(100);
+        }
+        using (var db = hub.OpenDb())
+        {
+            Assert.Equal("d_laptop", db.Scalar("SELECT device_id FROM visits WHERE id = 'v_vat'"));
+            Assert.Equal(1L, db.Scalar("SELECT count(*) FROM albums WHERE name = '夏'"));
+        }
+        // まとめ役で「移す」は使わない（メンバーの端末で使う）
+        Assert.Equal(400, (await hub.SendAsync("POST", "/api/settings/import/move", loopback: true)).Response.StatusCode);
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        try { Directory.Delete(dir, true); } catch (IOException) { }
+    }
 }

@@ -15,7 +15,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "メンバーの端末から、VAT・VRCX の DB を受け取って取り込む（まとめ役で）",
+        "summary": "メンバーの端末から、VAT・VRCX の DB か、その端末の Yamaori の DB の写し（move。手元に持っていた記録を移す）を受け取って取り込む（まとめ役で。その端末の記録として入れる）",
         "parameters": [
           {
             "name": "kind",
@@ -917,6 +917,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ImportStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/import/move": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "この端末が手元に持っていた記録（取り込んだ訪問・アルバム・写真の直し・ゴミ箱・お気に入り・忘れた人・フレンドの写し・メモ）を、まとめ役へ移す（メンバーで。手元は消さない）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -4215,7 +4245,8 @@
           "job",
           "vat",
           "vrcx",
-          "vrcxLocal"
+          "vrcxLocal",
+          "move"
         ],
         "type": "object",
         "properties": {
@@ -4230,6 +4261,9 @@
           },
           "vrcxLocal": {
             "$ref": "#/components/schemas/VrcxView"
+          },
+          "move": {
+            "$ref": "#/components/schemas/LastImport"
           }
         }
       },
