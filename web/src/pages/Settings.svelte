@@ -374,6 +374,9 @@
   .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
   .grow { flex: 1; min-width: 10rem; width: auto; }
   .choice > span.inline { display: inline; }
+  /* 入力欄を含む行は、ラジオボタンを入力欄の高さの中ほどに揃える */
+  .choice:has(> span.inline) { align-items: center; }
+  .choice:has(> span.inline) input { margin-top: 0; }
   .days { width: 4.5rem; display: inline-block; min-height: 2rem; padding: .2rem .4rem; }
   .secret { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .7rem .9rem; }
   .secret p { margin: 0 0 .3rem; }
