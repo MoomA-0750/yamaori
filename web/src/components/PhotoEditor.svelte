@@ -76,7 +76,7 @@
     {#if !info}
       <p class="faint">{msg || '読んでいます…'}</p>
     {:else}
-      <p class="faint">{dateTime(info.photo.takenAt)} · {info.photo.fileName} · {info.file?.worldId ? '写真にワールドの情報があります' : '写真にワールドの情報がありません'}</p>
+      <p class="faint">{dateTime(info.photo.takenAt)} · {info.photo.fileName} · {info.file?.worldId ? '写真のファイルにワールドの情報があります' : '写真のファイルにはワールドの情報がありません（下は直した・当てた情報）'}</p>
       {#if info.suggestion.worldId || info.suggestion.people.length}
         <div class="hint row">
           <span>撮った時刻にいたのは <b>{info.suggestion.worldName ?? info.suggestion.worldId ?? '（分からない）'}</b>{#if info.suggestion.people.length}、ほか {info.suggestion.people.length} 人{/if}</span>
@@ -132,7 +132,8 @@
   h2 { margin: 0; font-size: 1.05rem; }
   p { margin: 0; }
   .hint { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .5rem .75rem; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .75rem; }
+  .grid2 { display: grid; grid-template-columns: 2fr 3fr; gap: .5rem .75rem; }
+  .grid2 input { font-size: .9rem; }
   .people { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .35rem; }
   .people li { display: inline-flex; align-items: center; gap: .25rem; }
   .x { border: 0; background: none; padding: 0 .15rem; min-height: 0; color: var(--ink-2); cursor: pointer; }
