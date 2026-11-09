@@ -71,7 +71,7 @@
       <div class="stack block">
         <h3>この端末の記録をまとめ役へ移す</h3>
         <p class="faint">グループに入る前からこの端末にあった記録を、まとめ役へ送ります。取り込んだ訪問（VRChatActivityTools・VRCX）、アルバム、写真の直し、ゴミ箱、お気に入り、忘れた人、フレンドの写し、メモが対象です。ログの記録はふだんどおり送られます。</p>
-        <p class="faint">まとめ役にあるものは消さず、足りないものだけ足します。何度送っても二重にはなりません。この端末の記録も消しません。</p>
+        <p class="faint">まとめ役にあるものは消さず、足りないものだけ足します。移せるのは一度だけです（もう一度移すときは、まとめ役の画面でこの端末をグループから外し、入り直します）。この端末の記録は消しません。</p>
         <div><button class="primary" onclick={move} disabled={sending || view.job.running}>まとめ役へ移す</button></div>
         {#if view.move.at}<p class="faint">前に送った: {dateTime(view.move.at)} — {view.move.message}</p>{/if}
       </div>

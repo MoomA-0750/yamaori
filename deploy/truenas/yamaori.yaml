@@ -29,6 +29,7 @@ services:
       TS_HOSTNAME: yamaori
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "true"
+      TS_AUTH_ONCE: "true"                 # 一度入ったら、次からは /var/lib/tailscale の状態で起きる（鍵を消しても、使い終えた鍵が残っていてもよい）
       TS_SERVE_CONFIG: /var/lib/tailscale/serve.json
     # https（443）で受けて、同じコンテナの中の Yamaori（47800）へ渡す設定を書いてから起きる
     entrypoint:

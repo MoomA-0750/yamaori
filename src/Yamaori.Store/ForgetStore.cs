@@ -11,12 +11,16 @@ public sealed record ForgottenPerson(string Key, string? Label, DateTime Forgott
 public sealed class ForgetStore(Database db)
 {
     /// <summary>key は usr_… か name:&lt;名前&gt;。消した行の数を返す。</summary>
-    public int Forget(string key, string? label)
+    public int Forget(string key, string? label) => Forget(key, label, null);
+
+    /// <summary>outer を渡すと、そのトランザクションの中で忘れる（確定は呼んだ側）。</summary>
+    public int Forget(string key, string? label, Microsoft.Data.Sqlite.SqliteTransaction? outer)
     {
         if (!(key.StartsWith("usr_", StringComparison.Ordinal) || key.StartsWith("name:", StringComparison.Ordinal)) || key.Length > 300)
             throw new ArgumentException("人の ID は usr_… か name:<名前>", nameof(key));
         var name = key.StartsWith("name:", StringComparison.Ordinal) ? key[5..] : null;
-        using var tx = db.Connection.BeginTransaction();
+        using var own = outer == null ? db.Connection.BeginTransaction() : null;
+        var tx = outer ?? own!;
         var n = 0;
         int Exec(string sql, params (string, object?)[] args)
         {
@@ -39,7 +43,7 @@ public sealed class ForgetStore(Database db)
             n += Exec("DELETE FROM events WHERE user_id IS NULL AND name = $n", ("$n", name));
         }
         n += Exec("DELETE FROM notes WHERE target_type = 'person' AND target_id = $k", ("$k", key));
-        tx.Commit();
+        own?.Commit();
         return n;
     }
 

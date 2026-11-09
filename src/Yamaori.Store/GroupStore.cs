@@ -145,6 +145,8 @@ public sealed class GroupStore(Database db)
         string? token;
         using (var o = db.Command("SELECT token_id FROM group_members WHERE device_id = $d", null, ("$d", deviceId))) token = o.ExecuteScalar() as string;
         if (token != null) new AuthStore(db).DeleteToken(token);
+        // 外したら、その端末からもう一度「まとめ役へ移す」を受け付ける（入り直したとき）
+        new AuthStore(db).Set(MoveImport.DoneKey(deviceId), null);
         using var cmd = db.Command("DELETE FROM group_members WHERE device_id = $d", null, ("$d", deviceId));
         return cmd.ExecuteNonQuery() > 0;
     }

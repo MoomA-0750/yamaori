@@ -95,9 +95,63 @@ public sealed class MoveImportTests : IDisposable
         Assert.Equal(1, r.Notes);
         Assert.Equal(0L, Count(hub, "SELECT count(*) FROM notes WHERE id = 'n_2'"));
 
+        // 移すのは端末ごとに一度（まとめ役で消したものを古い写しで戻さない）。グループから外すと、もう一度受け付ける
+        Exec(hub, "DELETE FROM albums WHERE name = '冬'");
+        Assert.Throws<InvalidOperationException>(() => new MoveImport(hub, "d_member").Import(copy));
+        Assert.Equal(1L, Count(hub, "SELECT count(*) FROM albums"));
+        new AuthStore(hub).Set(MoveImport.DoneKey("d_member"), null);
         var again = new MoveImport(hub, "d_member").Import(copy);
-        Assert.Equal(new MoveResult(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), again);
+        Assert.Equal(new MoveResult(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0), again);
         Assert.Equal(2L, Count(hub, "SELECT count(*) FROM albums"));
+    }
+
+    [Fact]
+    public void 元からある同じ_ID_の行は変えず_読めない時刻は入れない()
+    {
+        var copy = Member();
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={copy};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "UPDATE photo_edits SET edited_at = 'zzzz' WHERE photo_id = 'p_1'; UPDATE friend_snapshot_meta SET taken_at = '9999-01-01T00:00:00Z'";
+            cmd.ExecuteNonQuery();
+        }
+        using var hub = Database.Open(Path.Combine(_dir, "hub.sqlite3"));
+        Exec(hub, """
+            INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at, left_at)
+            VALUES ('v_vat', 'vat:abc', NULL, 'wrld_hub', '1', '1', 'public', 'jp', '2020-01-01T10:00:00Z', '2020-01-01T11:00:00Z');
+            INSERT INTO photo_edits (photo_id, world_id, edited_at) VALUES ('p_1', 'wrld_hub', '2026-11-01T00:00:00Z');
+            """);
+        var r = new MoveImport(hub, "d_member").Import(copy);
+        Assert.Equal(0, r.Visits);
+        Assert.Equal(DBNull.Value, hub.Scalar("SELECT device_id FROM visits WHERE id = 'v_vat'"));
+        Assert.Equal("wrld_hub", hub.Scalar("SELECT world_id FROM visits WHERE id = 'v_vat'"));
+        Assert.Equal("wrld_hub", hub.Scalar("SELECT world_id FROM photo_edits WHERE photo_id = 'p_1'"));
+        Assert.Equal(0, r.FriendAccounts);
+        Assert.Equal(1, r.Edits); // p_2 だけ
+    }
+
+    [Theory]
+    [InlineData("DROP TABLE encounters; CREATE VIEW encounters AS SELECT * FROM visits")]
+    [InlineData("CREATE TABLE v2 (source TEXT NOT NULL, id TEXT PRIMARY KEY, device_id TEXT, world_id TEXT NOT NULL, world_name TEXT, instance TEXT NOT NULL, instance_number TEXT NOT NULL, access TEXT NOT NULL, owner_id TEXT, group_id TEXT, region TEXT NOT NULL, joined_at TEXT NOT NULL, left_at TEXT, left_reason TEXT, account_id TEXT); DROP TABLE visits; ALTER TABLE v2 RENAME TO visits")]
+    [InlineData("DROP TABLE notes")]
+    public void 表の形が違う写しは_何も変えずに断る(string sabotage)
+    {
+        var copy = Member();
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={copy};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = sabotage;
+            cmd.ExecuteNonQuery();
+        }
+        using var hub = Database.Open(Path.Combine(_dir, "hub.sqlite3"));
+        Exec(hub, "INSERT INTO encounters (id, source, device_id, visit_id, user_id, name, joined_at) VALUES ('h1', 'log:d_hub/x', 'd_hub', 'v_h', 'usr_bob', 'Bob', '2026-11-01T00:00:00Z')");
+        Assert.Throws<InvalidDataException>(() => new MoveImport(hub, "d_member").Import(copy));
+        // 忘れた人（usr_bob）も、まとめ役ではまだ忘れていない
+        Assert.Equal(1L, Count(hub, "SELECT count(*) FROM encounters WHERE user_id = 'usr_bob'"));
+        Assert.Equal(0L, Count(hub, "SELECT count(*) FROM forgotten_people"));
+        Assert.Null(new AuthStore(hub).Get(MoveImport.DoneKey("d_member")));
     }
 
     [Fact]
