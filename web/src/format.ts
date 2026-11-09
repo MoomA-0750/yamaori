@@ -92,3 +92,7 @@ export function safeHref(url: string | null | undefined): string | null {
 
 /** ワールドの一覧の名前（Yamaori で保存した一覧は鍵 saved で持ち、画面では「保存」と出す）。 */
 export const listLabel = (name: string) => (name === 'saved' ? '保存' : name)
+
+/** フレンドかどうかの表示（分からなければ null）。 */
+export const friendLabel = (f: string | null | undefined) =>
+  f === 'friend' ? 'フレンド' : f === 'former' ? '前はフレンド' : f === 'requested' ? '申請あり' : null

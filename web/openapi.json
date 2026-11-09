@@ -2690,6 +2690,12 @@
           "noteCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "friend": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

@@ -2272,6 +2272,7 @@ export interface components {
             visitCount: number;
             /** Format: int32 */
             noteCount: number;
+            friend?: null | string;
         };
         PhotoSettingsInput: {
             photoDirs: null | string[];

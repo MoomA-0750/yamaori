@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, type PersonDetail } from '../api'
-  import { dateTime, day, localDate } from '../format'
+  import { dateTime, day, localDate, friendLabel as friendStatus } from '../format'
   import { href } from '../router.svelte'
   import VisitList from '../components/VisitList.svelte'
   import Notes from '../components/Notes.svelte'
@@ -71,6 +71,7 @@
         <p class="faint">ID の分からない古い記録の人です。同じ名前の別人や、名前を変えた同じ人が混ざることがあります。</p>
       {:else}
         <p class="row">
+          {#if friendStatus(p.friend)}<span class="chip" class:accent={p.friend === 'friend'}>{friendStatus(p.friend)}</span>{/if}
           <a class="chip" href={`https://vrchat.com/home/user/${p.userId}`} target="_blank" rel="noopener noreferrer">vrchat.com で開く ↗</a>
           <span class="faint mono break">{p.userId}</span>
         </p>

@@ -57,6 +57,31 @@ public sealed class ExtensionTests : IDisposable
         Assert.Equal(3, new Queries(db).Events(kind: "friend").Total);
     }
 
+    [Fact]
+    public void 人の一覧に_フレンドかどうかを出し_絞り込める()
+    {
+        using var db = Database.Open(Path.Combine(_dir, "f.sqlite3"));
+        void Exec(string sql) { using var cmd = db.Command(sql); cmd.ExecuteNonQuery(); }
+        foreach (var u in new[] { "usr_a", "usr_b", "usr_c", "usr_d", "usr_e" })
+            Exec($"INSERT INTO encounters (id, source, device_id, visit_id, user_id, name, joined_at) VALUES ('e_{u}', 'x', 'd', 'v', '{u}', '{u}', '2026-01-01T00:00:00Z')");
+        var ext = new ExtensionStore(db);
+        var t0 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ext.SaveFriends("usr_me", [new("usr_a", "A"), new("usr_b", "B")], t0);
+        ext.SaveFriends("usr_me", [new("usr_a", "A")], t0.AddDays(1)); // b が外れた
+        // d はログでフレンド申請を承諾した、e は申請のやり取りだけ
+        Exec("""INSERT INTO events (id, source, at, kind, user_id, name, data) VALUES ('n1', 'x', '2026-01-03T00:00:00Z', 'notification', 'usr_d', 'D', '{"type":"friendRequest","direction":"accepted"}')""");
+        Exec("""INSERT INTO events (id, source, at, kind, user_id, name, data) VALUES ('n2', 'x', '2026-01-03T00:00:00Z', 'notification', 'usr_e', 'E', '{"type":"friendRequest","direction":"received"}')""");
+        var q = new Queries(db);
+        string? F(string id) => q.Person(id)!.Person.Friend;
+        Assert.Equal("friend", F("usr_a"));
+        Assert.Equal("former", F("usr_b"));
+        Assert.Null(F("usr_c"));
+        Assert.Equal("friend", F("usr_d"));
+        Assert.Equal("requested", F("usr_e"));
+        Assert.Equal(["usr_a", "usr_d"], q.People(kind: "friend").Items.Select(p => p.UserId).Order().ToArray());
+        Assert.Equal(3, q.People(kind: "not_friend").Total);
+    }
+
     [Theory]
     [InlineData("https://api.vrchat.cloud/api/1/image/file_ab/41/256", true)]
     [InlineData("https://assets.vrchat.com/a.png", true)]

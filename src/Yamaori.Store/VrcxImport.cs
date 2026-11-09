@@ -157,8 +157,38 @@ public sealed class VrcxImport(Database db, string deviceId)
         var worlds = ImportWorlds(c, tables, tx);
         var favorites = ImportFavorites(c, tables, tx);
         var notes = ImportMemos(c, tables, tx);
+        ImportCurrentFriends(c, tables, prefixes, AccountOf, File.GetLastWriteTimeUtc(vrcxPath), tx);
         tx.Commit();
         return new Result(visits.Count, encounters.Count, events.Count, friendEvents, worlds, favorites, notes, skipped, accounts);
+    }
+
+    /// <summary>
+    /// 今のフレンドの一覧（&lt;userId&gt;_friend_log_current）を、フレンドの一覧の写しに入れる。
+    /// 拡張機能で記録した一覧の方が新しければ、そちらを残す（VRCX の DB を最後に書いた時刻で比べる）。
+    /// </summary>
+    void ImportCurrentFriends(SqliteConnection c, HashSet<string> tables, List<string> prefixes, Func<string, string?> accountOf, DateTime takenAt, SqliteTransaction tx)
+    {
+        foreach (var prefix in prefixes)
+        {
+            if (!tables.Contains(prefix + "_friend_log_current") || accountOf(prefix) is not { } acc) continue;
+            string? before;
+            using (var b = db.Command("SELECT taken_at FROM friend_snapshot_meta WHERE account_id = $a", tx, ("$a", acc))) before = b.ExecuteScalar() as string;
+            if (before != null && string.CompareOrdinal(before, Database.Time(takenAt)) >= 0) continue;
+            var friends = Rows(c, $"SELECT user_id, display_name FROM \"{prefix}_friend_log_current\"", r => (Id: Str(r, 0), Name: Str(r, 1)))
+                .Where(f => f.Id != null && f.Id.StartsWith("usr_", StringComparison.Ordinal)).DistinctBy(f => f.Id).ToList();
+            using (var del = db.Command("DELETE FROM friend_snapshots WHERE account_id = $a", tx, ("$a", acc))) del.ExecuteNonQuery();
+            foreach (var f in friends)
+            {
+                using var ins = db.Command("INSERT INTO friend_snapshots (account_id, user_id, display_name, seen_at) VALUES ($a, $u, $n, $at)", tx,
+                    ("$a", acc), ("$u", f.Id), ("$n", f.Name), ("$at", Database.Time(takenAt)));
+                ins.ExecuteNonQuery();
+            }
+            using var meta = db.Command("""
+                INSERT INTO friend_snapshot_meta (account_id, taken_at, count) VALUES ($a, $at, $c)
+                ON CONFLICT (account_id) DO UPDATE SET taken_at = $at, count = $c
+                """, tx, ("$a", acc), ("$at", Database.Time(takenAt)), ("$c", friends.Count));
+            meta.ExecuteNonQuery();
+        }
     }
 
     int ImportWorlds(SqliteConnection c, HashSet<string> tables, SqliteTransaction tx)

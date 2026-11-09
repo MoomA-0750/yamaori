@@ -29,7 +29,8 @@ public sealed record WorldInfo(string? AuthorId, string? AuthorName, string? Des
 
 public sealed record WorldDetail(WorldSummary World, WorldInfo Info, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);
 
-public sealed record PersonSummary(string UserId, string? Name, DateTime? FirstMetAt, DateTime? LastMetAt, int VisitCount, int NoteCount);
+/// <summary>Friend: friend（フレンド）・former（前はフレンドだった）・requested（フレンド申請のやり取りがあった）・null（分からない）。</summary>
+public sealed record PersonSummary(string UserId, string? Name, DateTime? FirstMetAt, DateTime? LastMetAt, int VisitCount, int NoteCount, string? Friend = null);
 
 public sealed record NameSpan(string Name, DateTime? FirstSeenAt, DateTime? LastSeenAt);
 
@@ -207,8 +208,31 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     public const string NamePrefix = "name:";
 
     // ID の分かる人（people）と、名前だけの人を合わせた一覧
-    const string AllPeople = """
-        WITH all_people AS (
+    /// <summary>
+    /// フレンドかどうかの手がかり（新しいものが勝つ。同じ時刻ならフレンドの方）:
+    /// フレンドの一覧の写し（拡張機能・VRCX の今の一覧）、フレンドの記録（VRCX の増減・拡張機能で見た増減）、
+    /// ログの通知（フレンド申請を承諾した）。
+    /// </summary>
+    const string FriendState = """
+        friend_ev AS (
+            SELECT s.user_id, m.taken_at AS at, 1 AS f FROM friend_snapshots s JOIN friend_snapshot_meta m ON m.account_id = s.account_id
+            UNION ALL
+            SELECT user_id, at, CASE json_extract(data, '$.type') WHEN 'Friend' THEN 1 ELSE 0 END FROM events
+                WHERE kind = 'friend' AND json_extract(data, '$.type') IN ('Friend', 'Unfriend') AND user_id IS NOT NULL
+            UNION ALL
+            SELECT user_id, at, 1 FROM events
+                WHERE kind = 'notification' AND json_extract(data, '$.type') = 'friendRequest' AND json_extract(data, '$.direction') = 'accepted' AND user_id IS NOT NULL
+        ),
+        friend_state AS (
+            SELECT user_id, f FROM (SELECT user_id, f, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY at DESC, f DESC) AS rn FROM friend_ev) WHERE rn = 1
+        ),
+        friend_requested AS (
+            SELECT DISTINCT user_id FROM events WHERE kind = 'notification' AND json_extract(data, '$.type') = 'friendRequest' AND user_id IS NOT NULL
+        )
+        """;
+
+    const string AllPeople = "WITH " + FriendState + ", " + """
+        all_people AS (
             SELECT user_id, name, first_met_at, last_met_at, visit_count FROM people
             UNION ALL
             SELECT 'name:' || name, name, MIN(joined_at), MAX(COALESCE(left_at, joined_at)), COUNT(DISTINCT visit_id)
@@ -218,14 +242,16 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
 
     const string PersonColumns = """
         p.user_id, p.name, p.first_met_at, p.last_met_at, p.visit_count,
-        (SELECT COUNT(*) FROM notes n WHERE n.target_type = 'person' AND n.target_id = p.user_id)
+        (SELECT COUNT(*) FROM notes n WHERE n.target_type = 'person' AND n.target_id = p.user_id),
+        COALESCE((SELECT CASE fs.f WHEN 1 THEN 'friend' ELSE 'former' END FROM friend_state fs WHERE fs.user_id = p.user_id),
+                 (SELECT 'requested' FROM friend_requested fr WHERE fr.user_id = p.user_id))
         """;
 
-    static PersonSummary ReadPerson(SqliteDataReader r) => new(r.GetString(0), Str(r, 1), Time(r, 2), Time(r, 3), r.GetInt32(4), r.GetInt32(5));
+    static PersonSummary ReadPerson(SqliteDataReader r) => new(r.GetString(0), Str(r, 1), Time(r, 2), Time(r, 3), r.GetInt32(4), r.GetInt32(5), Str(r, 6));
 
     /// <summary>
     /// 会った人の一覧。sort は last（最後に会った順）・visits（会った回数）・name。名前の検索は前の名前も見る。
-    /// kind は all（既定）・id（ID の分かる人だけ）・name（名前だけの人だけ）。名前だけの人の ID は「name:名前」。
+    /// kind は all（既定）・id（ID の分かる人だけ）・name（名前だけの人だけ）・friend（今のフレンドだけ）・not_friend（フレンドでない人だけ）。名前だけの人の ID は「name:名前」。
     /// </summary>
     public Page<PersonSummary> People(string? q = null, string sort = "last", int limit = 50, int offset = 0, string kind = "all")
     {
@@ -233,6 +259,8 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         if (q != null) where.Add("(p.user_id IN (SELECT user_id FROM person_names WHERE name LIKE $q) OR p.user_id = $exact OR (p.user_id LIKE 'name:%' AND p.name LIKE $q))");
         if (kind == "id") where.Add("p.user_id NOT LIKE 'name:%'");
         if (kind == "name") where.Add("p.user_id LIKE 'name:%'");
+        if (kind == "friend") where.Add("p.user_id IN (SELECT user_id FROM friend_state WHERE f = 1)");
+        if (kind == "not_friend") where.Add("p.user_id NOT IN (SELECT user_id FROM friend_state WHERE f = 1)");
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
         var args = new List<(string, object?)> { ("$q", $"%{q}%"), ("$exact", q) };
         var total = Convert.ToInt32(db.Scalar($"{AllPeople} SELECT COUNT(*) FROM all_people p {w}", [.. args]), CultureInfo.InvariantCulture);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, type Page, type PersonSummary } from '../api'
-  import { localDate, day } from '../format'
+  import { localDate, day, friendLabel } from '../format'
   import { href } from '../router.svelte'
   import Loading from '../components/Loading.svelte'
 
@@ -31,9 +31,11 @@
       <option value="all">全員</option>
       <option value="id">ID の分かる人</option>
       <option value="name">名前だけの人</option>
+      <option value="friend">フレンド</option>
+      <option value="not_friend">フレンドでない人</option>
     </select>
   </div>
-  <p class="faint note">「名前だけ」の人は、ID の分からない古い記録（VRChatActivityTools から取り込んだもの）の人です。同じ名前の別人や、名前を変えた同じ人が混ざることがあります。</p>
+  <p class="faint note">「名前だけ」の人は、ID の分からない古い記録（VRChatActivityTools から取り込んだもの）の人です。同じ名前の別人や、名前を変えた同じ人が混ざることがあります。フレンドかどうかは、拡張機能で記録したフレンドの一覧、VRCX の記録、ログのフレンド申請から分かる分だけ出します。</p>
   {#if !page}
     <Loading {error} />
   {:else}
@@ -42,7 +44,7 @@
       {#each page.items as p (p.userId)}
         <li>
           <a href={href.person(p.userId)} class="item">
-            <span class="name break">{p.name ?? p.userId}{#if p.userId.startsWith('name:')} <span class="chip small">名前だけ</span>{/if}</span>
+            <span class="name break">{p.name ?? p.userId}{#if p.userId.startsWith('name:')} <span class="chip small">名前だけ</span>{/if}{#if friendLabel(p.friend)} <span class="chip small" class:accent={p.friend === 'friend'}>{friendLabel(p.friend)}</span>{/if}</span>
             <span class="row faint nums">
               <span>{p.visitCount} 回</span>
               {#if p.lastMetAt}<span>{day(localDate(p.lastMetAt))}</span>{/if}
@@ -59,7 +61,7 @@
 </div>
 
 <style>
-  .small { font-size: .7rem; padding: 0 .45rem; vertical-align: .1em; }
+  .small { font-size: .7rem; padding: 0 .45rem; vertical-align: .1em; margin-left: .35rem; }
   .tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; }
   .note { margin: 0; }
   .tools select { width: auto; }

@@ -21,6 +21,8 @@ public sealed class VrcxImportTests : IDisposable
             CREATE TABLE gamelog_join_leave (id INTEGER PRIMARY KEY, created_at TEXT, type TEXT, display_name TEXT, location TEXT, user_id TEXT, time INTEGER, UNIQUE(created_at, type, display_name));
             CREATE TABLE gamelog_video_play (id INTEGER PRIMARY KEY, created_at TEXT, video_url TEXT, video_name TEXT, video_id TEXT, location TEXT, display_name TEXT, user_id TEXT, UNIQUE(created_at, video_url));
             CREATE TABLE {Prefix}_friend_log_history (id INTEGER PRIMARY KEY, created_at TEXT, type TEXT, user_id TEXT, display_name TEXT, previous_display_name TEXT, trust_level TEXT, previous_trust_level TEXT, friend_number INTEGER);
+            CREATE TABLE {Prefix}_friend_log_current (user_id TEXT PRIMARY KEY, display_name TEXT, trust_level TEXT, friend_number INTEGER);
+            INSERT INTO {Prefix}_friend_log_current (user_id, display_name, trust_level) VALUES ('usr_alice', 'Alice2', 'Known User');
             CREATE TABLE {Prefix}_notifications (id TEXT PRIMARY KEY, created_at TEXT, type TEXT, sender_user_id TEXT, sender_username TEXT, receiver_user_id TEXT, message TEXT, world_id TEXT, world_name TEXT, image_url TEXT, invite_message TEXT, request_message TEXT, response_message TEXT, expired INTEGER);
             CREATE TABLE cache_world (id TEXT PRIMARY KEY, added_at TEXT, author_id TEXT, author_name TEXT, created_at TEXT, description TEXT, image_url TEXT, name TEXT, release_status TEXT, thumbnail_image_url TEXT, updated_at TEXT, version INTEGER);
             CREATE TABLE favorite_world (id INTEGER PRIMARY KEY, created_at TEXT, world_id TEXT, group_name TEXT);
@@ -86,6 +88,8 @@ public sealed class VrcxImportTests : IDisposable
         Assert.Equal("よさそう", q.Notes("world", "wrld_fav").Single().Body);
         Assert.Equal("絵がうまい", q.Notes("person", "usr_alice").Single().Body);
         Assert.Equal(1L, Count(db, "SELECT COUNT(*) FROM notes")  - 1); // 入れ直してもメモは増えない（2 件のまま）
+        Assert.Equal("friend", q.Person("usr_alice")!.Person.Friend); // 今のフレンドの一覧から
+        Assert.Equal(1L, Count(db, "SELECT COUNT(*) FROM friend_snapshots"));
     }
 
     [Fact]
