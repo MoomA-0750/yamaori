@@ -11,8 +11,8 @@ namespace Yamaori.Web;
 /// </summary>
 public static class GroupDiscovery
 {
-    public sealed record Found(string Url, string Host, string DeviceId, string DeviceName, string? GroupId, string? GroupName, bool IsHub, string Version);
-    public sealed record Result(bool TailscaleAvailable, string? Problem, IReadOnlyList<Found> Found);
+    public sealed record FoundYamaori(string Url, string Host, string DeviceId, string DeviceName, string? GroupId, string? GroupName, bool IsHub, string Version);
+    public sealed record DiscoveryResult(bool TailscaleAvailable, string? Problem, IReadOnlyList<FoundYamaori> Found);
 
     static string? TailscaleCli()
     {
@@ -54,10 +54,10 @@ public static class GroupDiscovery
         return (peers, null);
     }
 
-    public static async Task<Result> FindAsync(string selfDeviceId, CancellationToken cancel)
+    public static async Task<DiscoveryResult> FindAsync(string selfDeviceId, CancellationToken cancel)
     {
         var (peers, problem) = await PeersAsync(cancel).ConfigureAwait(false);
-        if (peers == null) return new Result(false, problem, []);
+        if (peers == null) return new DiscoveryResult(false, problem, []);
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
         var found = await Task.WhenAll(peers.Select(async peer =>
         {
@@ -68,12 +68,12 @@ public static class GroupDiscovery
                 {
                     var hello = await http.GetFromJsonAsync<GroupApi.Hello>(url + "/api/group/hello", cancel).ConfigureAwait(false);
                     if (hello is { App: "yamaori" } && hello.DeviceId != selfDeviceId)
-                        return new Found(url, peer.Host, hello.DeviceId, hello.DeviceName, hello.GroupId, hello.GroupName, hello.IsHub, hello.Version);
+                        return new FoundYamaori(url, peer.Host, hello.DeviceId, hello.DeviceName, hello.GroupId, hello.GroupName, hello.IsHub, hello.Version);
                 }
                 catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException) { }
             }
             return null;
         })).ConfigureAwait(false);
-        return new Result(true, null, found.OfType<Found>().OrderByDescending(f => f.IsHub).ThenBy(f => f.DeviceName).ToList());
+        return new DiscoveryResult(true, null, found.OfType<FoundYamaori>().OrderByDescending(f => f.IsHub).ThenBy(f => f.DeviceName).ToList());
     }
 }

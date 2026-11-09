@@ -9,7 +9,7 @@ public static class ImportSettings
 {
     public sealed record LastImport(DateTime? At, string? Message);
     public sealed record VrcxView(string Path, bool PathSet, bool Exists, DateTime? Modified, bool Auto, double Minutes);
-    public sealed record ImportView(ImportJobs.Status Job, LastImport Vat, LastImport Vrcx, VrcxView VrcxLocal);
+    public sealed record ImportView(ImportJobs.ImportStatus Job, LastImport Vat, LastImport Vrcx, VrcxView VrcxLocal);
     public sealed record ImportSettingsInput(string? VrcxPath, bool? VrcxAuto, double? VrcxMinutes);
     public sealed record ImportStarted(bool Started, string Message);
 

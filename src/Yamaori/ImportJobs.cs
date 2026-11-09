@@ -17,10 +17,10 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
     readonly Lock _gate = new();
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public sealed record Status(bool Running, string? Kind, DateTime? StartedAt, DateTime? FinishedAt, bool? Ok, string? Message, bool NeedsReplace);
+    public sealed record ImportStatus(bool Running, string? Kind, DateTime? StartedAt, DateTime? FinishedAt, bool? Ok, string? Message, bool NeedsReplace);
 
-    Status _status = new(false, null, null, null, null, null, false);
-    public Status Current { get { lock (_gate) return _status; } }
+    ImportStatus _status = new(false, null, null, null, null, null, false);
+    public ImportStatus Current { get { lock (_gate) return _status; } }
 
     public string TempDir => Path.Combine(options.Value.DataDir, "import-tmp");
 
@@ -63,19 +63,19 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
         lock (_gate)
         {
             if (_status.Running) { TryDelete(file); return false; }
-            _status = new Status(true, kind, DateTime.UtcNow, null, null, null, false);
+            _status = new ImportStatus(true, kind, DateTime.UtcNow, null, null, null, false);
         }
         _ = Task.Run(() => Run(kind, file, replace, accountId));
         return true;
     }
 
     /// <summary>取り込みを、この呼び出しの中で終わるまで動かす（VRCX の連携から）。</summary>
-    public Status RunNow(string kind, string file, bool replace)
+    public ImportStatus RunNow(string kind, string file, bool replace)
     {
         lock (_gate)
         {
             if (_status.Running) { TryDelete(file); return _status; }
-            _status = new Status(true, kind, DateTime.UtcNow, null, null, null, false);
+            _status = new ImportStatus(true, kind, DateTime.UtcNow, null, null, null, false);
         }
         Run(kind, file, replace, null);
         return Current;

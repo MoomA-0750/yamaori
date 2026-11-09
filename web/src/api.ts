@@ -123,6 +123,25 @@ export const api = {
   saveSyncSettings: (s: Partial<S['SyncSettingsInput']>) => call<S['SyncSettingsView']>('PUT', '/api/settings/sync/', s),
   testParent: (s: Partial<S['SyncSettingsInput']>) => call<S['ConnectionTest']>('POST', '/api/settings/sync/test', s),
   restart: () => call<void>('POST', '/api/settings/restart'),
+  group: () => call<S['GroupView']>('GET', '/api/settings/group/'),
+  createGroup: (name: string) => call<S['GroupView']>('POST', '/api/settings/group/create', { name }),
+  groupInvite: () => call<S['GroupInvite']>('POST', '/api/settings/group/invite'),
+  setMemberRoles: (deviceId: string, roles: string[], name?: string) => call<S['GroupView']>('PUT', `/api/settings/group/members/${encodeURIComponent(deviceId)}`, { roles, name: name ?? null }),
+  removeMember: (deviceId: string) => call<S['GroupView']>('DELETE', `/api/settings/group/members/${encodeURIComponent(deviceId)}`),
+  discover: () => call<S['DiscoveryResult']>('GET', '/api/settings/group/discover'),
+  joinGroup: (hubUrl: string, code: string) => call<S['JoinResult']>('POST', '/api/settings/group/join', { hubUrl, code }),
+  leaveGroup: () => call<S['JoinResult']>('POST', '/api/settings/group/leave'),
+  importState: () => call<S['ImportView']>('GET', '/api/settings/import/'),
+  saveImportSettings: (s: Partial<S['ImportSettingsInput']>) => call<S['ImportView']>('PUT', '/api/settings/import/', s),
+  importVrcxLocal: (replace: boolean) => call<S['ImportStarted']>('POST', `/api/settings/import/vrcx/local?replace=${replace}`),
+  /** ファイルをそのまま本文で送る（大きな DB でも、形を変えずに送る） */
+  importFile: async (kind: 'vat' | 'vrcx', file: File, replace: boolean, account?: string) => {
+    const q = new URLSearchParams({ replace: String(replace) })
+    if (account) q.set('account', account)
+    const r = await fetch(`/api/settings/import/${kind}?${q}`, { method: 'POST', body: file, headers: { 'content-type': 'application/octet-stream' }, credentials: 'same-origin' })
+    if (!r.ok) throw new Error((await r.text().catch(() => '')).replace(/^"|"$/g, '') || String(r.status))
+    return (await r.json()) as S['ImportStarted']
+  },
   thumbSettings: () => call<S['ThumbSettingsView']>('GET', '/api/settings/thumbs/'),
   saveThumbSettings: (s: Partial<S['ThumbSettingsInput']>) => call<S['ThumbSettingsView']>('PUT', '/api/settings/thumbs/', s),
   thumbsNow: () => call<S['ThumbJobView']>('POST', '/api/settings/thumbs/now'),

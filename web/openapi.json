@@ -10,6 +10,140 @@
     }
   ],
   "paths": {
+    "/api/sync/import/{kind}": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メンバーの端末から、VAT・VRCX の DB を受け取って取り込む（まとめ役で）",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "replace",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/group/hello": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "Yamaori の挨拶（同じ tailnet の Yamaori を見つけるため。認証なし）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Hello"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/group/accept": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "招待の合言葉で、端末をグループに入れる（まとめ役で。認証なし）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupJoined"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/group": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メンバーが、自分の役とグループを読む",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupSync"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/state": {
       "get": {
         "tags": [
@@ -650,6 +784,429 @@
               "application/json": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/import": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "取り込みの様子（動いているもの・前の結果・この PC の VRCX）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "VRCX との連携の設定（DB の場所・決まった間隔で取り込むか）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/import/vat": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "VRChatActivityTools の DB（VRChatActivityLog.db）を本文で送って取り込む（移行。replace で前の取り込みと入れ替える）",
+        "parameters": [
+          {
+            "name": "replace",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/import/vrcx": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "VRCX の DB（VRCX.sqlite3）を本文で送って取り込む",
+        "parameters": [
+          {
+            "name": "replace",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStarted"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/import/vrcx/local": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "この PC の VRCX の DB を取り込む（VRCX を使っている間でもよい）",
+        "parameters": [
+          {
+            "name": "replace",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "グループ（まとめ役ならメンバーと役、メンバーならまとめ役）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group/create": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "この端末をまとめ役にして、グループを作る",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group/discover": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "同じ Tailscale のアカウントの端末から、Yamaori を見つける（まとめ役のアドレスを選ぶため）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group/invite": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "招待の合言葉を作る（一度きり・30 分まで）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupInvite"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group/members/{deviceId}": {
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メンバーの役を変える（logs・photos・vrcx。まとめ役の役は動かせない）",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メンバーを外す（渡したトークンを消す。送ってきた記録は残す）",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group/join": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "まとめ役のアドレスと招待の合言葉で、この端末をグループに入れる",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/group/leave": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "グループから抜ける（まとめ役で外すのとは別に、この端末の設定を消す）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinResult"
                 }
               }
             }
@@ -2329,7 +2886,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "ゴミ箱を空にする（写真のファイルを、この PC と NAS のフォルダから本当に消す。戻せない。本人だけ）",
+        "summary": "ゴミ箱を空にする（写真のファイルを、見張っている写真のフォルダ（この PC と NAS）から本当に消す。送り先の写しは消さない。戻せない。本人だけ）",
         "responses": {
           "200": {
             "description": "OK",
@@ -2551,6 +3108,32 @@
   },
   "components": {
     "schemas": {
+      "AcceptInput": {
+        "required": [
+          "code",
+          "deviceId",
+          "deviceName",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "AccountView": {
         "required": [
           "id",
@@ -2845,6 +3428,20 @@
           }
         }
       },
+      "CreateInput": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "DaySummary": {
         "required": [
           "date",
@@ -2932,6 +3529,31 @@
           "visitCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "DiscoveryResult": {
+        "required": [
+          "tailscaleAvailable",
+          "problem",
+          "found"
+        ],
+        "type": "object",
+        "properties": {
+          "tailscaleAvailable": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "found": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoundYamaori"
+            }
           }
         }
       },
@@ -3135,6 +3757,51 @@
           }
         }
       },
+      "FoundYamaori": {
+        "required": [
+          "url",
+          "host",
+          "deviceId",
+          "deviceName",
+          "groupId",
+          "groupName",
+          "isHub",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isHub": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
       "FriendInput": {
         "required": [
           "id",
@@ -3211,6 +3878,414 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "GroupInfo": {
+        "required": [
+          "id",
+          "name",
+          "hubDeviceId",
+          "members"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hubDeviceId": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupMember"
+            }
+          }
+        }
+      },
+      "GroupInvite": {
+        "required": [
+          "code",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "GroupJoined": {
+        "required": [
+          "groupId",
+          "groupName",
+          "hubDeviceId",
+          "hubName",
+          "token",
+          "roles"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "hubDeviceId": {
+            "type": "string"
+          },
+          "hubName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "GroupMember": {
+        "required": [
+          "deviceId",
+          "name",
+          "url",
+          "roles",
+          "joinedAt",
+          "lastSeenAt",
+          "isSelf"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "isSelf": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GroupSync": {
+        "required": [
+          "groupId",
+          "groupName",
+          "roles",
+          "members"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupMember"
+            }
+          }
+        }
+      },
+      "GroupView": {
+        "required": [
+          "mode",
+          "group",
+          "member",
+          "deviceId",
+          "deviceName"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "group": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GroupInfo"
+              }
+            ]
+          },
+          "member": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MemberState"
+              }
+            ]
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          }
+        }
+      },
+      "Hello": {
+        "required": [
+          "app",
+          "version",
+          "deviceId",
+          "deviceName",
+          "groupId",
+          "groupName",
+          "isHub"
+        ],
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groupName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isHub": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ImportSettingsInput": {
+        "required": [
+          "vrcxPath",
+          "vrcxAuto",
+          "vrcxMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "vrcxPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vrcxAuto": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "vrcxMinutes": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ImportStarted": {
+        "required": [
+          "started",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ImportStatus": {
+        "required": [
+          "running",
+          "kind",
+          "startedAt",
+          "finishedAt",
+          "ok",
+          "message",
+          "needsReplace"
+        ],
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ok": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "needsReplace": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ImportView": {
+        "required": [
+          "job",
+          "vat",
+          "vrcx",
+          "vrcxLocal"
+        ],
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/ImportStatus"
+          },
+          "vat": {
+            "$ref": "#/components/schemas/LastImport"
+          },
+          "vrcx": {
+            "$ref": "#/components/schemas/LastImport"
+          },
+          "vrcxLocal": {
+            "$ref": "#/components/schemas/VrcxView"
+          }
+        }
+      },
+      "JoinInput": {
+        "required": [
+          "hubUrl",
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "hubUrl": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "JoinResult": {
+        "required": [
+          "ok",
+          "message",
+          "restartRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LastImport": {
+        "required": [
+          "at",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3311,6 +4386,36 @@
         "properties": {
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "MemberState": {
+        "required": [
+          "groupId",
+          "groupName",
+          "hubUrl",
+          "roles",
+          "tokenReadable"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "hubUrl": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tokenReadable": {
+            "type": "boolean"
           }
         }
       },
@@ -4344,6 +5449,27 @@
           }
         }
       },
+      "RolesInput": {
+        "required": [
+          "roles",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SaveWorldInput": {
         "required": [
           "url",
@@ -5139,6 +6265,42 @@
           "noteCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "VrcxView": {
+        "required": [
+          "path",
+          "pathSet",
+          "exists",
+          "modified",
+          "auto",
+          "minutes"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "pathSet": {
+            "type": "boolean"
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "modified": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "auto": {
+            "type": "boolean"
+          },
+          "minutes": {
+            "type": "number",
+            "format": "double"
           }
         }
       },

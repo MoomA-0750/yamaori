@@ -93,7 +93,7 @@ public static class GroupApi
         {
             var groups = new GroupStore(db);
             if (groups.Info(state.DeviceId) is not { } info) return TypedResults.Problem("この Yamaori はまとめ役でない", statusCode: StatusCodes.Status404NotFound);
-            var device = Auth.TokenOf(ctx)?.DeviceId ?? ctx.Request.Query["device"].ToString();
+            var device = Auth.BearerToken(ctx, new AuthStore(db))?.DeviceId ?? ctx.Request.Query["device"].ToString();
             if (string.IsNullOrEmpty(device)) return TypedResults.Problem("端末が分からない", statusCode: StatusCodes.Status400BadRequest);
             groups.Seen(device);
             return TypedResults.Ok(new GroupSync(info.Id, info.Name, groups.RolesOf(device), info.Members));

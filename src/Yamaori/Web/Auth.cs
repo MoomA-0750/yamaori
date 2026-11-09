@@ -80,6 +80,9 @@ public static class Auth
     /// <summary>トークンで通った要求なら、そのトークン（同期の口で端末と照らし合わせる）。</summary>
     public static ApiToken? TokenOf(HttpContext ctx) => ctx.Items[TokenKey] as ApiToken;
 
+    /// <summary>要求に付いていたトークン（本人として通った要求でも読む。グループのメンバーが、まとめ役と同じ PC から来たときなど）。</summary>
+    public static ApiToken? BearerToken(HttpContext ctx, AuthStore store) => TokenOf(ctx) ?? store.FindToken(Bearer(ctx));
+
     // この PC から直接なら、この PC でもログインを求める設定でも通す口（インストーラーが更新の前に止めるため。ほかのサイトからは Origin で断る）
     static readonly string[] LocalAlways = ["/api/settings/shutdown"];
 

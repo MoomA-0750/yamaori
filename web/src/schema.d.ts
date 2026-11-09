@@ -4,6 +4,177 @@
  */
 
 export interface paths {
+    "/api/sync/import/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** メンバーの端末から、VAT・VRCX の DB を受け取って取り込む（まとめ役で） */
+        post: {
+            parameters: {
+                query?: {
+                    replace?: boolean;
+                    account?: string;
+                };
+                header?: never;
+                path: {
+                    kind: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportStarted"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group/hello": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Yamaori の挨拶（同じ tailnet の Yamaori を見つけるため。認証なし） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Hello"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/group/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 招待の合言葉で、端末をグループに入れる（まとめ役で。認証なし） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AcceptInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupJoined"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** メンバーが、自分の役とグループを読む */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupSync"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/state": {
         parameters: {
             query?: never;
@@ -950,6 +1121,539 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 取り込みの様子（動いているもの・前の結果・この PC の VRCX） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportView"];
+                    };
+                };
+            };
+        };
+        /** VRCX との連携の設定（DB の場所・決まった間隔で取り込むか） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ImportSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/import/vat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** VRChatActivityTools の DB（VRChatActivityLog.db）を本文で送って取り込む（移行。replace で前の取り込みと入れ替える） */
+        post: {
+            parameters: {
+                query?: {
+                    replace?: boolean;
+                    account?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportStarted"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/import/vrcx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** VRCX の DB（VRCX.sqlite3）を本文で送って取り込む */
+        post: {
+            parameters: {
+                query?: {
+                    replace?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportStarted"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/import/vrcx/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** この PC の VRCX の DB を取り込む（VRCX を使っている間でもよい） */
+        post: {
+            parameters: {
+                query?: {
+                    replace?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportStarted"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** グループ（まとめ役ならメンバーと役、メンバーならまとめ役） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** この端末をまとめ役にして、グループを作る */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 同じ Tailscale のアカウントの端末から、Yamaori を見つける（まとめ役のアドレスを選ぶため） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DiscoveryResult"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 招待の合言葉を作る（一度きり・30 分まで） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupInvite"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group/members/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** メンバーの役を変える（logs・photos・vrcx。まとめ役の役は動かせない） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    deviceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RolesInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupView"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** メンバーを外す（渡したトークンを消す。送ってきた記録は残す） */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    deviceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** まとめ役のアドレスと招待の合言葉で、この端末をグループに入れる */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["JoinInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JoinResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/group/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** グループから抜ける（まとめ役で外すのとは別に、この端末の設定を消す） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JoinResult"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -2782,7 +3486,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** ゴミ箱を空にする（写真のファイルを、この PC と NAS のフォルダから本当に消す。戻せない。本人だけ） */
+        /** ゴミ箱を空にする（写真のファイルを、見張っている写真のフォルダ（この PC と NAS）から本当に消す。送り先の写しは消さない。戻せない。本人だけ） */
         post: {
             parameters: {
                 query?: never;
@@ -3081,6 +3785,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptInput: {
+            code: string;
+            deviceId: string;
+            deviceName: string;
+            url: null | string;
+        };
         AccountView: {
             id: string;
             name: null | string;
@@ -3155,6 +3865,9 @@ export interface components {
             /** Format: int32 */
             count: number;
         };
+        CreateInput: {
+            name: null | string;
+        };
         DaySummary: {
             date: string;
             /** Format: int32 */
@@ -3181,6 +3894,11 @@ export interface components {
             createdAt: string;
             /** Format: int32 */
             visitCount: number;
+        };
+        DiscoveryResult: {
+            tailscaleAvailable: boolean;
+            problem: null | string;
+            found: components["schemas"]["FoundYamaori"][];
         };
         EmptyResult: {
             /** Format: int32 */
@@ -3236,6 +3954,16 @@ export interface components {
             /** Format: date-time */
             forgottenAt: string;
         };
+        FoundYamaori: {
+            url: string;
+            host: string;
+            deviceId: string;
+            deviceName: string;
+            groupId: null | string;
+            groupName: null | string;
+            isHub: boolean;
+            version: string;
+        };
         FriendInput: {
             id: string;
             displayName: null | string;
@@ -3251,6 +3979,99 @@ export interface components {
             added: string[];
             removed: string[];
             renamed: string[];
+        };
+        GroupInfo: {
+            id: string;
+            name: string;
+            hubDeviceId: string;
+            members: components["schemas"]["GroupMember"][];
+        };
+        GroupInvite: {
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        GroupJoined: {
+            groupId: string;
+            groupName: string;
+            hubDeviceId: string;
+            hubName: string;
+            token: string;
+            roles: string[];
+        };
+        GroupMember: {
+            deviceId: string;
+            name: string;
+            url: null | string;
+            roles: string[];
+            /** Format: date-time */
+            joinedAt: string;
+            /** Format: date-time */
+            lastSeenAt: null | string;
+            isSelf: boolean;
+        };
+        GroupSync: {
+            groupId: string;
+            groupName: string;
+            roles: string[];
+            members: components["schemas"]["GroupMember"][];
+        };
+        GroupView: {
+            mode: string;
+            group: null | components["schemas"]["GroupInfo"];
+            member: null | components["schemas"]["MemberState"];
+            deviceId: string;
+            deviceName: string;
+        };
+        Hello: {
+            app: string;
+            version: string;
+            deviceId: string;
+            deviceName: string;
+            groupId: null | string;
+            groupName: null | string;
+            isHub: boolean;
+        };
+        ImportSettingsInput: {
+            vrcxPath: null | string;
+            vrcxAuto: null | boolean;
+            /** Format: double */
+            vrcxMinutes: null | number;
+        };
+        ImportStarted: {
+            started: boolean;
+            message: string;
+        };
+        ImportStatus: {
+            running: boolean;
+            kind: null | string;
+            /** Format: date-time */
+            startedAt: null | string;
+            /** Format: date-time */
+            finishedAt: null | string;
+            ok: null | boolean;
+            message: null | string;
+            needsReplace: boolean;
+        };
+        ImportView: {
+            job: components["schemas"]["ImportStatus"];
+            vat: components["schemas"]["LastImport"];
+            vrcx: components["schemas"]["LastImport"];
+            vrcxLocal: components["schemas"]["VrcxView"];
+        };
+        JoinInput: {
+            hubUrl: string;
+            code: string;
+        };
+        JoinResult: {
+            ok: boolean;
+            message: string;
+            restartRequired: boolean;
+        };
+        LastImport: {
+            /** Format: date-time */
+            at: null | string;
+            message: null | string;
         };
         LiveEvent: {
             kind: string;
@@ -3275,6 +4096,13 @@ export interface components {
         };
         LoginInput: {
             password: string;
+        };
+        MemberState: {
+            groupId: string;
+            groupName: string;
+            hubUrl: string;
+            roles: string[];
+            tokenReadable: boolean;
         };
         MissingWorld: {
             id: string;
@@ -3508,6 +4336,10 @@ export interface components {
             /** Format: int32 */
             jobs: number;
         };
+        RolesInput: {
+            roles: string[];
+            name: null | string;
+        };
         SaveWorldInput: {
             url: null | string;
             text: null | string;
@@ -3698,6 +4530,16 @@ export interface components {
             screenshotCount: number;
             /** Format: int32 */
             noteCount: number;
+        };
+        VrcxView: {
+            path: string;
+            pathSet: boolean;
+            exists: boolean;
+            /** Format: date-time */
+            modified: null | string;
+            auto: boolean;
+            /** Format: double */
+            minutes: number;
         };
         WorldDetail: {
             world: components["schemas"]["WorldSummary"];

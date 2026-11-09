@@ -1,5 +1,8 @@
 <script lang="ts">
   import ThumbSettings from '../components/ThumbSettings.svelte'
+  import GroupSettings from '../components/GroupSettings.svelte'
+  import ImportSettings from '../components/ImportSettings.svelte'
+  let legacyChild = $state(false)
   import { api, ApiError, type AccountView, type ApiToken, type AuthState, type DeviceView, type SettingsView, type TokenScope } from '../api'
   import { dateTime } from '../format'
 
@@ -252,9 +255,12 @@
       <ThumbSettings photoDirs={photo.effectivePhotoDirs} />
     {/if}
 
-    {#if sync}
+    <GroupSettings onrestart={restart} bind:legacyChild />
+    <ImportSettings member={sync?.role === 'child'} />
+
+    {#if sync && legacyChild}
       <section class="card pad stack">
-        <h2>ほかの端末と</h2>
+        <h2>ほかの端末と（前の形）</h2>
         <fieldset class="stack choices">
           <legend class="sr">この端末の役割</legend>
           <label class="choice"><input type="radio" bind:group={role} value="standalone" />
