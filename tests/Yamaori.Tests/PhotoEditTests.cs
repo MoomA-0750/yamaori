@@ -159,7 +159,8 @@ public sealed class PhotoEditTests : IDisposable
         Assert.Equal(1, r.Removed);
         var sent = Directory.GetFiles(Path.Combine(nas, "2026-11"));
         Assert.Single(sent); // 別の名前で増やさない
-        Assert.Equal("wrld_custom", PhotoMetaReader.Read(File.OpenRead(sent[0]), Path.GetFileName(sent[0]), DateTime.UtcNow, Tokyo).WorldId);
+        using (var f = File.OpenRead(sent[0]))
+            Assert.Equal("wrld_custom", PhotoMetaReader.Read(f, Path.GetFileName(sent[0]), DateTime.UtcNow, Tokyo).WorldId);
         Assert.Equal(id, catalog.List().Items.Single().Id);
     }
 
