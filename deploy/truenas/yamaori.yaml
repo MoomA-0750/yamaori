@@ -1,0 +1,30 @@
+# TrueNAS SCALE のアプリとして Yamaori を動かす定義。
+# TrueNAS の画面の「アプリ → アプリを見つける → ⋮ → YAML でインストール」に、名前を yamaori にして下を貼る。
+#
+# - 写真のフォルダ（/photos）を読み、WebUI・API を配る親になる。子の端末（Windows）から記録を受け取れる
+# - 写真の縮小を作り、写真のフォルダの .yamaori/thumbs にも置く（ThumbSidecar）。同じ写真のフォルダを見るほかの端末の Yamaori は、
+#   写真を読まずにその縮小を使う
+# - 最初にパスワードを決める: TrueNAS の画面でこのアプリの「シェル」を開き、yamaori set-password --data-dir /data
+#
+# 直すところ（★）:
+#   - 2 つの host path を、この NAS の道にする。/data 用のフォルダは前もって作っておく
+#   - user を、写真のフォルダに書けるユーザーの uid:gid にする（id <ユーザー名> で分かる）
+services:
+  yamaori:
+    image: ghcr.io/mooma-0750/yamaori:latest
+    restart: unless-stopped
+    user: "1000:3000"                     # ★ 写真のフォルダに書けるユーザー（縮小を .yamaori に置くため）
+    ports:
+      - "47800:47800"
+    environment:
+      TZ: Asia/Tokyo                       # 日の区切りに使う
+      YAMAORI_ThumbSidecar: "true"         # 作った縮小を写真のフォルダにも置く
+      YAMAORI_ThumbNight: "01:00-07:00"    # 縮小を前もって作る時間帯（空なら作らない。設定の画面から「今すぐ」もできる）
+      YAMAORI_DeviceName: truenas
+    volumes:
+      - type: bind
+        source: /mnt/HD/HD8/Applications/yamaori     # ★ DB・メモ・縮小・設定
+        target: /data
+      - type: bind
+        source: /mnt/HD/HD8/Applications/Plex/Pictures/VRChat   # ★ VRChat の写真
+        target: /photos

@@ -157,7 +157,9 @@ AI を使わなくても、説明文に出てくる言葉（YamaPlayer、QV Pen 
 
 - 送り先: フォルダ（SMB の共有 `\\NAS\…` や割り当てたドライブ）・SFTP・WebDAV
 - 送ったあと手元を: 消す／N 日残す／全部残す、を設定で選ぶ
-- NAS の写真を縮小して WebUI で見せる
+- NAS の写真を縮小して WebUI で見せる。一覧の縮小は前もって作る（夜の時間帯と、設定の「今すぐ全部作る」）
+- NAS から写真を読むのは遅いので、NAS の上で縮小を作れる。設定の「写真の縮小 → NAS の上で作る」で NAS のアドレス・ユーザー・写真のフォルダの組を入れ、Yamaori が作った公開鍵を NAS のユーザーに登録すると、Yamaori が SSH で入って `yamaori-thumbs.py`（Python 3 と Pillow。TrueNAS SCALE には入っている）を動かす。縮小は写真のフォルダの `.yamaori/thumbs` にでき、Yamaori は写真を読まずにそれを使う
+- TrueNAS のアプリとしても動かせる（[deploy/truenas/yamaori.yaml](deploy/truenas/yamaori.yaml)）。NAS の上で親として WebUI を配り、作った縮小を写真のフォルダにも置くので、ほかの端末の Yamaori もそれを使う
 - メディアサーバー（Plex・Immich・Jellyfin など）とのつなぎは後で
 
 ## 取り込み

@@ -88,7 +88,7 @@
       {#each dirs as d, i (i)}
         <div class="pair">
           <input type="text" bind:value={d.local} placeholder="\\NAS\photo\VRChat" aria-label="この端末から見た道" />
-          <span aria-hidden="true">→</span>
+          <span class="arrow" aria-hidden="true">→</span>
           <input type="text" bind:value={d.remote} placeholder="/mnt/pool/photo/VRChat" aria-label="NAS の上の道" />
           <button onclick={() => dirs.splice(i, 1)} aria-label="この組を外す">外す</button>
         </div>
@@ -101,14 +101,14 @@
       {#if view.remote.publicKey}
         <span class="faint">この公開鍵を、NAS のユーザーの SSH 公開鍵に登録します（TrueNAS なら「資格情報 → ユーザー → 編集 → SSH 公開鍵」）。</span>
         <code class="mono break pub">{view.remote.publicKey}</code>
-        <div class="row"><button onclick={copyKey}>写す</button><button onclick={newKey}>鍵を作り直す</button></div>
+        <div class="row"><button onclick={copyKey}>コピー</button><button onclick={newKey}>鍵を作り直す</button></div>
       {:else}
         <div class="row"><button onclick={newKey}>NAS に入る鍵を作る</button></div>
       {/if}
     </div>
 
+    <div class="row"><button class="primary" onclick={save}>保存</button></div>
     <div class="row">
-      <button class="primary" onclick={save}>保存</button>
       <button onclick={() => run(api.remoteThumbTest)} disabled={!view.remote.keySet}>試しにつなぐ</button>
       <button onclick={() => run(api.remoteThumbStart)} disabled={!view.remote.keySet}>NAS で今すぐ作る</button>
       <button onclick={status} disabled={!view.remote.keySet}>NAS の様子</button>
@@ -135,8 +135,9 @@
   .pub { font-size: .75rem; padding: .5rem; background: var(--bg-soft, rgba(0,0,0,.04)); border-radius: .5rem; }
   .plain { list-style: none; margin: 0; padding: 0; }
   @media (max-width: 640px) {
-    .grid3 { grid-template-columns: 1fr; }
-    .pair { grid-template-columns: 1fr; }
-    .pair span { display: none; }
+    .grid3 { grid-template-columns: 1fr; gap: 1rem; }
+    .pair { grid-template-columns: 1fr; gap: .35rem; padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
+    .pair .arrow { transform: rotate(90deg); justify-self: start; padding-left: .5rem; }
+    .pair button { justify-self: start; }
   }
 </style>

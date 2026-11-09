@@ -33,6 +33,8 @@ var brokenConfig = ConfigFile.Recover(Path.GetFullPath(dataDir));
 if (brokenConfig != null) Console.Error.WriteLine($"yamaori.json を読めなかったので {brokenConfig} へ退けた。既定の設定で起きる");
 var config = new ConfigurationBuilder()
     .AddJsonFile(Path.Combine(Path.GetFullPath(dataDir), "yamaori.json"), optional: true)
+    // コンテナ（TrueNAS のアプリなど）では環境変数でも決められる: YAMAORI_ThumbSidecar=true、YAMAORI_PhotoUpload__Kind=none など
+    .AddEnvironmentVariables("YAMAORI_")
     .AddCommandLine(rest, switches)
     .Build();
 var options = new YamaoriOptions();

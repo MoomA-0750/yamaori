@@ -1,4 +1,5 @@
 # Yamaori を親（サーバー）として動かすコンテナ。子の端末から記録を受け取り、WebUI・API を配る。
+# TrueNAS のアプリとして動かすときは deploy/truenas/yamaori.yaml。設定は環境変数 YAMAORI_<項目> でも決められる。
 # VRChat のログはないので、ログの見張りは何もしない。写真は NAS をつないだフォルダを /photos に渡せば目録に入る。
 #
 #   docker build -t yamaori .
@@ -25,6 +26,8 @@ WORKDIR /app
 COPY --from=build /out/app ./
 RUN ln -s /app/Yamaori /usr/local/bin/yamaori && mkdir -p /data /photos
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+# 設定のファイルの見張りを切る（コンテナでは要らず、NAS の上でファイルの見張りの数を使い切らないように）
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
 # 家の中から見せる（パスワードかトークンが要る）。データは /data に
 EXPOSE 47800
 VOLUME ["/data"]
