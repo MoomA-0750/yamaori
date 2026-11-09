@@ -412,6 +412,7 @@ public sealed class Database : IDisposable
             author_id TEXT,
             author_name TEXT,
             people TEXT NOT NULL DEFAULT '[]',   -- 一緒にいた人 [{"id": "usr_…" か null, "name": "…"}]
+            people_set INTEGER NOT NULL DEFAULT 0, -- 一緒にいた人を手で決めた（1 なら、時刻から当てた人の代わりに people を使う）
             edited_at TEXT NOT NULL,
             written_at TEXT                      -- 写真のファイルにも書いた時刻
         );

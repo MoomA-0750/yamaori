@@ -120,9 +120,10 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
     /// その人の会った記録から写真を引く（記録は数件〜数百件なので、写真を 1 枚ずつ調べるより速い）。
     /// </summary>
     const string WithPerson = """
-        p.id IN (SELECT p2.id FROM encounters e JOIN visits v ON v.id = e.visit_id
+        (p.id IN (SELECT p2.id FROM encounters e JOIN visits v ON v.id = e.visit_id
                  JOIN photos p2 ON p2.taken_at >= e.joined_at AND p2.taken_at < COALESCE(e.left_at, v.left_at, '9999')
                  WHERE e.user_id = $person OR (e.user_id IS NULL AND 'name:' || e.name = $person))
+         AND p.id NOT IN (SELECT photo_id FROM photo_edits WHERE people_set = 1))
         OR p.id IN (SELECT pe.photo_id FROM photo_edits pe, json_each(pe.people) j
                     WHERE COALESCE(json_extract(j.value, '$.id'), 'name:' || json_extract(j.value, '$.name')) = $person)
         """;
@@ -170,13 +171,17 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         using (var r = cmd.ExecuteReader())
             while (r.Read()) visits.Add((r.GetString(0), r.GetString(1), r.GetString(2)));
         var pairs = new List<(string, Shot)>();
-        var vi = -1;
+        var next = 0;
+        var active = new List<(string Joined, string Left, string World)>();
         foreach (var s in shots)
         {
             if (s.World != null) { pairs.Add((s.World, s)); continue; }
-            // 撮った時刻より前に入った最後の訪問
-            while (vi + 1 < visits.Count && string.CompareOrdinal(visits[vi + 1].Joined, s.Taken) <= 0) vi++;
-            if (vi >= 0 && string.CompareOrdinal(s.Taken, visits[vi].Left) < 0) pairs.Add((visits[vi].World, s));
+            // 撮った時刻に続いていた訪問（重なっていることもある。別の端末で同時に遊んでいたなど）
+            while (next < visits.Count && string.CompareOrdinal(visits[next].Joined, s.Taken) <= 0) active.Add(visits[next++]);
+            active.RemoveAll(v => string.CompareOrdinal(v.Left, s.Taken) <= 0);
+            // ワールドが 1 つに決まるときだけ数える（決まらない写真は、当てずにおく）
+            var worlds = active.Select(v => v.World).Distinct(StringComparer.Ordinal).Take(2).ToList();
+            if (worlds.Count == 1) pairs.Add((worlds[0], s));
         }
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         using (var cmd = db.Command("SELECT id, name FROM worlds WHERE name IS NOT NULL"))
@@ -195,6 +200,11 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
     public IReadOnlyList<PhotoGroup> ByPerson(int limit = 200)
     {
         var shots = Shots();
+        // 一緒にいた人を手で決めた写真は、時刻から当てない
+        var decided = new HashSet<string>(StringComparer.Ordinal);
+        using (var cmd = db.Command("SELECT photo_id FROM photo_edits WHERE people_set = 1"))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read()) decided.Add(r.GetString(0));
         var pairs = new List<(string, Shot)>();
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         using (var cmd = db.Command("""
@@ -208,7 +218,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
                 names[who] = r.GetString(1);
                 var to = r.GetString(3);
                 for (var i = LowerBound(shots, r.GetString(2)); i < shots.Count && string.CompareOrdinal(shots[i].Taken, to) < 0; i++)
-                    pairs.Add((who, shots[i]));
+                    if (!decided.Contains(shots[i].Id)) pairs.Add((who, shots[i]));
             }
         // 手で直した「一緒にいた人」
         var byId = shots.ToDictionary(x => x.Id);
@@ -284,6 +294,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
 
     static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
+
     /// <summary>写真の ID と置き場所の一つ（新しい順）。縮小を前もって作るため。</summary>
     public IReadOnlyList<(string Id, string Path)> AllNewestFirst()
     {
@@ -313,8 +324,9 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         var args = new List<(string, object?)> { ("$t", target), ("$limit", limit) };
         var inRoots = RootsIn(localRoots, args);
         return ReadLocal($"""
-            SELECT p.id, l.path, p.file_name, p.size, p.taken_at FROM photos p JOIN photo_locations l ON l.photo_id = p.id
-            WHERE l.root IN ({inRoots}) AND NOT EXISTS (SELECT 1 FROM photo_uploads u WHERE u.photo_id = p.id AND u.target = $t)
+            SELECT p.id, l.path, p.file_name, p.size, p.taken_at, u.remote_path FROM photos p JOIN photo_locations l ON l.photo_id = p.id
+            LEFT JOIN photo_uploads u ON u.photo_id = p.id AND u.target = $t
+            WHERE l.root IN ({inRoots}) AND (u.photo_id IS NULL OR u.size <> p.size) AND l.size = p.size
               AND NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id)
             GROUP BY p.id ORDER BY p.taken_at LIMIT $limit
             """, args);

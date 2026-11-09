@@ -80,6 +80,9 @@ public sealed class ExtensionTests : IDisposable
         Assert.Equal("requested", F("usr_e"));
         Assert.Equal(["usr_a", "usr_d"], q.People(kind: "friend").Items.Select(p => p.UserId).Order().ToArray());
         Assert.Equal(3, q.People(kind: "not_friend").Total);
+        // 別の自分のアカウントであとから外しても、このアカウントでは今もフレンドなのでフレンド
+        Exec("""INSERT INTO events (id, source, at, kind, user_id, name, data, account_id) VALUES ('f1', 'x', '2026-02-01T00:00:00Z', 'friend', 'usr_a', 'A', '{"type":"Unfriend"}', 'usr_alt')""");
+        Assert.Equal("friend", F("usr_a"));
     }
 
     [Theory]

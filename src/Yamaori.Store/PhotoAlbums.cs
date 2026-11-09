@@ -136,12 +136,15 @@ public sealed class PhotoAlbums(Database db)
     public sealed record EmptyResult(int Photos, int Files, IReadOnlyList<string> Failed);
 
     /// <summary>
-    /// ゴミ箱を空にする: ゴミ箱の写真のファイルを、目録にある置き場所（この PC と NAS のフォルダ）から全部消す。戻せない。
-    /// 消せなかったファイルがある写真はゴミ箱に残す（次にもう一度空にできる）。
-    /// 写真の送り先（WebDAV・SFTP）に送った写しは消さない。縮小は thumbsDir から消す。
+    /// ゴミ箱を空にする: ゴミ箱の写真のファイルを消す。戻せない。消すのは、見張っている写真のフォルダ（watchedRoots）の中の置き場所だけ
+    /// （写真の送り先のフォルダに送った写しは消さない）。消す前に、目録のときと大きさ・時刻が同じか、置き場所が 2 つ以上あれば中身が同じかを確かめ、
+    /// 違えば（差し替わった・名前と大きさが同じで中身の違う写真）その写真は消さずにゴミ箱に残す。
+    /// 縮小は、この端末の thumbsDir と、写真のフォルダの .yamaori/thumbs から消す。
     /// </summary>
-    public EmptyResult Empty(string? thumbsDir)
+    public EmptyResult Empty(string? thumbsDir, IReadOnlyList<string> watchedRoots, IReadOnlyList<int>? thumbSizes = null)
     {
+        var cmp = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var roots = watchedRoots.Select(r => Path.TrimEndingDirectorySeparator(Path.GetFullPath(r))).ToHashSet(cmp);
         var ids = new List<string>();
         using (var cmd = db.Command("SELECT photo_id FROM photo_trash WHERE purged_at IS NULL"))
         using (var r = cmd.ExecuteReader())
@@ -150,29 +153,68 @@ public sealed class PhotoAlbums(Database db)
         var failed = new List<string>();
         foreach (var id in ids)
         {
-            var paths = new List<string>();
-            using (var cmd = db.Command("SELECT path FROM photo_locations WHERE photo_id = $id", null, ("$id", id)))
+            var locs = new List<(string Path, string Root, string Mtime, long Size)>();
+            using (var cmd = db.Command("SELECT path, root, mtime, size FROM photo_locations WHERE photo_id = $id", null, ("$id", id)))
             using (var r = cmd.ExecuteReader())
-                while (r.Read()) paths.Add(r.GetString(0));
-            var ok = true;
-            foreach (var path in paths)
+                while (r.Read()) locs.Add((r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt64(3)));
+            var mine = locs.Where(l => roots.Contains(Path.TrimEndingDirectorySeparator(l.Root))).ToList();
+            // 確かめる: 目録のときのままか（差し替わっていないか）、置き場所どうしで中身が同じか
+            var problem = (string?)null;
+            var present = new List<(string Path, string Root, string Mtime, long Size)>();
+            foreach (var l in mine)
+            {
+                var fi = new FileInfo(l.Path);
+                if (!fi.Exists) continue;
+                if (fi.Length != l.Size || Database.Time(fi.LastWriteTimeUtc) != l.Mtime) { problem = $"{l.Path}: 目録を作ったあとで変わっている（写真の目録を読み直してから、もう一度空にする）"; break; }
+                present.Add(l);
+            }
+            if (problem == null && present.Count > 1)
             {
                 try
                 {
-                    if (File.Exists(path)) { File.Delete(path); files++; }
-                    using var del = db.Command("DELETE FROM photo_locations WHERE path = $p", null, ("$p", path));
+                    var hashes = present.Select(l => Convert.ToHexString(Hash(l.Path))).Distinct().Count();
+                    if (hashes > 1) problem = $"{present[0].Path} ほか: 同じ名前と大きさで中身の違う写真がある（別の写真を消さないよう、消さない）";
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { problem = $"{present[0].Path}: {ex.Message}"; }
+            }
+            if (problem != null) { failed.Add(problem); continue; }
+            var ok = true;
+            foreach (var l in present)
+            {
+                try
+                {
+                    File.Delete(l.Path);
+                    files++;
+                    using var del = db.Command("DELETE FROM photo_locations WHERE path = $p", null, ("$p", l.Path));
                     del.ExecuteNonQuery();
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     ok = false;
-                    failed.Add($"{path}: {ex.Message}");
+                    failed.Add($"{l.Path}: {ex.Message}");
                 }
             }
             if (!ok) continue;
-            if (thumbsDir != null && id.Length > 4)
-                foreach (var t in Directory.Exists(Path.Combine(thumbsDir, id[..4])) ? Directory.GetFiles(Path.Combine(thumbsDir, id[..4]), id + "_*.jpg") : [])
-                    try { File.Delete(t); } catch (IOException) { }
+            // 見張るフォルダにもうない置き場所（消えたもの）は目録から外す。送り先の写しの置き場所は残す
+            foreach (var l in mine.Except(present))
+            {
+                using var del = db.Command("DELETE FROM photo_locations WHERE path = $p", null, ("$p", l.Path));
+                del.ExecuteNonQuery();
+            }
+            // 縮小（この端末のものと、写真のフォルダの .yamaori に置いたもの）
+            if (id.Length > 4)
+            {
+                var dirs = new List<string>();
+                if (thumbsDir != null) dirs.Add(Path.Combine(thumbsDir, id[..4]));
+                dirs.AddRange(mine.Select(l => Path.Combine(l.Root, ".yamaori", "thumbs", id[..4])).Distinct(cmp));
+                foreach (var dir in dirs)
+                    try
+                    {
+                        if (Directory.Exists(dir))
+                            foreach (var t in Directory.GetFiles(dir, id + "_*.jpg")) File.Delete(t);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { failed.Add($"{dir}: 縮小を消せなかった: {ex.Message}"); }
+            }
             using var tx = db.Connection.BeginTransaction();
             using (var a = db.Command("DELETE FROM album_photos WHERE photo_id = $id", tx, ("$id", id))) a.ExecuteNonQuery();
             using (var u = db.Command("UPDATE photo_trash SET purged_at = $now WHERE photo_id = $id", tx, ("$id", id), ("$now", Database.Time(DateTime.UtcNow)))) u.ExecuteNonQuery();
@@ -180,6 +222,12 @@ public sealed class PhotoAlbums(Database db)
             photos++;
         }
         return new EmptyResult(photos, files, failed);
+    }
+
+    static byte[] Hash(string path)
+    {
+        using var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return System.Security.Cryptography.SHA256.HashData(f);
     }
 
     static string Clean(string s, int max)

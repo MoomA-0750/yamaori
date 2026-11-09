@@ -5,12 +5,14 @@ namespace Yamaori.Store;
 
 public sealed record PhotoEdit(string? WorldId, string? WorldName, string? AuthorId, string? AuthorName, IReadOnlyList<PhotoPerson> People, DateTime EditedAt, DateTime? WrittenAt);
 
+
 /// <summary>撮った時刻から当てた情報（その時刻にいた訪問のワールド・アカウント・同じインスタンスにいた人）。</summary>
 public sealed record PhotoSuggestion(string? VisitId, string? WorldId, string? WorldName, string? AuthorId, string? AuthorName, IReadOnlyList<PhotoPerson> People);
 
 /// <summary>写真の情報: 写真から読んだもの（File）、手で直したもの（Edit）、撮った時刻から当てたもの（Suggestion）。</summary>
 public sealed record PhotoInfo(PhotoView Photo, PhotoMeta? File, PhotoEdit? Edit, PhotoSuggestion Suggestion, bool CanWrite);
 
+/// <summary>People を渡すと（空でも）、一緒にいた人は時刻から当てた人の代わりにそれを使う。渡さなければ、時刻から当てた人のまま。</summary>
 public sealed record PhotoEditInput(string? WorldId, string? WorldName, string? AuthorId, string? AuthorName, IReadOnlyList<PhotoPerson>? People);
 
 /// <summary>
@@ -93,9 +95,9 @@ public sealed class PhotoEdits(Database db, TimeZoneInfo? timeZone = null)
             .Select(p => new PhotoPerson(C(p.Id) is { } id && id.StartsWith("usr_", StringComparison.Ordinal) ? id : null, C(p.Name)!))
             .DistinctBy(p => p.Id ?? "name:" + p.Name).Take(MaxPeople).ToList();
         using var cmd = db.Command("""
-            INSERT INTO photo_edits (photo_id, world_id, world_name, author_id, author_name, people, edited_at) VALUES ($id, $w, $wn, $a, $an, $p, $now)
-            ON CONFLICT (photo_id) DO UPDATE SET world_id = $w, world_name = $wn, author_id = $a, author_name = $an, people = $p, edited_at = $now
-            """, null, ("$id", photoId), ("$w", worldId), ("$wn", C(input.WorldName)), ("$a", authorId), ("$an", C(input.AuthorName)),
+            INSERT INTO photo_edits (photo_id, world_id, world_name, author_id, author_name, people, people_set, edited_at) VALUES ($id, $w, $wn, $a, $an, $p, $ps, $now)
+            ON CONFLICT (photo_id) DO UPDATE SET world_id = $w, world_name = $wn, author_id = $a, author_name = $an, people = $p, people_set = $ps, edited_at = $now
+            """, null, ("$id", photoId), ("$ps", input.People != null ? 1 : 0), ("$w", worldId), ("$wn", C(input.WorldName)), ("$a", authorId), ("$an", C(input.AuthorName)),
             ("$p", JsonSerializer.Serialize(people, Json)), ("$now", Database.Time(DateTime.UtcNow)));
         cmd.ExecuteNonQuery();
         // 直したワールドも、ワールドの一覧に入れる（ワールドのページが開けるように）
@@ -126,7 +128,6 @@ public sealed class PhotoEdits(Database db, TimeZoneInfo? timeZone = null)
         var people = edit?.People ?? [];
         var local = TimeZoneInfo.ConvertTimeFromUtc(photo.TakenAt, _tz);
         var fields = new PhotoXmp.Fields(new DateTimeOffset(local, _tz.GetUtcOffset(photo.TakenAt)), photo.AuthorName, photo.AuthorId, photo.WorldId, photo.WorldName, photoId, people);
-        var xmp = PhotoXmp.Build(fields);
         var paths = new List<string>();
         using (var cmd = db.Command("SELECT path FROM photo_locations WHERE photo_id = $id", null, ("$id", photoId)))
         using (var r = cmd.ExecuteReader())
@@ -143,7 +144,7 @@ public sealed class PhotoEdits(Database db, TimeZoneInfo? timeZone = null)
                 var mtime = File.GetLastWriteTimeUtc(path);
                 using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var output = new FileStream(tmp, FileMode.Create, FileAccess.Write))
-                    PhotoXmp.Write(input, output, xmp);
+                    PhotoXmp.Write(input, output, fields);
                 File.Move(tmp, path, overwrite: true);
                 // 撮った時刻の手がかりにファイルの時刻を使う写真もあるので、時刻は元のままにする
                 File.SetLastWriteTimeUtc(path, mtime);
@@ -161,6 +162,10 @@ public sealed class PhotoEdits(Database db, TimeZoneInfo? timeZone = null)
         }
         if (files > 0)
         {
+            // 写真の大きさを書いたあとのものにする（送り先へは、前に送った同じ場所へ送り直される）
+            var written = paths.Where(File.Exists).Select(p => new FileInfo(p).Length).FirstOrDefault();
+            if (written > 0)
+                using (var sz = db.Command("UPDATE photos SET size = $s WHERE id = $id", null, ("$s", written), ("$id", photoId))) sz.ExecuteNonQuery();
             // 直した情報がなくても、書いた印は残す（どの写真に書いたか分かるように）
             using var cmd = db.Command("""
                 INSERT INTO photo_edits (photo_id, world_id, world_name, author_id, author_name, people, edited_at, written_at) VALUES ($id, $w, $wn, $a, $an, '[]', $now, $now)

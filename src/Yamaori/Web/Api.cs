@@ -222,8 +222,8 @@ public static class Api
         api.MapPost("/photos/restore", (Database db, PhotoSelection input) => new CountResult(new PhotoAlbums(db).Restore(input.PhotoIds)))
             .WithSummary("写真をゴミ箱から戻す");
         api.MapGet("/photos/trash/count", (Database db) => new CountResult(new PhotoAlbums(db).TrashCount())).WithSummary("ゴミ箱の写真の数");
-        api.MapPost("/photos/trash/empty", (Database db, Thumbnails thumbs) => new PhotoAlbums(db).Empty(thumbs.Dir))
-            .WithSummary("ゴミ箱を空にする（写真のファイルを、この PC と NAS のフォルダから本当に消す。戻せない。本人だけ）");
+        api.MapPost("/photos/trash/empty", (Database db, Thumbnails thumbs, Microsoft.Extensions.Options.IOptions<YamaoriOptions> o) => new PhotoAlbums(db).Empty(thumbs.Dir, o.Value.EffectivePhotoDirs))
+            .WithSummary("ゴミ箱を空にする（写真のファイルを、見張っている写真のフォルダ（この PC と NAS）から本当に消す。送り先の写しは消さない。戻せない。本人だけ）");
 
         api.MapGet("/photos/by-world", (PhotoCatalog photos, int? limit) => photos.ByWorld(limit ?? 200))
             .WithSummary("ワールドごとの写真の数（多い順。表紙はいちばん新しい写真）");

@@ -215,16 +215,19 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     /// </summary>
     const string FriendState = """
         friend_ev AS (
-            SELECT s.user_id, m.taken_at AS at, 1 AS f FROM friend_snapshots s JOIN friend_snapshot_meta m ON m.account_id = s.account_id
+            SELECT s.account_id AS acc, s.user_id, m.taken_at AS at, 1 AS f FROM friend_snapshots s JOIN friend_snapshot_meta m ON m.account_id = s.account_id
             UNION ALL
-            SELECT user_id, at, CASE json_extract(data, '$.type') WHEN 'Friend' THEN 1 ELSE 0 END FROM events
+            SELECT COALESCE(account_id, ''), user_id, at, CASE json_extract(data, '$.type') WHEN 'Friend' THEN 1 ELSE 0 END FROM events
                 WHERE kind = 'friend' AND json_extract(data, '$.type') IN ('Friend', 'Unfriend') AND user_id IS NOT NULL
             UNION ALL
-            SELECT user_id, at, 1 FROM events
+            SELECT COALESCE(account_id, ''), user_id, at, 1 FROM events
                 WHERE kind = 'notification' AND json_extract(data, '$.type') = 'friendRequest' AND json_extract(data, '$.direction') = 'accepted' AND user_id IS NOT NULL
         ),
+        -- 自分のアカウントごとに今の状態を決め、どれかのアカウントで今フレンドならフレンド
         friend_state AS (
-            SELECT user_id, f FROM (SELECT user_id, f, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY at DESC, f DESC) AS rn FROM friend_ev) WHERE rn = 1
+            SELECT user_id, MAX(f) AS f FROM (
+                SELECT user_id, f, ROW_NUMBER() OVER (PARTITION BY acc, user_id ORDER BY at DESC, f DESC) AS rn FROM friend_ev)
+            WHERE rn = 1 GROUP BY user_id
         ),
         friend_requested AS (
             SELECT DISTINCT user_id FROM events WHERE kind = 'notification' AND json_extract(data, '$.type') = 'friendRequest' AND user_id IS NOT NULL

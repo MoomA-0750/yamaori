@@ -114,7 +114,7 @@
           {#if !confirmWrite}
             <div><button onclick={() => (confirmWrite = true)} disabled={busy}>写真のファイルにも書く…</button>{#if info.edit?.writtenAt}<span class="faint"> 前に書いた: {dateTime(info.edit.writtenAt)}</span>{/if}</div>
           {:else}
-            <p class="warn">写真のファイル（この PC と NAS にあるもの全部）に、VRChat と同じ形の情報（XMP）を書き込みます。画像はそのままですが、ファイルは書き換わります。写真の送り先に送った写しは書き換えません。</p>
+            <p class="warn">写真のファイル（この PC と NAS にあるもの全部）に、VRChat と同じ形の情報（XMP）を書き込みます。画像はそのままですが、ファイルは書き換わります。WebDAV・SFTP の送り先に送った写しは、次に送るときに書いたもので送り直します。</p>
             <div class="row"><button class="danger-text" onclick={write} disabled={busy}>{busy ? '書いています…' : '書く'}</button><button onclick={() => (confirmWrite = false)}>やめる</button></div>
           {/if}
         </div>

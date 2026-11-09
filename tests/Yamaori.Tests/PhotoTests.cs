@@ -109,6 +109,24 @@ public sealed class PhotoTests : IDisposable
         Assert.Equal(2, catalog.List().Total);
     }
 
+    [Fact]
+    public void 重なった訪問のどちらか決まらない写真は_ワールドを当てない()
+    {
+        var pics = Directory.CreateDirectory(Path.Combine(_dir, "Pictures", "2026-11")).FullName;
+        File.WriteAllBytes(Path.Combine(pics, "VRChat_2026-11-08_20-45-00.000_1920x1080.png"), Png(1920, 1080, null)); // 11:45Z
+        File.WriteAllBytes(Path.Combine(pics, "VRChat_2026-11-08_20-50-00.000_1920x1080.png"), Png(1920, 1080, null)); // 11:50Z
+        using var db = Database.Open(Path.Combine(_dir, "o.sqlite3"));
+        void Exec(string sql) { using var cmd = db.Command(sql); cmd.ExecuteNonQuery(); }
+        // A は 10:00–12:00、B は 11:00–11:48（別の端末）。11:45 は A と B が重なる、11:50 は A だけ
+        Exec("INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at, left_at) VALUES ('va', 'x', 'd1', 'wrld_a', '1', '1', 'public', 'jp', '2026-11-08T10:00:00Z', '2026-11-08T12:00:00Z')");
+        Exec("INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at, left_at) VALUES ('vb', 'x', 'd2', 'wrld_b', '1', '1', 'public', 'jp', '2026-11-08T11:00:00Z', '2026-11-08T11:48:00Z')");
+        var catalog = new PhotoCatalog(db, "d1", Tokyo);
+        catalog.Scan(Path.Combine(_dir, "Pictures"));
+        var g = Assert.Single(catalog.ByWorld());
+        Assert.Equal("wrld_a", g.Key);
+        Assert.Equal(1, g.Count);
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

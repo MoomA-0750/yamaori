@@ -93,6 +93,8 @@ public sealed class RemoteThumbs(IOptions<YamaoriOptions> options)
         try
         {
             ssh.Connect();
+            // 初めての相手でも、SFTP の接続では SSH の接続で見た鍵と同じかを確かめる
+            if (seen != null) known = seen;
             sftp.Connect();
         }
         catch (Renci.SshNet.Common.SshException) when (rejected != null)
@@ -101,7 +103,7 @@ public sealed class RemoteThumbs(IOptions<YamaoriOptions> options)
             throw new InvalidOperationException($"NAS の鍵が、覚えている鍵と違う（今の鍵 {rejected}）。NAS を作り直したのなら、設定で「NAS の鍵を覚え直す」を押す");
         }
         catch { ssh.Dispose(); sftp.Dispose(); throw; }
-        if (seen != null) store.Set(pinKey, seen);
+        if (seen != null && known == seen) store.Set(pinKey, seen);
         return (ssh, sftp);
     }
 

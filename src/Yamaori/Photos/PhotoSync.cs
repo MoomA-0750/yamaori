@@ -71,9 +71,18 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
         foreach (var p in catalog.PendingUploads(localRoots, target.Key))
         {
             cancel.ThrowIfCancellationRequested();
-            var remote = RemotePath(p);
+            var remote = p.RemotePath ?? RemotePath(p);
             try
             {
+                // 前に送った写真を書き換えた（Yamaori が情報を書いた）なら、前に送った同じ場所へ上書きで送り直す
+                if (p.RemotePath != null)
+                {
+                    await target.UploadAsync(p.Path, remote, cancel).ConfigureAwait(false);
+                    if (await target.SizeAsync(remote, cancel).ConfigureAwait(false) != p.Size) throw new IOException("送り先の大きさが合わない");
+                    catalog.RecordUpload(p.PhotoId, target.Key, remote, p.Size);
+                    uploaded++;
+                    continue;
+                }
                 var there = await target.SizeAsync(remote, cancel).ConfigureAwait(false);
                 // 同じ名前で中身の違う写真が送り先にある（ほかのフォルダの同じ名前の写真、壊れたファイルなど）。上書きせず、別の名前で送る。
                 // 大きさが同じでも、中身まで比べてから「もうある」とする（違う中身を送ったことにして、手元を消さない）

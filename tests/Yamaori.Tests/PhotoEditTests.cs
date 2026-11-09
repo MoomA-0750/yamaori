@@ -27,7 +27,7 @@ public sealed class PhotoEditTests : IDisposable
         {
             using var i = new MemoryStream(input);
             using var o = new MemoryStream();
-            PhotoXmp.Write(i, o, PhotoXmp.Build(f));
+            PhotoXmp.Write(i, o, f);
             return o.ToArray();
         }
         var once = Write(png, fields);
@@ -43,6 +43,48 @@ public sealed class PhotoEditTests : IDisposable
         Assert.Equal("MoomA", meta.AuthorName);
         Assert.Equal("p_0123456789abcdef0123", meta.YamaoriId);
         Assert.Equal([new PhotoPerson("usr_a", "Alice|A"), new PhotoPerson(null, "名前だけ")], meta.Players!);
+    }
+
+    [Fact]
+    public void 前からある_XMP_のほかの項目は残す()
+    {
+        var png = RealPng();
+        // ほかのアプリが書いた XMP（タイトルと権利）がある PNG
+        var other = """<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:rights>(c) me</dc:rights><dc:title>夕焼け</dc:title></rdf:Description></rdf:RDF></x:xmpmeta>""";
+        var withOther = PngWithXmp(png, other);
+        using var i = new MemoryStream(withOther);
+        using var o = new MemoryStream();
+        PhotoXmp.Write(i, o, new PhotoXmp.Fields(DateTimeOffset.Now, null, null, "wrld_x", "W", "p_0123456789abcdef0123", []));
+        var text = System.Text.Encoding.UTF8.GetString(o.ToArray());
+        Assert.Contains("<dc:rights>(c) me</dc:rights>", text, StringComparison.Ordinal);
+        Assert.Contains("<dc:title>夕焼け</dc:title>", text, StringComparison.Ordinal);
+        Assert.Contains("<vrc:WorldID>wrld_x</vrc:WorldID>", text, StringComparison.Ordinal);
+        Assert.Contains("xmlns:vrc=", text, StringComparison.Ordinal);
+        using (var bmp = SKBitmap.Decode(o.ToArray())) Assert.NotNull(bmp);
+        var meta = PhotoMetaReader.Read(new MemoryStream(o.ToArray()), "a.png", DateTime.UtcNow, Tokyo);
+        Assert.Equal("wrld_x", meta.WorldId);
+    }
+
+    /// <summary>IHDR のあとに XMP の iTXt を入れた PNG（試験用）。</summary>
+    static byte[] PngWithXmp(byte[] png, string xmp)
+    {
+        var data = new List<byte>(System.Text.Encoding.Latin1.GetBytes("XML:com.adobe.xmp")) { 0, 0, 0, 0, 0 };
+        data.AddRange(System.Text.Encoding.UTF8.GetBytes(xmp));
+        var type = "iTXt"u8.ToArray();
+        var crc = 0xFFFFFFFFu;
+        foreach (var b in type.Concat(data))
+        {
+            crc ^= b;
+            for (var k = 0; k < 8; k++) crc = (crc & 1) != 0 ? 0xEDB88320u ^ (crc >> 1) : crc >> 1;
+        }
+        crc ^= 0xFFFFFFFFu;
+        var chunk = new List<byte>();
+        chunk.AddRange(BitConverter.GetBytes(data.Count).Reverse());
+        chunk.AddRange(type);
+        chunk.AddRange(data);
+        chunk.AddRange(BitConverter.GetBytes(crc).Reverse());
+        // 署名 8 + IHDR（4+4+13+4）のあと
+        return [.. png[..33], .. chunk, .. png[33..]];
     }
 
     [Fact]
@@ -71,6 +113,9 @@ public sealed class PhotoEditTests : IDisposable
         Assert.Equal(1, catalog.List(worldId: "wrld_custom").Total);
         Assert.Equal(1, catalog.List(personId: "name:Dave").Total);
         Assert.Contains(catalog.ByPerson(), g => g.Key == "name:Dave");
+        // 一緒にいた人を手で決めたので、時刻から当てた Carol は外れる
+        Assert.DoesNotContain(catalog.ByPerson(), g => g.Name == "Carol");
+        Assert.Equal(0, catalog.List(personId: "usr_00000000-0000-0000-0000-000000000004").Total);
         Assert.Throws<ArgumentException>(() => edits.Save(id, new PhotoEditInput("bad", null, null, null, null)));
 
         var before = new FileInfo(path).Length;
@@ -88,6 +133,34 @@ public sealed class PhotoEditTests : IDisposable
 
         Assert.True(edits.Clear(id));
         Assert.Null(edits.Get(id));
+    }
+
+    [Fact]
+    public async Task 情報を書いた写真は_前に送った同じ場所へ送り直し_手元を消せる()
+    {
+        var pics = Directory.CreateDirectory(Path.Combine(_dir, "Pictures", "2026-11")).FullName;
+        var path = Path.Combine(pics, "VRChat_2026-11-08_02-42-00.000_1920x1080.png");
+        File.WriteAllBytes(path, RealPng());
+        using var db = Database.Open(Path.Combine(_dir, "s.sqlite3"));
+        var catalog = new PhotoCatalog(db, "d_test", Tokyo);
+        var root = Path.Combine(_dir, "Pictures");
+        catalog.Scan(root);
+        var id = catalog.List().Items.Single().Id;
+        var nas = Path.Combine(_dir, "nas");
+        using var target = new Yamaori.Photos.FolderTarget(nas);
+        var sync = new Yamaori.Photos.PhotoSync(catalog, target, [root], null, Tokyo);
+        Assert.Equal(1, (await sync.RunAsync("keep", 30, default)).Uploaded);
+
+        var edits = new PhotoEdits(db, Tokyo);
+        edits.Save(id, new PhotoEditInput("wrld_custom", "W", null, null, null));
+        Assert.Equal(2, edits.WriteToFiles(id).Files); // 手元と、目録にあるフォルダの送り先の写しの両方
+        var r = await sync.RunAsync("after_upload", 30, default);
+        Assert.Equal(1, r.Uploaded);
+        Assert.Equal(1, r.Removed);
+        var sent = Directory.GetFiles(Path.Combine(nas, "2026-11"));
+        Assert.Single(sent); // 別の名前で増やさない
+        Assert.Equal("wrld_custom", PhotoMetaReader.Read(File.OpenRead(sent[0]), Path.GetFileName(sent[0]), DateTime.UtcNow, Tokyo).WorldId);
+        Assert.Equal(id, catalog.List().Items.Single().Id);
     }
 
     public void Dispose()
