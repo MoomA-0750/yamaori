@@ -1776,6 +1776,20 @@
             }
           },
           {
+            "name": "album",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "trash",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -1799,6 +1813,394 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PageOfPhotoView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/albums": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真のアルバム（新しく変えた順）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Album"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "アルバムを作る",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlbumInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Album"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/albums/{id}": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "アルバム（写真は /api/photos?album=… で読む）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Album"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "アルバムの名前・説明・表紙を変える（説明と表紙は空の文字で外す）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlbumInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Album"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "アルバムを消す（写真は消さない）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/albums/{id}/photos": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真をアルバムに入れる",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/albums/{id}/photos/remove": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真をアルバムから外す（写真は消さない）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/albums": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "その写真が入っているアルバム",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AlbumRef"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/trash": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真をゴミ箱に入れる（一覧から隠すだけ。ファイルはそのまま）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/restore": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真をゴミ箱から戻す",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/trash/count": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ゴミ箱の写真の数",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/trash/empty": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ゴミ箱を空にする（写真のファイルを、この PC と NAS のフォルダから本当に消す。戻せない。本人だけ）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyResult"
                 }
               }
             }
@@ -2117,6 +2519,93 @@
           }
         }
       },
+      "Album": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "coverPhotoId",
+          "count",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "coverPhotoId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AlbumInput": {
+        "required": [
+          "name",
+          "description",
+          "coverPhotoId"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "coverPhotoId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AlbumRef": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "ApiToken": {
         "required": [
           "id",
@@ -2208,6 +2697,18 @@
           }
         }
       },
+      "CountResult": {
+        "required": [
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "DaySummary": {
         "required": [
           "date",
@@ -2295,6 +2796,30 @@
           "visitCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "EmptyResult": {
+        "required": [
+          "photos",
+          "files",
+          "failed"
+        ],
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "files": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -3012,6 +3537,20 @@
           "latestAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PhotoSelection": {
+        "required": [
+          "photoIds"
+        ],
+        "type": "object",
+        "properties": {
+          "photoIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

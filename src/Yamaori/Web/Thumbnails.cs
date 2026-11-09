@@ -16,6 +16,9 @@ public sealed class Thumbnails(string dir, IReadOnlyList<string>? photoRoots = n
     readonly SemaphoreSlim _gate = new(2);
     readonly IReadOnlyList<string> _roots = photoRoots ?? [];
 
+    /// <summary>縮小を置くフォルダ。</summary>
+    public string Dir => dir;
+
     public static int Fit(int requested) => Sizes.FirstOrDefault(s => s >= requested, Sizes[^1]);
 
     public string LocalPath(string photoId, int size) => Path.Combine(dir, photoId[..4], $"{photoId}_{Fit(size)}.jpg");

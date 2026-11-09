@@ -168,6 +168,17 @@ public sealed class HttpScopeTests
     }
 
     [Fact]
+    public async Task ゴミ箱を空にするのは本人だけ()
+    {
+        await using var h = new HttpHost();
+        var t = Bearer(Token(h, TokenScopes.Full));
+        Assert.Equal(403, (await h.SendAsync("POST", "/api/photos/trash/empty", headers: t)).Response.StatusCode);
+        Assert.Equal(403, (await h.SendAsync("POST", "/API/Photos/Trash/Empty", headers: t)).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/photos/trash", body: """{"photoIds":[]}""", headers: t)).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/photos/trash/empty", loopback: true)).Response.StatusCode);
+    }
+
+    [Fact]
     public async Task トークンは範囲を選ばないと作れない()
     {
         await using var h = new HttpHost();

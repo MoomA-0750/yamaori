@@ -123,7 +123,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
 
     List<Shot> Shots()
     {
-        using var cmd = db.Command("SELECT id, taken_at, world_id FROM photos ORDER BY taken_at");
+        using var cmd = db.Command($"SELECT id, taken_at, world_id FROM photos p WHERE {NotTrashed} ORDER BY taken_at");
         using var r = cmd.ExecuteReader();
         var list = new List<Shot>();
         while (r.Read()) list.Add(new Shot(r.GetString(0), r.GetString(1), Str(r, 2)));
@@ -204,11 +204,20 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         return Group(pairs, k => names.GetValueOrDefault(k), limit);
     }
 
-    /// <summary>写真の一覧（新しい順）。visitId を渡すと、その訪問の間に撮った写真（古い順）。personId を渡すと、その人が同じインスタンスにいたときの写真。</summary>
-    public Page<PhotoView> List(DateTime? from = null, DateTime? to = null, string? worldId = null, string? visitId = null, int limit = 100, int offset = 0, string? personId = null)
+    /// <summary>ゴミ箱に入っていない写真。</summary>
+    public const string NotTrashed = "NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id)";
+
+    /// <summary>
+    /// 写真の一覧（新しい順）。visitId を渡すと、その訪問の間に撮った写真（古い順）。personId を渡すと、その人が同じインスタンスにいたときの写真。
+    /// albumId を渡すと、そのアルバムの写真。trash なら、ゴミ箱の写真（空にしたものは出さない）。ゴミ箱の写真は、ほかの一覧には出さない。
+    /// </summary>
+    public Page<PhotoView> List(DateTime? from = null, DateTime? to = null, string? worldId = null, string? visitId = null, int limit = 100, int offset = 0,
+        string? personId = null, string? albumId = null, bool trash = false)
     {
         var where = new List<string>();
         var args = new List<(string, object?)>();
+        where.Add(trash ? "EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id AND t.purged_at IS NULL)" : NotTrashed);
+        if (albumId != null) { where.Add("p.id IN (SELECT photo_id FROM album_photos WHERE album_id = $album)"); args.Add(("$album", albumId)); }
         if (personId != null) { where.Add(WithPerson); args.Add(("$person", personId)); }
         if (from is { } f) { where.Add("p.taken_at >= $from"); args.Add(("$from", Database.Time(f))); }
         if (to is { } t) { where.Add("p.taken_at < $to"); args.Add(("$to", Database.Time(t))); }
@@ -232,7 +241,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
 
     public PhotoView? Get(string id)
     {
-        using var cmd = db.Command($"SELECT {Columns} FROM photos p WHERE p.id = $id", null, ("$id", id));
+        using var cmd = db.Command($"SELECT {Columns} FROM photos p WHERE p.id = $id AND NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id AND t.purged_at IS NOT NULL)", null, ("$id", id));
         using var r = cmd.ExecuteReader();
         return r.Read() ? Read(r) : null;
     }
@@ -254,7 +263,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
     {
         using var cmd = db.Command("""
             SELECT p.id, (SELECT l.path FROM photo_locations l WHERE l.photo_id = p.id ORDER BY (l.device_id IS NULL), l.path LIMIT 1)
-            FROM photos p ORDER BY p.taken_at DESC
+            FROM photos p WHERE NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id AND t.purged_at IS NOT NULL) ORDER BY p.taken_at DESC
             """);
         using var r = cmd.ExecuteReader();
         var list = new List<(string, string)>();
@@ -280,6 +289,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         return ReadLocal($"""
             SELECT p.id, l.path, p.file_name, p.size, p.taken_at FROM photos p JOIN photo_locations l ON l.photo_id = p.id
             WHERE l.root IN ({inRoots}) AND NOT EXISTS (SELECT 1 FROM photo_uploads u WHERE u.photo_id = p.id AND u.target = $t)
+              AND NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id)
             GROUP BY p.id ORDER BY p.taken_at LIMIT $limit
             """, args);
     }

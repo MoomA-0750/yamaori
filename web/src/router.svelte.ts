@@ -42,7 +42,7 @@ export const href = {
   world: (id: string) => `#/world/${encodeURIComponent(id)}`,
   people: () => '#/people',
   person: (id: string) => `#/person/${encodeURIComponent(id)}`,
-  photos: (q: { world?: string; person?: string; by?: 'world' | 'person' } = {}) => {
+  photos: (q: { world?: string; person?: string; album?: string; trash?: string; by?: 'world' | 'person' | 'album' } = {}) => {
     const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]).toString()
     return p ? `#/photos?${p}` : '#/photos'
   },

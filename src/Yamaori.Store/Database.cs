@@ -380,6 +380,29 @@ public sealed class Database : IDisposable
             SELECT world_id, 'saved', source, added_at FROM world_favorites WHERE source = 'yamaori' AND list_name = '保存';
         DELETE FROM world_favorites WHERE source = 'yamaori' AND list_name = '保存';
         """,
+        // 15 版目: 写真のアルバムとゴミ箱。ゴミ箱は写真の行とは別に持つ（目録を読み直しても外れない）。空にした写真は purged_at を立てて、また見つかっても出さない
+        """
+        CREATE TABLE albums (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            cover_photo_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE album_photos (
+            album_id TEXT NOT NULL,
+            photo_id TEXT NOT NULL,
+            added_at TEXT NOT NULL,
+            PRIMARY KEY (album_id, photo_id)
+        );
+        CREATE INDEX album_photos_photo ON album_photos (photo_id);
+        CREATE TABLE photo_trash (
+            photo_id TEXT PRIMARY KEY,
+            trashed_at TEXT NOT NULL,
+            purged_at TEXT                 -- ゴミ箱を空にして、ファイルを消した時刻
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

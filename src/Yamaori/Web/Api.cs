@@ -170,9 +170,44 @@ public static class Api
 
         // ---- 写真
 
-        api.MapGet("/photos", (PhotoCatalog photos, DateTime? from, DateTime? to, string? world, string? visit, string? person, int? limit, int? offset) =>
-            photos.List(Utc(from), Utc(to), world, visit, limit ?? 100, offset ?? 0, person))
+        api.MapGet("/photos", (PhotoCatalog photos, DateTime? from, DateTime? to, string? world, string? visit, string? person, string? album, bool? trash, int? limit, int? offset) =>
+            photos.List(Utc(from), Utc(to), world, visit, limit ?? 100, offset ?? 0, person, album, trash ?? false))
             .WithSummary("写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に。person を渡すと、その人が同じインスタンスにいたときの写真）");
+
+        // ---- アルバムとゴミ箱
+
+        api.MapGet("/albums", (Database db) => new PhotoAlbums(db).List()).WithSummary("写真のアルバム（新しく変えた順）");
+        api.MapPost("/albums", Results<Ok<Album>, BadRequest<string>> (Database db, AlbumInput input) =>
+            string.IsNullOrWhiteSpace(input.Name) ? TypedResults.BadRequest("名前を付ける") : TypedResults.Ok(new PhotoAlbums(db).Create(input.Name, input.Description)))
+            .WithSummary("アルバムを作る");
+        api.MapGet("/albums/{id}", Results<Ok<Album>, NotFound> (Database db, string id) =>
+            new PhotoAlbums(db).Get(id) is { } a ? TypedResults.Ok(a) : TypedResults.NotFound()).WithSummary("アルバム（写真は /api/photos?album=… で読む）");
+        api.MapPut("/albums/{id}", Results<Ok<Album>, NotFound, BadRequest<string>> (Database db, string id, AlbumInput input) =>
+            input.Name is { } n && n.Trim().Length == 0 ? TypedResults.BadRequest("名前を空にはできない")
+            : new PhotoAlbums(db).Update(id, input.Name, input.Description, input.CoverPhotoId) is { } a ? TypedResults.Ok(a) : TypedResults.NotFound())
+            .WithSummary("アルバムの名前・説明・表紙を変える（説明と表紙は空の文字で外す）");
+        api.MapDelete("/albums/{id}", Results<NoContent, NotFound> (Database db, string id) =>
+            new PhotoAlbums(db).Delete(id) ? TypedResults.NoContent() : TypedResults.NotFound()).WithSummary("アルバムを消す（写真は消さない）");
+        api.MapPost("/albums/{id}/photos", Results<Ok<CountResult>, NotFound> (Database db, string id, PhotoSelection input) =>
+        {
+            try { return TypedResults.Ok(new CountResult(new PhotoAlbums(db).Add(id, input.PhotoIds))); }
+            catch (KeyNotFoundException) { return TypedResults.NotFound(); }
+        }).WithSummary("写真をアルバムに入れる");
+        api.MapPost("/albums/{id}/photos/remove", Results<Ok<CountResult>, NotFound> (Database db, string id, PhotoSelection input) =>
+        {
+            try { return TypedResults.Ok(new CountResult(new PhotoAlbums(db).Remove(id, input.PhotoIds))); }
+            catch (KeyNotFoundException) { return TypedResults.NotFound(); }
+        }).WithSummary("写真をアルバムから外す（写真は消さない）");
+        api.MapGet("/photos/{id}/albums", (Database db, string id) => new PhotoAlbums(db).AlbumsOf(id).Select(a => new AlbumRef(a.Id, a.Name)))
+            .WithSummary("その写真が入っているアルバム");
+
+        api.MapPost("/photos/trash", (Database db, PhotoSelection input) => new CountResult(new PhotoAlbums(db).Trash(input.PhotoIds)))
+            .WithSummary("写真をゴミ箱に入れる（一覧から隠すだけ。ファイルはそのまま）");
+        api.MapPost("/photos/restore", (Database db, PhotoSelection input) => new CountResult(new PhotoAlbums(db).Restore(input.PhotoIds)))
+            .WithSummary("写真をゴミ箱から戻す");
+        api.MapGet("/photos/trash/count", (Database db) => new CountResult(new PhotoAlbums(db).TrashCount())).WithSummary("ゴミ箱の写真の数");
+        api.MapPost("/photos/trash/empty", (Database db, Thumbnails thumbs) => new PhotoAlbums(db).Empty(thumbs.Dir))
+            .WithSummary("ゴミ箱を空にする（写真のファイルを、この PC と NAS のフォルダから本当に消す。戻せない。本人だけ）");
 
         api.MapGet("/photos/by-world", (PhotoCatalog photos, int? limit) => photos.ByWorld(limit ?? 200))
             .WithSummary("ワールドごとの写真の数（多い順。表紙はいちばん新しい写真）");
@@ -219,6 +254,10 @@ public static class Api
 
     public sealed record SaveWorldInput(string? Url, string? Text, string? WorldId, string? Name, string? List);
     public sealed record SavedWorld(string WorldId, string List);
+    public sealed record AlbumInput(string? Name, string? Description, string? CoverPhotoId);
+    public sealed record AlbumRef(string Id, string Name);
+    public sealed record PhotoSelection(IReadOnlyList<string> PhotoIds);
+    public sealed record CountResult(int Count);
     public sealed record FavoriteList(string Name, int Count);
     public sealed record SyncNotesResult(int Applied);
     public sealed record ForgetInput(string? Label);

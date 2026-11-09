@@ -5,8 +5,10 @@
   import { href, router } from '../router.svelte'
   import PhotoGrid from '../components/PhotoGrid.svelte'
   import Loading from '../components/Loading.svelte'
+  import AlbumPicker from '../components/AlbumPicker.svelte'
 
   type Group = components['schemas']['PhotoGroup']
+  type Album = components['schemas']['Album']
 
   // 「#/photos?world=…」「#/photos?person=…」「#/photos?by=world」を読む
   function params() { return new URLSearchParams(location.hash.split('?')[1] ?? '') }
@@ -14,7 +16,21 @@
   $effect(() => { router.route; query = params() })
   const world = $derived(query.get('world'))
   const person = $derived(query.get('person'))
-  const by = $derived(world || person ? null : query.get('by'))
+  const album = $derived(query.get('album'))
+  const trash = $derived(query.get('trash') === '1')
+  const by = $derived(world || person || album || trash ? null : query.get('by'))
+
+  // 選んで、まとめてアルバムに入れる・ゴミ箱に入れる
+  let selecting = $state(false)
+  let selected = $state<string[]>([])
+  let picker = $state<string[] | null>(null)
+  let note = $state('')
+  let albums = $state<Album[] | null>(null)
+  let albumInfo = $state<Album | null>(null)
+  let renaming = $state('')
+  let trashTotal = $state(0)
+  let emptying = $state(false)
+  let confirmEmpty = $state(false)
 
   let items = $state<PhotoView[]>([])
   let total = $state<number | null>(null)
@@ -26,16 +42,29 @@
   async function load(reset: boolean) {
     busy = true
     try {
-      const page = await api.photos({ limit: 120, offset: reset ? 0 : items.length, world: world ?? undefined, person: person ?? undefined })
+      const page = await api.photos({ limit: 120, offset: reset ? 0 : items.length, world: world ?? undefined, person: person ?? undefined, album: album ?? undefined, trash: trash || undefined })
       items = reset ? page.items : [...items, ...page.items]
       total = page.total
     } catch (e) { error = (e as Error).message }
     busy = false
   }
+  function reload() { selected = []; load(true); refreshCounts() }
+  function refreshCounts() {
+    api.trashCount().then((c) => (trashTotal = c.count)).catch(() => {})
+    if (album) api.album(album).then((a) => { albumInfo = a; renaming = a.name }).catch(() => (albumInfo = null))
+  }
   $effect(() => {
     live.version
     error = ''
-    if (by === 'world' || by === 'person') {
+    selecting = false
+    selected = []
+    note = ''
+    confirmEmpty = false
+    refreshCounts()
+    if (by === 'album') {
+      albums = null
+      api.albums().then((a) => (albums = a)).catch((e) => (error = (e as Error).message))
+    } else if (by === 'world' || by === 'person') {
       groups = null
       ;(by === 'world' ? api.photosByWorld() : api.photosByPerson()).then((g) => (groups = g)).catch((e) => (error = (e as Error).message))
     } else {
@@ -49,6 +78,39 @@
     if (world) api.world(world).then((w) => (title = w.world.name ?? world)).catch(() => (title = world))
     else if (person) api.person(person).then((p) => (title = p.person.name ?? person)).catch(() => (title = person.replace(/^name:/, '')))
   })
+
+  async function trashSelected() {
+    const ids = selected
+    const r = trash ? await api.restorePhotos(ids) : await api.trashPhotos(ids)
+    note = trash ? `${r.count} 枚を戻しました` : `${r.count} 枚をゴミ箱に入れました（ゴミ箱から戻せます）`
+    reload()
+  }
+  async function removeFromAlbum() {
+    if (!album) return
+    const r = await api.removeFromAlbum(album, selected)
+    note = `${r.count} 枚をアルバムから外しました（写真は消していません）`
+    reload()
+  }
+  async function renameAlbum() {
+    if (!album || !renaming.trim()) return
+    albumInfo = await api.updateAlbum(album, { name: renaming.trim() })
+    note = '名前を変えました'
+  }
+  async function deleteAlbum() {
+    if (!album) return
+    await api.deleteAlbum(album)
+    location.hash = href.photos({ by: 'album' })
+  }
+  async function empty() {
+    emptying = true
+    try {
+      const r = await api.emptyTrash()
+      note = `${r.photos} 枚を消しました（ファイル ${r.files} 個）${r.failed.length ? `。消せなかったもの: ${r.failed.join('、')}` : ''}`
+      confirmEmpty = false
+      reload()
+    } catch (e) { note = (e as Error).message }
+    emptying = false
+  }
 
   const months = $derived.by(() => {
     const m = new Map<string, PhotoView[]>()
@@ -64,12 +126,34 @@
 <div class="stack">
   <h1>写真</h1>
   <nav class="tabs" aria-label="写真の分け方">
-    <a href={href.photos()} class:on={!by && !world && !person}>すべて</a>
+    <a href={href.photos()} class:on={!by && !world && !person && !album && !trash}>すべて</a>
     <a href={href.photos({ by: 'world' })} class:on={by === 'world' || !!world}>ワールドごと</a>
     <a href={href.photos({ by: 'person' })} class:on={by === 'person' || !!person}>人ごと</a>
+    <a href={href.photos({ by: 'album' })} class:on={by === 'album' || !!album}>アルバム</a>
+    <a href={href.photos({ trash: '1' })} class:on={trash}>ゴミ箱{#if trashTotal}<span class="nums count">{trashTotal}</span>{/if}</a>
   </nav>
 
-  {#if by === 'world' || by === 'person'}
+  {#if by === 'album'}
+    {#if !albums}
+      <Loading {error} />
+    {:else if albums.length === 0}
+      <p class="faint">まだアルバムがありません。写真を開いて「アルバムに入れる」か、「選ぶ」で何枚か選んで作れます。</p>
+    {:else}
+      <ul class="groups">
+        {#each albums as a (a.id)}
+          <li>
+            <a class="group card" href={href.photos({ album: a.id })}>
+              {#if a.coverPhotoId}<img src={api.thumb(a.coverPhotoId, 320)} alt="" loading="lazy" decoding="async" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />{:else}<span class="nocover"></span>{/if}
+              <span class="label">
+                <span class="name break">{a.name}</span>
+                <span class="faint nums">{a.count} 枚</span>
+              </span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  {:else if by === 'world' || by === 'person'}
     {#if !groups}
       <Loading {error} />
     {:else if groups.length === 0}
@@ -91,6 +175,30 @@
       </ul>
     {/if}
   {:else}
+    {#if album && albumInfo}
+      <div class="row filter">
+        <a href={href.photos({ by: 'album' })}>← アルバム</a>
+        <span class="faint">/</span>
+        <form class="row rename" onsubmit={(e) => { e.preventDefault(); renameAlbum() }}>
+          <input type="text" bind:value={renaming} aria-label="アルバムの名前" maxlength="200" />
+          {#if renaming.trim() && renaming.trim() !== albumInfo.name}<button type="submit">名前を変える</button>{/if}
+        </form>
+        <button class="ghost" onclick={deleteAlbum}>アルバムを消す（写真は残す）</button>
+      </div>
+    {/if}
+    {#if trash}
+      <div class="card pad stack">
+        <p>ゴミ箱の写真は、ほかの一覧には出ません。ファイルはまだ消していないので、「戻す」で戻せます。</p>
+        {#if total}
+          {#if !confirmEmpty}
+            <div><button onclick={() => (confirmEmpty = true)}>ゴミ箱を空にする…</button></div>
+          {:else}
+            <p class="warn">{total} 枚の写真のファイルを、この PC と NAS のフォルダから本当に消します。戻せません（写真の送り先に送った写しは消しません）。</p>
+            <div class="row"><button class="danger" onclick={empty} disabled={emptying}>{emptying ? '消しています…' : `${total} 枚を消す`}</button><button onclick={() => (confirmEmpty = false)}>やめる</button></div>
+          {/if}
+        {/if}
+      </div>
+    {/if}
     {#if world || person}
       <div class="row filter">
         <a href={href.photos({ by: world ? 'world' : 'person' })}>← {world ? 'ワールドごと' : '人ごと'}</a>
@@ -107,11 +215,24 @@
         {#if !world && !person}<p class="faint">VRChat の写真のフォルダ（NAS のフォルダも足せる）にある写真が、撮った時刻とワールドつきで並びます。</p>{/if}
       </div>
     {:else}
-      <p class="faint">{total} 枚</p>
+      <div class="row tools">
+        <span class="faint">{total} 枚</span>
+        {#if !selecting}
+          <button onclick={() => (selecting = true)}>選ぶ</button>
+        {:else}
+          <span class="nums">{selected.length} 枚を選んでいます</span>
+          <button onclick={() => (selected = items.map((p) => p.id))}>読んだ分を全部選ぶ</button>
+          {#if !trash}<button onclick={() => (picker = selected)} disabled={!selected.length}>アルバムに入れる</button>{/if}
+          {#if album}<button onclick={removeFromAlbum} disabled={!selected.length}>アルバムから外す</button>{/if}
+          <button onclick={trashSelected} disabled={!selected.length}>{trash ? '戻す' : 'ゴミ箱へ'}</button>
+          <button class="ghost" onclick={() => { selecting = false; selected = [] }}>選ぶのをやめる</button>
+        {/if}
+      </div>
+      {#if note}<p class="muted" role="status">{note}</p>{/if}
       {#each months as [month, list] (month)}
         <section>
           <h2 class="month">{month}</h2>
-          <PhotoGrid photos={list} showDate />
+          <PhotoGrid photos={list} showDate {selecting} bind:selected inTrash={trash} onchange={reload} />
         </section>
       {/each}
       {#if items.length < total}
@@ -120,6 +241,8 @@
     {/if}
   {/if}
 </div>
+
+{#if picker}<AlbumPicker photoIds={picker} onclose={() => (picker = null)} ondone={(m) => { note = m; selecting = false; selected = [] }} />{/if}
 
 <style>
   .month { color: var(--ink-2); font-size: .9rem; margin: .25rem 0 .5rem; }
@@ -134,4 +257,11 @@
   .group img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--line); display: block; }
   .label { display: flex; flex-direction: column; gap: .1rem; padding: .5rem .65rem .6rem; }
   .name { font-weight: 600; font-size: .9rem; line-height: 1.35; }
+  .nocover { display: block; width: 100%; aspect-ratio: 16 / 9; background: var(--line); }
+  .count { margin-left: .35rem; font-size: .75rem; }
+  .tools { gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .rename input { min-width: 0; width: 16rem; max-width: 60vw; font-weight: 600; }
+  .warn { color: var(--danger, #b3261e); margin: 0; }
+  .pad { padding: 1rem; }
+  .pad p { margin: 0; }
 </style>

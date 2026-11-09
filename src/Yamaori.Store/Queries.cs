@@ -55,7 +55,7 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         (SELECT COUNT(DISTINCT COALESCE(e.user_id, e.name)) FROM encounters e WHERE e.visit_id = v.id),
         (SELECT COUNT(*) FROM events x WHERE x.visit_id = v.id AND x.kind = 'video'),
         MAX((SELECT COUNT(*) FROM events x WHERE x.visit_id = v.id AND x.kind = 'screenshot'),
-            (SELECT COUNT(*) FROM photos ph WHERE ph.taken_at >= v.joined_at AND ph.taken_at < COALESCE(v.left_at, '9999'))),
+            (SELECT COUNT(*) FROM photos ph WHERE ph.taken_at >= v.joined_at AND ph.taken_at < COALESCE(v.left_at, '9999') AND NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = ph.id))),
         (SELECT COUNT(*) FROM notes n WHERE n.target_type = 'visit' AND n.target_id = v.id)
         """;
 
