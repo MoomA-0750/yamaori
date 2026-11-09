@@ -1,26 +1,59 @@
 # TrueNAS SCALE のアプリとして Yamaori を動かす定義。
 # TrueNAS の画面の「アプリ → アプリを見つける → ⋮ → YAML でインストール」に、名前を yamaori にして下を貼る。
+# 入れたあとに直すときは「アプリ → yamaori → 編集」で、この YAML を貼り直す。
 #
-# - 写真のフォルダ（/photos）を読み、WebUI・API を配る親になる。子の端末（Windows）から記録を受け取れる
-# - 写真の縮小を作り、写真のフォルダの .yamaori/thumbs にも置く（ThumbSidecar）。同じ写真のフォルダを見るほかの端末の Yamaori は、
-#   写真を読まずにその縮小を使う
+# - 端末のグループの「まとめ役」になる。記録を全部持ち、WebUI・API を配る。メンバーの端末（Windows）から記録を受け取る
+# - 写真のフォルダ（/photos）を読み、縮小を作って写真のフォルダの .yamaori/thumbs にも置く（ThumbSidecar）。
+#   同じ写真のフォルダを見るほかの端末の Yamaori は、写真を読まずにその縮小を使う
 # - 最初にパスワードを決める: TrueNAS の画面でこのアプリの「シェル」を開き、yamaori set-password --data-dir /data
+#
+# Tailscale（tailscale のサービス）:
+#   メンバーの端末はトークンを持ってまとめ役へ送り続けるので、まとめ役は https で開ける必要がある（http の家の中のアドレスでは入れない）。
+#   tailscale のサービスがこのアプリを tailnet に「yamaori」という名前で入れ、https://yamaori.<tailnet の名前>.ts.net で配る。
+#   - 入れ方は 2 通り。どちらも、tailnet の持ち主（本人）のアカウントで入れる（タグを付けた鍵にしない。同じアカウントの端末から「探す」で見つけるため）
+#     a. TS_AUTHKEY に鍵を入れる（Tailscale の管理画面 → Settings → Keys → Generate auth key。Reusable は要らない）
+#     b. TS_AUTHKEY を空のままにして入れ、このアプリの tailscale のコンテナの記録（ログ）に出る https://login.tailscale.com/… を開いて承認する
+#   - 一度入れば、状態は /data/tailscale に残るので、鍵は消してよい
+#   - Tailscale の管理画面で、このノードの「Disable key expiry」を入れておくと、半年ごとに入り直さなくて済む
 #
 # 直すところ（★）:
 #   - 2 つの host path を、この NAS の道にする。/data 用のフォルダは前もって作っておく
 #   - user を、写真のフォルダに書けるユーザーの uid:gid にする（id <ユーザー名> で分かる）
 services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    restart: unless-stopped
+    hostname: yamaori                      # tailnet での名前（https://yamaori.<tailnet>.ts.net になる）
+    environment:
+      TS_AUTHKEY: ""                       # ★ 鍵（a）。空なら記録に出るアドレスで承認する（b）
+      TS_HOSTNAME: yamaori
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /var/lib/tailscale/serve.json
+    # https（443）で受けて、同じコンテナの中の Yamaori（47800）へ渡す設定を書いてから起きる
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        printf '%s' '{"TCP":{"443":{"HTTPS":true}},"Web":{"$${TS_CERT_DOMAIN}:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:47800"}}}}}'
+        > /var/lib/tailscale/serve.json && exec /usr/local/bin/containerboot
+    ports:
+      - "47800:47800"                      # 家の中からも http://<NAS>:47800 で開ける（Yamaori はこのコンテナのネットワークを使う）
+    volumes:
+      - /mnt/HD/HD8/Applications/yamaori/tailscale:/var/lib/tailscale   # ★ /data のフォルダの下の tailscale
+
   yamaori:
     image: ghcr.io/mooma-0750/yamaori:latest
     restart: unless-stopped
+    network_mode: service:tailscale        # tailscale と同じネットワークにいる（serve が 127.0.0.1:47800 へ渡せるように）
+    depends_on:
+      - tailscale
     user: "1000:3000"                     # ★ 写真のフォルダに書けるユーザー（縮小を .yamaori に置くため）
-    ports:
-      - "47800:47800"
     environment:
       TZ: Asia/Tokyo                       # 日の区切りに使う
       YAMAORI_ThumbSidecar: "true"         # 作った縮小を写真のフォルダにも置く
       YAMAORI_ThumbNight: "01:00-07:00"    # 縮小を前もって作る時間帯（空なら作らない。設定の画面から「今すぐ」もできる）
-      YAMAORI_DeviceName: truenas
+    command: ["--data-dir", "/data", "--log-dir", "/nonexistent", "--Listen", "lan", "--PhotoDirs:0", "/photos", "--DeviceName", "truenas"]
     # ★ 左が NAS の道、右がコンテナの中の道。1 行目は DB・メモ・縮小・設定、2 行目は VRChat の写真
     volumes:
       - /mnt/HD/HD8/Applications/yamaori:/data
