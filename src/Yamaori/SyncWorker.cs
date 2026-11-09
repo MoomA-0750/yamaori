@@ -24,11 +24,17 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
             logger.LogWarning("親のトークンを読めない（ほかの PC かユーザーで置いたもの）。設定の「この端末の役割」でトークンを入れ直す");
         // 起きた直後はログを読み終えるのを少し待つ
         try { await Task.Delay(TimeSpan.FromSeconds(20), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
+        var warnedOldParent = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var r = await PushAsync(http, o, state, stoppingToken).ConfigureAwait(false);
+                var r = await PushAsync(http, o, state, stoppingToken, v =>
+                {
+                    if (warnedOldParent) return;
+                    warnedOldParent = true;
+                    logger.LogWarning("親の Yamaori（{Version}）がこの端末より古い。消したメモなど、新しい分は親を更新するまで送らない（親は子と同じか新しい版にする）", v);
+                }).ConfigureAwait(false);
                 if (r.Sources + r.Notes > 0) logger.LogInformation("親へ送った: 出どころ {Sources}・メモ {Notes}", r.Sources, r.Notes);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
@@ -45,7 +51,7 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
 
     public sealed record PushResult(int Sources, int Notes);
 
-    public static async Task<PushResult> PushAsync(HttpClient http, YamaoriOptions o, YamaoriState state, CancellationToken cancel)
+    public static async Task<PushResult> PushAsync(HttpClient http, YamaoriOptions o, YamaoriState state, CancellationToken cancel, Action<string>? onOldParent = null)
     {
         var parent = http.BaseAddress!.ToString();
         using var db = Database.Open(o.DatabasePath);
@@ -61,6 +67,10 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
             sync.MarkPushed(parent, source, hash);
             sources++;
         }
+        // 親が古い（やり取りの版が低い）なら、親の知らない送り方は使わずに知らせる（親は子と同じか新しい版にする）
+        var status = await http.GetFromJsonAsync<Api.Status>("api/status", Web, cancel).ConfigureAwait(false);
+        var protocol = status?.SyncProtocol ?? 0;
+        if (protocol < Api.SyncProtocol) onOldParent?.Invoke(status?.Version ?? "?");
         var pending = sync.NotesToPush(parent, state.DeviceId);
         if (pending.Count > 0)
         {
@@ -68,6 +78,17 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
             await EnsureAsync(res, cancel).ConfigureAwait(false);
             sync.MarkPushed(parent, "notes", sync.NotesMark(parent, pending));
             notes = pending.Count;
+        }
+        if (protocol >= 2)
+        {
+            var deletions = sync.DeletionsToPush(parent, state.DeviceId);
+            if (deletions.Count > 0)
+            {
+                using var res = await http.PostAsJsonAsync("api/sync/notes/deletions", deletions, Web, cancel).ConfigureAwait(false);
+                await EnsureAsync(res, cancel).ConfigureAwait(false);
+                sync.MarkPushed(parent, SyncStore.DeletionsKey, sync.DeletionsMark(parent, deletions));
+                notes += deletions.Count;
+            }
         }
         return new PushResult(sources, notes);
     }

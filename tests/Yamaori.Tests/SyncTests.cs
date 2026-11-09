@@ -89,6 +89,35 @@ public sealed class SyncTests : IDisposable
         Assert.Equal("親で直した", new Queries(parent).Note(note.Id)!.Body);
     }
 
+    [Fact]
+    public void 子で消したメモは親でも消え_消したあとに親で直したものは残す()
+    {
+        using var child = Child(out var dev);
+        using var parent = Database.Open(Path.Combine(_dir, "parent.sqlite3"));
+        var c = new SyncStore(child);
+        var q = new Queries(child);
+        var a = q.AddNote("day", "2026-11-08", "消すメモ", dev);
+        var b = q.AddNote("day", "2026-11-08", "親で直すメモ", dev);
+        new SyncStore(parent).ApplyNotes(c.NotesToPush("http://desktop/", dev));
+        Assert.Equal(2L, parent.Scalar("SELECT COUNT(*) FROM notes"));
+
+        Assert.True(q.DeleteNote(a.Id));
+        Assert.True(q.DeleteNote(b.Id));
+        using (var cmd = parent.Command("UPDATE notes SET body = '親で直した', updated_at = '2099-01-01T00:00:00Z' WHERE id = $id", null, ("$id", b.Id))) cmd.ExecuteNonQuery();
+        var deletions = c.DeletionsToPush("http://desktop/", dev);
+        Assert.Equal(2, deletions.Count);
+        // ほかの端末に結び付いたトークンからは消さない
+        Assert.Equal(0, new SyncStore(parent).ApplyNoteDeletions(deletions, onlyDevice: "d_other"));
+        Assert.Equal(1, new SyncStore(parent).ApplyNoteDeletions(deletions, onlyDevice: dev));
+        Assert.Null(new Queries(parent).Note(a.Id));
+        Assert.Equal("親で直した", new Queries(parent).Note(b.Id)!.Body);
+
+        c.MarkPushed("http://desktop/", SyncStore.DeletionsKey, c.DeletionsMark("http://desktop/", deletions));
+        Assert.Empty(c.DeletionsToPush("http://desktop/", dev));
+        // 消した印に本文は残さない
+        Assert.Equal(0L, child.Scalar("SELECT COUNT(*) FROM note_deletions WHERE id NOT IN ($a, $b)", ("$a", a.Id), ("$b", b.Id)));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

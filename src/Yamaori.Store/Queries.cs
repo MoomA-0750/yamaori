@@ -331,10 +331,19 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         return cmd.ExecuteNonQuery() == 0 ? null : Note(id);
     }
 
+    /// <summary>メモを消す。この端末で書いたメモ（取り込みでないもの）は、消した印を残す（子なら親へ送って、親でも消す）。</summary>
     public bool DeleteNote(string id)
     {
-        using var cmd = db.Command("DELETE FROM notes WHERE id = $id", null, ("$id", id));
-        return cmd.ExecuteNonQuery() > 0;
+        using var tx = db.Connection.BeginTransaction();
+        using (var mark = db.Command("""
+            INSERT INTO note_deletions (id, device_id, deleted_at) SELECT id, device_id, $now FROM notes WHERE id = $id AND source IS NULL
+            ON CONFLICT (id) DO UPDATE SET deleted_at = excluded.deleted_at
+            """, tx, ("$id", id), ("$now", Database.Time(DateTime.UtcNow))))
+            mark.ExecuteNonQuery();
+        using var cmd = db.Command("DELETE FROM notes WHERE id = $id", tx, ("$id", id));
+        var n = cmd.ExecuteNonQuery();
+        tx.Commit();
+        return n > 0;
     }
 
     /// <summary>お気に入り・保存の一覧の名前と数。</summary>

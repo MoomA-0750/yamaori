@@ -11,14 +11,15 @@ public static class Api
 {
     public sealed record NoteInput(string TargetType, string TargetId, string Body);
     public sealed record NoteUpdate(string Body);
-    public sealed record Status(string Version, string DeviceId, string DeviceName, string Listen, string TimeZone, DateTime Now);
+    /// <summary>SyncProtocol は親と子のやり取りの版（古い親は持っていないので 0 になる）。</summary>
+    public sealed record Status(string Version, string DeviceId, string DeviceName, string Listen, string TimeZone, DateTime Now, int SyncProtocol = 0);
 
     public static void Map(WebApplication app)
     {
         var api = app.MapGroup("/api");
 
         api.MapGet("/status", (Database db, YamaoriState state) =>
-            new Status(typeof(Api).Assembly.GetName().Version?.ToString() ?? "", state.DeviceId, state.DeviceName, state.Listen, TimeZoneInfo.Local.Id, DateTime.UtcNow))
+            new Status(typeof(Api).Assembly.GetName().Version?.ToString() ?? "", state.DeviceId, state.DeviceName, state.Listen, TimeZoneInfo.Local.Id, DateTime.UtcNow, SyncProtocol))
             .WithSummary("Yamaori の状態");
 
         api.MapGet("/days", (Queries q, DateOnly? from, DateOnly? to) => q.Days(from, to))
@@ -125,20 +126,20 @@ public static class Api
         api.MapPost("/sync/notes", Results<Ok<SyncNotesResult>, ProblemHttpResult> (HttpContext ctx, Database db, IReadOnlyList<SyncNote> notes) =>
             {
                 notes = notes.Where(x => x.Body.Length <= MaxNote).Take(10_000).ToList();
-                string? only = null;
-                if (Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t)
-                {
-                    // まだ端末に結び付いていなければ、メモの端末に結び付ける（記録より先にメモが来ることがある）。
-                    // 結び付かなければ断る（子は送ったことにせず、次の回に送り直す）
-                    var device = notes.Select(n => n.DeviceId).FirstOrDefault(d => d != null);
-                    var parentSelf = device != null && db.Scalar("SELECT is_self FROM devices WHERE id = $d", ("$d", device)) is long self && self != 0;
-                    if (t.DeviceId == null && device != null && !parentSelf) new AuthStore(db).BindTokenDevice(t.Id, device);
-                    only = db.Scalar("SELECT device_id FROM api_tokens WHERE id = $id", ("$id", t.Id)) as string;
-                    if (only == null) return TypedResults.Problem("このトークンは、まだ端末に結び付いていない", statusCode: StatusCodes.Status403Forbidden);
-                }
+                if (!SyncDevice(ctx, db, notes.Select(n => n.DeviceId), out var only))
+                    return TypedResults.Problem("このトークンは、まだ端末に結び付いていない", statusCode: StatusCodes.Status403Forbidden);
                 return TypedResults.Ok(new SyncNotesResult(new SyncStore(db).ApplyNotes(notes, only)));
             })
             .WithSummary("子の端末から、メモを受け取る（後から直した方を残す）");
+
+        api.MapPost("/sync/notes/deletions", Results<Ok<SyncNotesResult>, ProblemHttpResult> (HttpContext ctx, Database db, IReadOnlyList<SyncNoteDeletion> deletions) =>
+            {
+                deletions = deletions.Where(x => x.Id.Length <= 200).Take(10_000).ToList();
+                if (!SyncDevice(ctx, db, deletions.Select(n => n.DeviceId), out var only))
+                    return TypedResults.Problem("このトークンは、まだ端末に結び付いていない", statusCode: StatusCodes.Status403Forbidden);
+                return TypedResults.Ok(new SyncNotesResult(new SyncStore(db).ApplyNoteDeletions(deletions, only)));
+            })
+            .WithSummary("子の端末から、子で消したメモを受け取って消す（消したあとに親で直したものは残す）");
 
         // ---- 拡張機能から
 
@@ -219,6 +220,28 @@ public static class Api
 
     /// <summary>メモの長さの上限（文字）。</summary>
     public const int MaxNote = 100_000;
+
+    /// <summary>
+    /// 親と子のやり取りの版。足すだけの変更でも上げる（子は、親がこの版より古ければ、新しい送り方を使わずに知らせる）。
+    /// 1: 記録とメモ、2: 消したメモ
+    /// </summary>
+    public const int SyncProtocol = 2;
+
+    /// <summary>
+    /// 子の端末のトークンなら、そのトークンが結び付いた端末（まだなら、送ってきた端末に結び付ける）。結び付かなければ false。
+    /// 本人（ログイン・この PC）からなら only は null（どの端末の分でも受け取る）。
+    /// </summary>
+    static bool SyncDevice(HttpContext ctx, Database db, IEnumerable<string?> devices, out string? only)
+    {
+        only = null;
+        if (Auth.TokenOf(ctx) is not { Scope: TokenScopes.Sync } t) return true;
+        // 記録より先にメモが来ることがあるので、まだ結び付いていなければメモの端末に結び付ける（親そのものの端末には結び付けない）
+        var device = devices.FirstOrDefault(d => d != null);
+        var parentSelf = device != null && db.Scalar("SELECT is_self FROM devices WHERE id = $d", ("$d", device)) is long self && self != 0;
+        if (t.DeviceId == null && device != null && !parentSelf) new AuthStore(db).BindTokenDevice(t.Id, device);
+        only = db.Scalar("SELECT device_id FROM api_tokens WHERE id = $id", ("$id", t.Id)) as string;
+        return only != null;
+    }
 
     public sealed record FriendSnapshotInput(string? AccountId, IReadOnlyList<FriendInput>? Friends);
     public sealed record DayView(string Date, IReadOnlyList<VisitSummary> Visits, IReadOnlyList<Note> Notes);

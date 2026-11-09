@@ -363,6 +363,15 @@ public sealed class Database : IDisposable
             WHEN NEW.owner_id IN (SELECT key FROM forgotten_people)
             BEGIN UPDATE visits SET instance = replace(instance, NEW.owner_id, 'forgotten'), owner_id = NULL WHERE id = NEW.id; END;
         """,
+        // 13 版目: 消したメモの印。子で消したメモを親でも消すため（メモの本文は残さない）
+        """
+        CREATE TABLE note_deletions (
+            id TEXT PRIMARY KEY,           -- 消したメモの ID
+            device_id TEXT,                -- そのメモを書いた端末
+            deleted_at TEXT NOT NULL
+        );
+        CREATE INDEX note_deletions_at ON note_deletions (deleted_at);
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

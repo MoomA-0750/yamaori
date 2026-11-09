@@ -9,6 +9,9 @@ namespace Yamaori.Store;
 /// <summary>子から親へ送る、出どころ 1 つ分の記録（ログ 1 本など）。</summary>
 public sealed record SyncProjection(string DeviceId, string DeviceName, string Source, Projection Projection);
 
+/// <summary>子で消したメモ（親でも消す）。</summary>
+public sealed record SyncNoteDeletion(string Id, string? DeviceId, DateTime DeletedAt);
+
 /// <summary>子から親へ送るメモ。</summary>
 public sealed record SyncNote(string Id, string TargetType, string TargetId, string Body, string? DeviceId, DateTime CreatedAt, DateTime UpdatedAt);
 
@@ -90,6 +93,29 @@ public sealed class SyncStore(Database db)
             .ToList();
     }
 
+    /// <summary>この端末で書いて、この端末で消したメモのうち、前に送ってから消したもの。</summary>
+    public IReadOnlyList<SyncNoteDeletion> DeletionsToPush(string parent, string deviceId)
+    {
+        var mark = (PushedHash(parent, DeletionsKey) ?? "").Split('|', 2);
+        var since = mark[0];
+        var sent = mark.Length > 1 ? mark[1].Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet() : [];
+        return Rows("SELECT id, device_id, deleted_at FROM note_deletions WHERE device_id = $d AND deleted_at >= $since ORDER BY deleted_at",
+                r => new SyncNoteDeletion(r.GetString(0), S(r, 1), Database.ParseTime(r.GetString(2))), ("$d", deviceId), ("$since", since))
+            .Where(x => Database.Time(x.DeletedAt) != since || !sent.Contains(x.Id))
+            .ToList();
+    }
+
+    public const string DeletionsKey = "note_deletions";
+
+    public string DeletionsMark(string parent, IReadOnlyList<SyncNoteDeletion> pushed)
+    {
+        var last = Database.Time(pushed.Max(n => n.DeletedAt));
+        var ids = pushed.Where(n => Database.Time(n.DeletedAt) == last).Select(n => n.Id);
+        var prev = (PushedHash(parent, DeletionsKey) ?? "").Split('|', 2);
+        if (prev[0] == last && prev.Length > 1) ids = ids.Concat(prev[1].Split(',', StringSplitOptions.RemoveEmptyEntries));
+        return last + "|" + string.Join(",", ids.Distinct());
+    }
+
     /// <summary>送ったメモの印（最後の時刻と、その時刻のメモの ID）。前の印と同じ時刻なら、前に送った ID も残す。</summary>
     public string NotesMark(string parent, IReadOnlyList<SyncNote> pushed)
     {
@@ -136,6 +162,24 @@ public sealed class SyncStore(Database db)
             cmd.ExecuteNonQuery();
         ProjectionWriter.Replace(db, p.Source, p.Projection with { DeviceId = p.DeviceId }, tx);
         tx.Commit();
+    }
+
+    /// <summary>
+    /// 子で消したメモを消す。消したあとに親で直したメモは残す。onlyDevice を渡すと、その端末のメモだけを消す。消した数。
+    /// </summary>
+    public int ApplyNoteDeletions(IReadOnlyList<SyncNoteDeletion> deletions, string? onlyDevice = null)
+    {
+        var n = 0;
+        using var tx = db.Connection.BeginTransaction();
+        foreach (var x in deletions)
+        {
+            if (onlyDevice != null && x.DeviceId != onlyDevice) continue;
+            using var cmd = db.Command("DELETE FROM notes WHERE id = $id AND device_id IS $d AND source IS NULL AND updated_at <= $t", tx,
+                ("$id", x.Id), ("$d", x.DeviceId), ("$t", Database.Time(x.DeletedAt)));
+            n += cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+        return n;
     }
 
     /// <summary>
