@@ -353,7 +353,10 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     /// <summary>
     /// ワールドを保存の一覧に入れる（スマホの共有・ショートカット・拡張機能から）。text から wrld_… を探す。入れたワールドの ID、見つからなければ null。
     /// </summary>
-    public string? SaveWorld(string text, string? name = null, string list = "保存")
+    /// <summary>Yamaori で保存した一覧の鍵（画面では「保存」と出す）。</summary>
+    public const string SavedList = "saved";
+
+    public string? SaveWorld(string text, string? name = null, string list = SavedList)
     {
         var m = System.Text.RegularExpressions.Regex.Match(text ?? "", @"wrld_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
         if (!m.Success) return null;

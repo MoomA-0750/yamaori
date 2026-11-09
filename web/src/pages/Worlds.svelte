@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, type Page, type WorldSummary } from '../api'
-  import { localDate, day, minutes } from '../format'
+  import { localDate, day, minutes, listLabel } from '../format'
   import { href } from '../router.svelte'
   import Loading from '../components/Loading.svelte'
 
@@ -35,7 +35,7 @@
     <select bind:value={list} aria-label="どのワールドを出すか">
       <option value="">全部</option>
       <option value="*">保存・お気に入り</option>
-      {#each lists as l (l.name)}<option value={l.name}>★ {l.name}（{l.count}）</option>{/each}
+      {#each lists as l (l.name)}<option value={l.name}>★ {listLabel(l.name)}（{l.count}）</option>{/each}
     </select>
   </div>
   {#if !page}

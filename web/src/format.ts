@@ -89,3 +89,6 @@ export function safeHref(url: string | null | undefined): string | null {
     return null
   }
 }
+
+/** ワールドの一覧の名前（Yamaori で保存した一覧は鍵 saved で持ち、画面では「保存」と出す）。 */
+export const listLabel = (name: string) => (name === 'saved' ? '保存' : name)

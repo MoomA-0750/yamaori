@@ -51,8 +51,8 @@ public static class Api
             .WithSummary("お気に入り・保存の一覧の名前と数");
 
         api.MapPost("/worlds/save", Results<Ok<SavedWorld>, BadRequest<string>> (Queries queries, SaveWorldInput input) =>
-            queries.SaveWorld(string.Join(" ", new[] { input.Url, input.Text, input.WorldId }.Where(x => x != null)), input.Name, input.List ?? "保存") is { } id
-                ? TypedResults.Ok(new SavedWorld(id, input.List ?? "保存"))
+            queries.SaveWorld(string.Join(" ", new[] { input.Url, input.Text, input.WorldId }.Where(x => x != null)), input.Name, ListKey(input.List)) is { } id
+                ? TypedResults.Ok(new SavedWorld(id, ListKey(input.List)))
                 : TypedResults.BadRequest("ワールドの ID（wrld_…）が見つからない"))
             .WithSummary("ワールドを保存の一覧に入れる（スマホの共有・ショートカットから。url・text・worldId のどれかに wrld_… があればよい）");
 
@@ -220,6 +220,9 @@ public static class Api
 
     /// <summary>メモの長さの上限（文字）。</summary>
     public const int MaxNote = 100_000;
+
+    /// <summary>保存の一覧の鍵。指定がなければ saved（前の版の「保存」も saved として受ける）。</summary>
+    static string ListKey(string? list) => list is null or "" or "保存" ? Queries.SavedList : list.Trim();
 
     /// <summary>
     /// 親と子のやり取りの版。足すだけの変更でも上げる（子は、親がこの版より古ければ、新しい送り方を使わずに知らせる）。

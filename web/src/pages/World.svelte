@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, type WorldDetail } from '../api'
-  import { minutes, dateTime } from '../format'
+  import { minutes, dateTime, listLabel } from '../format'
   import { href } from '../router.svelte'
   import VisitList from '../components/VisitList.svelte'
   import Notes from '../components/Notes.svelte'
@@ -62,7 +62,7 @@
         {#if data.info.thumbnailUrl && !thumbFailed}<img class="thumb" src={data.info.thumbnailUrl} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={() => (thumbFailed = true)} />{/if}
         <div class="stack text">
           {#if data.info.authorName}<div class="muted">作者 {data.info.authorName}</div>{/if}
-          {#if data.info.favorites.length}<div class="row">{#each data.info.favorites as f (f)}<span class="chip accent">★ {f}</span>{/each}</div>{/if}
+          {#if data.info.favorites.length}<div class="row">{#each data.info.favorites as f (f)}<span class="chip accent">★ {listLabel(f)}</span>{/each}</div>{/if}
           {#if data.info.categories.length}<div class="row">{#each data.info.categories as c (c)}<span class="chip">{c}</span>{/each}</div>{/if}
           {#if data.info.platforms.length || data.info.capacity || data.info.visitsTotal}
             <div class="faint">

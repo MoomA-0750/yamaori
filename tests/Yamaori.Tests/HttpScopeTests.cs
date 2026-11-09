@@ -139,6 +139,34 @@ public sealed class HttpScopeTests
     }
 
     [Fact]
+    public async Task 保存した一覧は鍵_saved_で持ち_前の名前でも同じ一覧に入る()
+    {
+        await using var h = new HttpHost();
+        var t = Bearer(Token(h, TokenScopes.Extension));
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/worlds/save", body: """{"url":"https://vrchat.com/home/world/wrld_00000000-0000-0000-0000-00000000000a"}""", headers: t)).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/worlds/save", body: """{"url":"https://vrchat.com/home/world/wrld_00000000-0000-0000-0000-00000000000b","list":"保存"}""", headers: t)).Response.StatusCode);
+        using var db = h.OpenDb();
+        Assert.Equal(2L, db.Scalar("SELECT COUNT(*) FROM world_favorites WHERE list_name = 'saved'"));
+    }
+
+    [Fact]
+    public void 前の版で保存した一覧は_版を上げると鍵_saved_になる()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "yamaori-saved-" + Guid.NewGuid().ToString("N") + ".sqlite3");
+        Database.CreateAtVersion(path, 13);
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "INSERT INTO world_favorites (world_id, list_name, source, added_at) VALUES ('wrld_a', '保存', 'yamaori', '2026-01-01T00:00:00Z'), ('wrld_b', '保存', 'vrcx', '2026-01-01T00:00:00Z')";
+            cmd.ExecuteNonQuery();
+        }
+        using var db = Database.Open(path);
+        Assert.Equal("saved", db.Scalar("SELECT list_name FROM world_favorites WHERE world_id = 'wrld_a'"));
+        Assert.Equal("保存", db.Scalar("SELECT list_name FROM world_favorites WHERE world_id = 'wrld_b'")); // VRCX のグループの名前はそのまま
+    }
+
+    [Fact]
     public async Task トークンは範囲を選ばないと作れない()
     {
         await using var h = new HttpHost();

@@ -372,6 +372,12 @@ public sealed class Database : IDisposable
         );
         CREATE INDEX note_deletions_at ON note_deletions (deleted_at);
         """,
+        // 14 版目: Yamaori で保存した一覧の名前を、表示の言葉（保存）から決まった鍵（saved）に替える（表示は画面で付ける）
+        """
+        INSERT OR IGNORE INTO world_favorites (world_id, list_name, source, added_at)
+            SELECT world_id, 'saved', source, added_at FROM world_favorites WHERE source = 'yamaori' AND list_name = '保存';
+        DELETE FROM world_favorites WHERE source = 'yamaori' AND list_name = '保存';
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>
