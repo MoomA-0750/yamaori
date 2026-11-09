@@ -31,6 +31,7 @@
   let trashTotal = $state(0)
   let emptying = $state(false)
   let confirmEmpty = $state(false)
+  let newAlbum = $state('')
 
   let items = $state<PhotoView[]>([])
   let total = $state<number | null>(null)
@@ -134,6 +135,10 @@
   </nav>
 
   {#if by === 'album'}
+    <form class="row" onsubmit={async (e) => { e.preventDefault(); if (newAlbum.trim()) { const a = await api.createAlbum(newAlbum.trim()); newAlbum = ''; location.hash = href.photos({ album: a.id }) } }}>
+      <input type="text" bind:value={newAlbum} placeholder="新しいアルバムの名前" aria-label="新しいアルバムの名前" maxlength="200" />
+      <button type="submit" disabled={!newAlbum.trim()}>アルバムを作る</button>
+    </form>
     {#if !albums}
       <Loading {error} />
     {:else if albums.length === 0}
@@ -143,7 +148,7 @@
         {#each albums as a (a.id)}
           <li>
             <a class="group card" href={href.photos({ album: a.id })}>
-              {#if a.coverPhotoId}<img src={api.thumb(a.coverPhotoId, 320)} alt="" loading="lazy" decoding="async" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />{:else}<span class="nocover"></span>{/if}
+              {#if a.coverPhotoId}<img src={api.thumb(a.coverPhotoId, 320)} alt="" loading="lazy" decoding="async" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />{:else}<span class="nocover faint">空のアルバム</span>{/if}
               <span class="label">
                 <span class="name break">{a.name}</span>
                 <span class="faint nums">{a.count} 枚</span>
@@ -183,7 +188,7 @@
           <input type="text" bind:value={renaming} aria-label="アルバムの名前" maxlength="200" />
           {#if renaming.trim() && renaming.trim() !== albumInfo.name}<button type="submit">名前を変える</button>{/if}
         </form>
-        <button class="ghost" onclick={deleteAlbum}>アルバムを消す（写真は残す）</button>
+        <button class="danger-text" onclick={deleteAlbum}>アルバムを消す（写真は残す）</button>
       </div>
     {/if}
     {#if trash}
@@ -216,16 +221,16 @@
       </div>
     {:else}
       <div class="row tools">
-        <span class="faint">{total} 枚</span>
+        {#if !selecting}<span class="faint">{total} 枚</span>{/if}
         {#if !selecting}
           <button onclick={() => (selecting = true)}>選ぶ</button>
         {:else}
-          <span class="nums">{selected.length} 枚を選んでいます</span>
+          <span class="nums">{total} 枚のうち {selected.length} 枚を選んでいます</span>
           <button onclick={() => (selected = items.map((p) => p.id))}>読んだ分を全部選ぶ</button>
           {#if !trash}<button onclick={() => (picker = selected)} disabled={!selected.length}>アルバムに入れる</button>{/if}
           {#if album}<button onclick={removeFromAlbum} disabled={!selected.length}>アルバムから外す</button>{/if}
           <button onclick={trashSelected} disabled={!selected.length}>{trash ? '戻す' : 'ゴミ箱へ'}</button>
-          <button class="ghost" onclick={() => { selecting = false; selected = [] }}>選ぶのをやめる</button>
+          <button onclick={() => { selecting = false; selected = [] }}>選ぶのをやめる</button>
         {/if}
       </div>
       {#if note}<p class="muted" role="status">{note}</p>{/if}
@@ -257,7 +262,8 @@
   .group img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--line); display: block; }
   .label { display: flex; flex-direction: column; gap: .1rem; padding: .5rem .65rem .6rem; }
   .name { font-weight: 600; font-size: .9rem; line-height: 1.35; }
-  .nocover { display: block; width: 100%; aspect-ratio: 16 / 9; background: var(--line); }
+  .nocover { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: var(--surface-2); font-size: .8rem; }
+  .danger-text { color: var(--danger, #b3261e); }
   .count { margin-left: .35rem; font-size: .75rem; }
   .tools { gap: .5rem; flex-wrap: wrap; align-items: center; }
   .rename input { min-width: 0; width: 16rem; max-width: 60vw; font-weight: 600; }

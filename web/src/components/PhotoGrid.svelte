@@ -105,8 +105,8 @@
   .when { position: absolute; left: 0; right: 0; bottom: 0; padding: 1rem .4rem .25rem; font-size: .75rem; color: #fff; text-align: left;
     background: linear-gradient(transparent, rgb(0 0 0 / 65%)); font-variant-numeric: tabular-nums; }
   .picked { outline: 3px solid var(--accent); outline-offset: -3px; }
-  .check { position: absolute; top: .3rem; left: .3rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: rgb(255 255 255 / 85%);
-    border: 1px solid var(--line); display: grid; place-items: center; font-size: .85rem; color: var(--accent); z-index: 1; }
+  .check { position: absolute; top: .3rem; left: .3rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: rgb(255 255 255 / 90%);
+    border: 2px solid rgb(0 0 0 / 45%); display: grid; place-items: center; font-size: .85rem; color: var(--accent); z-index: 1; }
   .picked .check { background: var(--accent); color: #fff; border-color: var(--accent); }
   .note { margin: 0; padding: .4rem 1rem 0; }
   .missing { display: grid; place-items: center; height: 100%; font-size: .8rem; }
