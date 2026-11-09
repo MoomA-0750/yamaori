@@ -125,7 +125,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲: full（設定以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末）",
+        "summary": "API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲は必須: full（設定と子の端末の口以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末）",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1363,7 +1363,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AnonymousTypeOfint"
+                  "$ref": "#/components/schemas/SyncNotesResult"
                 }
               }
             }
@@ -1797,18 +1797,6 @@
               "null",
               "string"
             ]
-          }
-        }
-      },
-      "AnonymousTypeOfint": {
-        "required": [
-          "applied"
-        ],
-        "type": "object",
-        "properties": {
-          "applied": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -2737,6 +2725,12 @@
               "number"
             ],
             "format": "double"
+          },
+          "forgetHostKey": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -3181,6 +3175,18 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "SyncNotesResult": {
+        "required": [
+          "applied"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

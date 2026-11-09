@@ -109,25 +109,27 @@
   let photoMsg = $state('')
   let testMsg = $state('')
   let confirmDelete = $state(false)
+  let forgetHostKey = $state(false)
   api.photoSettings().then((p) => {
     photo = p
     photoDirs = p.photoDirs.join('\n'); kind = p.kind; target = p.target; username = p.username ?? ''
     retention = p.retention; retentionDays = p.retentionDays
   }).catch(() => {})
-  const photoInput = () => ({ photoDirs: photoDirs.split('\n').map((x) => x.trim()).filter(Boolean), kind, target, username: username || null, password: password || null, retention, retentionDays })
+  const photoInput = () => ({ photoDirs: photoDirs.split('\n').map((x) => x.trim()).filter(Boolean), kind, target, username: username || null, password: password || null, retention, retentionDays, forgetHostKey: forgetHostKey || null })
   async function savePhoto() {
     photoMsg = ''
     if (retention !== 'keep' && kind !== 'none' && !confirmDelete) { photoMsg = '手元の写真を消す設定にするには、下の確かめに印を付けてください'; return }
     try {
       photo = await api.savePhotoSettings(photoInput())
       password = ''
+      forgetHostKey = false
       photoMsg = '保存しました。起こし直すと効きます。'
       restartNeeded = true
     } catch (e) { photoMsg = (e as Error).message }
   }
   async function testTarget() {
     testMsg = 'つないでいます…'
-    try { const r = await api.testPhotoTarget(photoInput()); testMsg = r.ok ? 'つながりました' : `つながりません: ${r.message}` } catch (e) { testMsg = (e as Error).message }
+    try { const r = await api.testPhotoTarget(photoInput()); testMsg = r.ok ? (r.message === 'つながった' ? 'つながりました' : r.message) : `つながりません: ${r.message}` } catch (e) { testMsg = (e as Error).message }
   }
 
   // 端末の役割
@@ -220,13 +222,16 @@
             <option value="sftp">SFTP</option>
           </select></label>
         {#if kind !== 'none'}
-          <p class="faint">{kind === 'folder' ? 'NAS の共有（\\\\NAS\\photo\\VRChat）や、割り当てたドライブ（Z:\\VRChat）。' : kind === 'webdav' ? 'https:// で始まる WebDAV のアドレス（Synology・QNAP・Nextcloud など）。' : 'sftp://ホスト/フォルダ の形。最初につないだときの相手の鍵を覚え、鍵が変わったら送らない（相手の鍵を変えたときは、ここで保存し直す）。'}</p>
+          <p class="faint">{kind === 'folder' ? 'NAS の共有（\\\\NAS\\photo\\VRChat）や、割り当てたドライブ（Z:\\VRChat）。' : kind === 'webdav' ? 'https:// で始まる WebDAV のアドレス（Synology・QNAP・Nextcloud など）。' : 'sftp://ホスト/フォルダ の形。最初につないだときの相手の鍵を覚え、鍵が変わったら送らない。'}</p>
           <label class="stack field">送り先のアドレス<input type="text" bind:value={target} placeholder={kind === 'folder' ? '\\\\NAS\\photo\\VRChat' : kind === 'webdav' ? 'https://nas.local:5006/photo/VRChat' : 'sftp://nas.local/volume1/photo/VRChat'} /></label>
           {#if kind !== 'folder'}
             <div class="grid2">
               <label class="stack field">ユーザー名<input type="text" bind:value={username} autocomplete="off" /></label>
               <label class="stack field">パスワード{photo.passwordSet ? '（決めてあります。変えるときだけ入れる）' : ''}<input type="password" bind:value={password} autocomplete="new-password" /></label>
             </div>
+          {/if}
+          {#if kind === 'sftp'}
+            <label class="check"><input type="checkbox" bind:checked={forgetHostKey} /> 送り先の鍵を覚え直す（NAS の鍵を作り直したとき。保存すると、次につないだときの鍵を覚える）</label>
           {/if}
           <div class="row"><button onclick={testTarget}>試しにつなぐ</button><span class="faint">{testMsg}</span></div>
           <fieldset class="stack choices">
@@ -236,7 +241,7 @@
             <label class="choice"><input type="radio" bind:group={retention} value="after_upload" /><span>送ったら消す</span></label>
           </fieldset>
           {#if retention !== 'keep'}
-            <label class="check"><input type="checkbox" bind:checked={confirmDelete} /> 送り先に同じ大きさで届いたと確かめた写真だけを、この PC から消すことを分かった上で決める</label>
+            <label class="check"><input type="checkbox" bind:checked={confirmDelete} /> 送り先に中身まで同じものが届いたと確かめた写真だけを、この PC から消すことを分かった上で決める</label>
           {/if}
           <p class="faint">送り先には「年-月/ファイル名」で置きます。10 分ごとに送ります。消す前に縮小を作るので、消したあとも Yamaori で見られます。</p>
         {/if}

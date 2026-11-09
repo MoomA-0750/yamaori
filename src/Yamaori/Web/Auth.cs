@@ -322,7 +322,7 @@ public static class Auth
     public sealed record PhotoSettingsView(IReadOnlyList<string> PhotoDirs, IReadOnlyList<string> EffectivePhotoDirs, string Kind, string Target,
         string? Username, bool PasswordSet, string Retention, int RetentionDays, double IntervalMinutes);
     public sealed record PhotoSettingsInput(IReadOnlyList<string>? PhotoDirs, string? Kind, string? Target, string? Username, string? Password,
-        string? Retention, int? RetentionDays, double? IntervalMinutes);
+        string? Retention, int? RetentionDays, double? IntervalMinutes, bool? ForgetHostKey = null);
     public sealed record ConnectionTest(bool Ok, string Message);
 
     static PhotoSettingsView PhotoView(YamaoriOptions o) => new(o.PhotoDirs, o.EffectivePhotoDirs, o.PhotoUpload.Kind, o.PhotoUpload.Target,
@@ -406,9 +406,9 @@ public static class Auth
                 if (input.IntervalMinutes is { } m) up["IntervalMinutes"] = Math.Max(1, m);
                 json["PhotoUpload"] = up;
             });
-            // 送り先（種類・アドレス・ユーザー名）を変えたときだけ、SFTP の相手の鍵を忘れ、次につないだときに覚え直す。
+            // 送り先（種類・アドレス・ユーザー名）を変えたとき（と、覚え直すと選んだとき）だけ、SFTP の相手の鍵を忘れ、次につないだときに覚え直す。
             // 残す日数などを変えただけでは忘れない（覚え直す隙を作らない）
-            var targetChanged = (input.Kind != null && input.Kind != before.Kind)
+            var targetChanged = input.ForgetHostKey == true || (input.Kind != null && input.Kind != before.Kind)
                 || (input.Target != null && !string.Equals(input.Target.Trim(), before.Target.Trim(), StringComparison.Ordinal))
                 || (input.Username != null && input.Username != (before.Username ?? ""));
             if (targetChanged)
@@ -445,6 +445,8 @@ public static class Auth
                 // ないはずのファイルの大きさを訊く（つながって、答えが返るか）
                 await target.SizeAsync("yamaori-connection-test/none.png", cancel).ConfigureAwait(false);
                 if (opt.Kind == "folder" && !Directory.Exists(opt.Target)) return new ConnectionTest(false, $"フォルダが見つからない: {opt.Target}");
+                if (target is Photos.SftpTarget sftp && sftp.HostKey != null)
+                    return new ConnectionTest(true, $"つながった（相手の鍵 {sftp.HostKey}{(sftp.SeenHostKey != null ? "。初めての相手なので、NAS に出ている鍵と同じか確かめる" : "。覚えている鍵と同じ")}）");
                 return new ConnectionTest(true, "つながった");
             }
             catch (Exception ex)

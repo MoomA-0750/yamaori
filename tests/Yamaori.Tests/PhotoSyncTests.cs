@@ -155,6 +155,41 @@ public sealed class PhotoSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task 送り先に同じ名前と大きさで中身の違うファイルがあれば_もうあるとせず別の名前で送る()
+    {
+        var name = "VRChat_2026-11-08_02-38-21.263_1920x1080.png";
+        var (db, catalog, local) = Setup(name);
+        using var _ = db;
+        var nas = Path.Combine(_dir, "nas");
+        Directory.CreateDirectory(Path.Combine(nas, "2026-11"));
+        File.WriteAllBytes(Path.Combine(nas, "2026-11", name), [9, 9, 9, 9, 9]); // 同じ 5 バイトで別の中身
+        using var target = new FolderTarget(nas);
+        var r = await new PhotoSync(catalog, target, [local], null, Tokyo).RunAsync("after_upload", 30, default);
+        Assert.Equal(1, r.Uploaded);
+        Assert.Equal(0, r.AlreadyThere);
+        Assert.Equal(1, r.Removed);
+        Assert.Equal([9, 9, 9, 9, 9], File.ReadAllBytes(Path.Combine(nas, "2026-11", name))); // 前からあったものは上書きしない
+        var alt = Directory.GetFiles(Path.Combine(nas, "2026-11")).Single(f => !f.EndsWith(name, StringComparison.Ordinal));
+        Assert.Equal([1, 2, 3, 4, 5], File.ReadAllBytes(alt));
+    }
+
+    [Fact]
+    public async Task 送ったあとで送り先が同じ大きさの別の中身に替わっていたら_手元を消さない()
+    {
+        var name = "VRChat_2026-11-08_02-38-21.263_1920x1080.png";
+        var (db, catalog, local) = Setup(name);
+        using var _ = db;
+        var nas = Path.Combine(_dir, "nas");
+        using var target = new FolderTarget(nas);
+        var sync = new PhotoSync(catalog, target, [local], null, Tokyo);
+        Assert.Equal(1, (await sync.RunAsync("keep", 30, default)).Uploaded);
+        File.WriteAllBytes(Path.Combine(nas, "2026-11", name), [0, 0, 0, 0, 0]);
+        var r = await sync.RunAsync("after_upload", 30, default);
+        Assert.Equal(0, r.Removed);
+        Assert.True(File.Exists(Path.Combine(local, name)));
+    }
+
+    [Fact]
     public async Task 送り先で大きさが合わなければ記録せず消さない()
     {
         var (db, catalog, local) = Setup("VRChat_2026-11-08_02-38-21.263_1920x1080.png");
@@ -183,7 +218,7 @@ public sealed class PhotoSyncTests : IDisposable
     /// <summary>WebDAV の偽の相手（受け取ったものを覚え、HEAD で大きさを返す）。</summary>
     sealed class FakeDav(bool truncate) : HttpMessageHandler
     {
-        readonly Dictionary<string, long> _files = [];
+        readonly Dictionary<string, byte[]> _files = [];
         public List<string> Log { get; } = [];
         public List<string?> Auth { get; } = [];
 
@@ -195,16 +230,18 @@ public sealed class PhotoSyncTests : IDisposable
             if (req.Method == HttpMethod.Put)
             {
                 var body = await req.Content!.ReadAsByteArrayAsync(cancel);
-                _files[path] = truncate ? body.Length - 1 : body.Length;
+                _files[path] = truncate ? body[..^1] : body;
                 return new HttpResponseMessage(HttpStatusCode.Created);
             }
             if (req.Method == HttpMethod.Head)
             {
-                if (!_files.TryGetValue(path, out var len)) return new HttpResponseMessage(HttpStatusCode.NotFound);
+                if (!_files.TryGetValue(path, out var f)) return new HttpResponseMessage(HttpStatusCode.NotFound);
                 var res = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) };
-                res.Content.Headers.ContentLength = len;
+                res.Content.Headers.ContentLength = f.Length;
                 return res;
             }
+            if (req.Method == HttpMethod.Get)
+                return _files.TryGetValue(path, out var g) ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(g) } : new HttpResponseMessage(HttpStatusCode.NotFound);
             return new HttpResponseMessage(HttpStatusCode.Created); // MKCOL
         }
     }

@@ -14,6 +14,8 @@ public interface IPhotoTarget : IDisposable
     string? LocalPath(string remotePath);
     /// <summary>送り先に、その大きさのファイルがあるか。</summary>
     Task<long?> SizeAsync(string remotePath, CancellationToken cancel);
+    /// <summary>送り先のファイルの中身の SHA-256（なければ null）。手元を消す前に、中身まで同じかを確かめる。</summary>
+    Task<byte[]?> HashAsync(string remotePath, CancellationToken cancel);
     Task UploadAsync(string localPath, string remotePath, CancellationToken cancel);
 }
 
@@ -30,6 +32,14 @@ public sealed class FolderTarget(string root) : IPhotoTarget
     {
         var p = LocalPath(remotePath)!;
         return Task.FromResult(File.Exists(p) ? new FileInfo(p).Length : (long?)null);
+    }
+
+    public async Task<byte[]?> HashAsync(string remotePath, CancellationToken cancel)
+    {
+        var p = LocalPath(remotePath)!;
+        if (!File.Exists(p)) return null;
+        await using var f = new FileStream(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return await System.Security.Cryptography.SHA256.HashDataAsync(f, cancel).ConfigureAwait(false);
     }
 
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken cancel)
@@ -71,6 +81,15 @@ public sealed class WebDavTarget : IPhotoTarget
         return res.IsSuccessStatusCode ? res.Content.Headers.ContentLength : null;
     }
 
+    public async Task<byte[]?> HashAsync(string remotePath, CancellationToken cancel)
+    {
+        using var res = await _http.GetAsync(Url(remotePath), HttpCompletionOption.ResponseHeadersRead, cancel).ConfigureAwait(false);
+        if (res.StatusCode == HttpStatusCode.NotFound) return null;
+        res.EnsureSuccessStatusCode();
+        await using var body = await res.Content.ReadAsStreamAsync(cancel).ConfigureAwait(false);
+        return await System.Security.Cryptography.SHA256.HashDataAsync(body, cancel).ConfigureAwait(false);
+    }
+
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken cancel)
     {
         // 年月のフォルダを作る（もうあれば 405 が返るので、それは気にしない）
@@ -108,11 +127,15 @@ public sealed class SftpTarget : IPhotoTarget
         _client.HostKeyReceived += (_, e) =>
         {
             var fp = "SHA256:" + e.FingerPrintSHA256;
+            HostKey = fp;
             if (string.IsNullOrEmpty(knownHostKey)) { SeenHostKey = fp; e.CanTrust = true; }
             else if (fp == knownHostKey) e.CanTrust = true;
             else { _rejected = fp; e.CanTrust = false; }
         };
     }
+
+    /// <summary>つないだ相手の鍵（試しにつないだときに見せる）。</summary>
+    public string? HostKey { get; private set; }
 
     /// <summary>初めてつないだときに受け入れた相手の鍵（覚えておく）。</summary>
     public string? SeenHostKey { get; private set; }
@@ -126,7 +149,7 @@ public sealed class SftpTarget : IPhotoTarget
         try { _client.Connect(); }
         catch (Renci.SshNet.Common.SshException) when (_rejected != null)
         {
-            throw new TargetRefusedException($"送り先の鍵が、覚えている鍵と違う（今の鍵 {_rejected}）。送り先の鍵を変えたのなら、写真の設定を保存し直すと今の鍵を覚え直す");
+            throw new TargetRefusedException($"送り先の鍵が、覚えている鍵と違う（今の鍵 {_rejected}）。送り先の鍵を変えたのなら、写真の設定で「送り先の鍵を覚え直す」を選んで保存する");
         }
     }
 
@@ -135,6 +158,15 @@ public sealed class SftpTarget : IPhotoTarget
         Connect();
         var p = $"{_root}/{remotePath}";
         return Task.FromResult(_client.Exists(p) ? _client.GetAttributes(p).Size : (long?)null);
+    }
+
+    public async Task<byte[]?> HashAsync(string remotePath, CancellationToken cancel)
+    {
+        Connect();
+        var p = $"{_root}/{remotePath}";
+        if (!_client.Exists(p)) return null;
+        await using var f = _client.OpenRead(p);
+        return await System.Security.Cryptography.SHA256.HashDataAsync(f, cancel).ConfigureAwait(false);
     }
 
     public Task UploadAsync(string localPath, string remotePath, CancellationToken cancel)

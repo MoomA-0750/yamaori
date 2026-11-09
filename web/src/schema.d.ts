@@ -188,7 +188,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲: full（設定以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末） */
+        /** API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲は必須: full（設定と子の端末の口以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末） */
         post: {
             parameters: {
                 query?: never;
@@ -1602,7 +1602,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AnonymousTypeOfint"];
+                        "application/json": components["schemas"]["SyncNotesResult"];
                     };
                 };
             };
@@ -2013,10 +2013,6 @@ export interface components {
             };
             accountId?: null | string;
         };
-        AnonymousTypeOfint: {
-            /** Format: int32 */
-            applied: number;
-        };
         ApiToken: {
             id: string;
             name: string;
@@ -2248,6 +2244,7 @@ export interface components {
             retentionDays: null | number;
             /** Format: double */
             intervalMinutes: null | number;
+            forgetHostKey?: null | boolean;
         };
         PhotoSettingsView: {
             photoDirs: string[];
@@ -2347,6 +2344,10 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        SyncNotesResult: {
+            /** Format: int32 */
+            applied: number;
         };
         SyncProjection: {
             deviceId: string;

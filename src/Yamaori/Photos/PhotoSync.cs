@@ -5,7 +5,7 @@ namespace Yamaori.Photos;
 
 /// <summary>
 /// 写真を送り先へ送り、手元の残し方に従って消す（1 回分）。
-/// 消すのは、送り先に同じ大きさで届いたと確かめて記録した写真だけで、消す前に縮小を作っておく（消したあとも WebUI で見られる）。
+/// 消すのは、送り先に中身まで同じものが届いたと確かめた写真だけで、消す前に縮小を作っておく（消したあとも WebUI で見られる）。
 /// フォルダの送り先は、送ったファイルを目録の置き場所にも入れる（手元を消しても、もとの大きさで見られる）。
 /// </summary>
 public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOnlyList<string> localRoots, Thumbnails? thumbs, TimeZoneInfo? timeZone = null)
@@ -25,12 +25,17 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
         return dot > remote.LastIndexOf('/') ? remote[..dot] + tag + remote[dot..] : remote + tag;
     }
 
-    static bool SameContent(string a, string b)
+    static byte[] HashOf(string path)
     {
-        using var fa = File.OpenRead(a);
-        using var fb = File.OpenRead(b);
-        return System.Security.Cryptography.SHA256.HashData(fa).AsSpan().SequenceEqual(System.Security.Cryptography.SHA256.HashData(fb));
+        using var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return System.Security.Cryptography.SHA256.HashData(f);
     }
+
+    static bool SameContent(string a, string b) => HashOf(a).AsSpan().SequenceEqual(HashOf(b));
+
+    /// <summary>送り先のファイルが、手元のファイルと中身まで同じか。</summary>
+    async Task<bool> SameAsRemoteAsync(string local, string remote, CancellationToken cancel) =>
+        await target.HashAsync(remote, cancel).ConfigureAwait(false) is { } h && h.AsSpan().SequenceEqual(HashOf(local));
 
     static bool SameFile(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
@@ -45,11 +50,14 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
             try
             {
                 var there = await target.SizeAsync(remote, cancel).ConfigureAwait(false);
-                if (there != null && there != p.Size)
+                // 同じ名前で中身の違う写真が送り先にある（ほかのフォルダの同じ名前の写真、壊れたファイルなど）。上書きせず、別の名前で送る。
+                // 大きさが同じでも、中身まで比べてから「もうある」とする（違う中身を送ったことにして、手元を消さない）
+                if (there != null && (there != p.Size || !await SameAsRemoteAsync(p.Path, remote, cancel).ConfigureAwait(false)))
                 {
-                    // 同じ名前で大きさの違う写真が送り先にある（ほかのフォルダの同じ名前の写真など）。上書きせず、別の名前で送る
                     remote = AltPath(remote, p.PhotoId);
                     there = await target.SizeAsync(remote, cancel).ConfigureAwait(false);
+                    if (there != null && (there != p.Size || !await SameAsRemoteAsync(p.Path, remote, cancel).ConfigureAwait(false)))
+                        throw new IOException($"送り先の {remote} に中身の違うファイルがある（上書きしない）");
                 }
                 if (there == p.Size) already++;
                 else
@@ -96,10 +104,12 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
                     }
                     if (p.RemotePath == null) continue;
                     if (target.LocalPath(p.RemotePath) is { } same && SameFile(same, p.Path)) continue;
-                    if (await target.SizeAsync(p.RemotePath, cancel).ConfigureAwait(false) != p.Size)
+                    // 送り先に、手元と中身まで同じファイルがあることを確かめてから消す（消すことだけは戻せない）
+                    if (await target.SizeAsync(p.RemotePath, cancel).ConfigureAwait(false) != p.Size
+                        || !await SameAsRemoteAsync(p.Path, p.RemotePath, cancel).ConfigureAwait(false))
                     {
                         catalog.ForgetUpload(p.PhotoId, target.Key);
-                        log?.Invoke($"{p.FileName} が送り先で見つからないか大きさが違うので、消さずに送り直す");
+                        log?.Invoke($"{p.FileName} が送り先で見つからないか中身が違うので、消さずに送り直す");
                         continue;
                     }
                     if (thumbs != null)
