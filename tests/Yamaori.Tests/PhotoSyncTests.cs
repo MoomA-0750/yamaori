@@ -190,6 +190,19 @@ public sealed class PhotoSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task 消す途中で止まって残った写真は_次の回に元へ戻す()
+    {
+        var name = "VRChat_2026-11-08_02-38-21.263_1920x1080.png";
+        var (db, catalog, local) = Setup(name);
+        using var _ = db;
+        File.Move(Path.Combine(local, name), Path.Combine(local, name + PhotoSync.HoldSuffix));
+        using var target = new FolderTarget(Path.Combine(_dir, "nas"));
+        await new PhotoSync(catalog, target, [local], null, Tokyo).RunAsync("keep", 30, default);
+        Assert.True(File.Exists(Path.Combine(local, name)));
+        Assert.False(File.Exists(Path.Combine(local, name + PhotoSync.HoldSuffix)));
+    }
+
+    [Fact]
     public async Task 送り先で大きさが合わなければ記録せず消さない()
     {
         var (db, catalog, local) = Setup("VRChat_2026-11-08_02-38-21.263_1920x1080.png");

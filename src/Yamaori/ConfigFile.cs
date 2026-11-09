@@ -48,9 +48,14 @@ public static class ConfigFile
             if (!File.Exists(path)) return null;
             try
             {
-                if (Read(path) != null) return null;
+                // JSON として読めて、設定の形（数の項目に数が入っているかなど）にも当てはめられるか
+                if (Read(path) != null)
+                {
+                    new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(path, optional: false, reloadOnChange: false).Build().Bind(new YamaoriOptions());
+                    return null;
+                }
             }
-            catch (Exception ex) when (ex is JsonException or InvalidOperationException) { }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or InvalidDataException) { }
             var broken = $"{path}.broken-{DateTime.Now:yyyyMMdd-HHmmss}";
             File.Move(path, broken, overwrite: true);
             LastRecovered = broken;

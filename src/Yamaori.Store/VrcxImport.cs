@@ -41,7 +41,7 @@ public sealed class VrcxImport(Database db, string deviceId)
         var oldest = tables.Contains("gamelog_location") ? Rows(c, "SELECT MIN(created_at) FROM gamelog_location", r => Str(r, 0)).FirstOrDefault() : null;
         var origin = $"{string.Join(",", accounts.Order(StringComparer.Ordinal))}@{oldest}";
         ImportGuard.CheckOrigin(db, Source, origin, replace);
-        var covered = LogCoveredRanges();
+        var covered = ImportGuard.LogCoveredRanges(db, deviceId);
         var vatVisits = ImportGuard.VisitsOf(db, VatImport.Source);
         var visits = new List<Visit>();
         var encounters = new List<Encounter>();
@@ -70,7 +70,7 @@ public sealed class VrcxImport(Database db, string deviceId)
                     left = next is { } n && n - at <= MaxGap ? n : at;
                     reason = "estimated";
                 }
-                left = ImportGuard.ClipToCovered(at, left, covered);
+                left = ImportGuard.ClipToCovered(at, left, account, covered);
                 var colon = row.Location.IndexOf(':', StringComparison.Ordinal);
                 var instance = colon > 0 ? row.Location[(colon + 1)..] : "";
                 var info = InstanceInfo.Parse(instance);
@@ -240,14 +240,6 @@ public sealed class VrcxImport(Database db, string deviceId)
         return char.IsDigit(p[0]) ? "_" + p : p;
     }
 
-    List<(DateTime From, DateTime To)> LogCoveredRanges()
-    {
-        using var cmd = db.Command("SELECT started_at, ended_at FROM sessions WHERE device_id = $d AND started_at IS NOT NULL", null, ("$d", deviceId));
-        using var r = cmd.ExecuteReader();
-        var list = new List<(DateTime, DateTime)>();
-        while (r.Read()) list.Add((Database.ParseTime(r.GetString(0)), r.IsDBNull(1) ? DateTime.UtcNow : Database.ParseTime(r.GetString(1))));
-        return list;
-    }
 
     /// <summary>VRCX の時刻（JavaScript の toJSON の形、UTC）。</summary>
     static DateTime? Utc(string? s) =>

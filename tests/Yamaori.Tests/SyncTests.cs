@@ -112,6 +112,10 @@ public sealed class SyncTests : IDisposable
         Assert.Null(new Queries(parent).Note(a.Id));
         Assert.Equal("親で直した", new Queries(parent).Note(b.Id)!.Body);
 
+        // 古い子・戻した子が、消す前のメモを送り直しても入れない
+        Assert.Equal(0, new SyncStore(parent).ApplyNotes([new SyncNote(a.Id, "day", "2026-11-08", "消すメモ", dev, a.CreatedAt, a.UpdatedAt)]));
+        Assert.Null(new Queries(parent).Note(a.Id));
+
         c.MarkPushed("http://desktop/", SyncStore.DeletionsKey, c.DeletionsMark("http://desktop/", deletions));
         Assert.Empty(c.DeletionsToPush("http://desktop/", dev));
         // 消した印に本文は残さない

@@ -177,6 +177,12 @@ public sealed class SyncStore(Database db)
             using var cmd = db.Command("DELETE FROM notes WHERE id = $id AND device_id IS $d AND source IS NULL AND updated_at <= $t", tx,
                 ("$id", x.Id), ("$d", x.DeviceId), ("$t", Database.Time(x.DeletedAt)));
             n += cmd.ExecuteNonQuery();
+            // 親にも消した印を残す（古い子や戻した子が、消す前のメモを送り直しても入れない）
+            using var mark = db.Command("""
+                INSERT INTO note_deletions (id, device_id, deleted_at) VALUES ($id, $d, $t)
+                ON CONFLICT (id) DO UPDATE SET deleted_at = MAX(note_deletions.deleted_at, excluded.deleted_at)
+                """, tx, ("$id", x.Id), ("$d", x.DeviceId), ("$t", Database.Time(x.DeletedAt)));
+            mark.ExecuteNonQuery();
         }
         tx.Commit();
         return n;
@@ -193,8 +199,10 @@ public sealed class SyncStore(Database db)
         foreach (var x in notes)
         {
             if (onlyDevice != null && x.DeviceId != onlyDevice) continue;
+            // 消した印より前に書いたものなら入れない（消したメモが、古い子からの送り直しで戻らないように）
             using var cmd = db.Command("""
-                INSERT INTO notes (id, target_type, target_id, body, device_id, created_at, updated_at) VALUES ($id, $t, $i, $b, $d, $c, $u)
+                INSERT INTO notes (id, target_type, target_id, body, device_id, created_at, updated_at)
+                SELECT $id, $t, $i, $b, $d, $c, $u WHERE NOT EXISTS (SELECT 1 FROM note_deletions WHERE id = $id AND deleted_at >= $u)
                 ON CONFLICT (id) DO UPDATE SET body = $b, updated_at = $u WHERE notes.updated_at < $u AND notes.device_id IS $d
                 """, tx, ("$id", x.Id), ("$t", x.TargetType), ("$i", x.TargetId), ("$b", x.Body), ("$d", x.DeviceId),
                 ("$c", Database.Time(x.CreatedAt)), ("$u", Database.Time(x.UpdatedAt)));

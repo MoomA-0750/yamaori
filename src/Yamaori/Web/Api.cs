@@ -222,7 +222,7 @@ public static class Api
     public const int MaxNote = 100_000;
 
     /// <summary>保存の一覧の鍵。指定がなければ saved（前の版の「保存」も saved として受ける）。</summary>
-    static string ListKey(string? list) => list is null or "" or "保存" ? Queries.SavedList : list.Trim();
+    static string ListKey(string? list) => list?.Trim() is null or "" or "保存" ? Queries.SavedList : list.Trim();
 
     /// <summary>
     /// 親と子のやり取りの版。足すだけの変更でも上げる（子は、親がこの版より古ければ、新しい送り方を使わずに知らせる）。

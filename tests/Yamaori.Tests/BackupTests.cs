@@ -16,8 +16,14 @@ public sealed class BackupTests : IDisposable
         Assert.Null(BackupWorker.RunOnce(o, day.AddDays(4))); // 同じ日には取り直さない
         var files = Directory.GetFiles(o.BackupPath).Select(f => Path.GetFileName(f)!).Order().ToArray();
         Assert.Equal(["auto-20261103.sqlite3", "auto-20261104.sqlite3", "auto-20261105.sqlite3"], files);
-        using var copy = Database.Open(Path.Combine(o.BackupPath, "auto-20261105.sqlite3"));
-        Assert.Equal(1L, copy.Scalar("SELECT COUNT(*) FROM notes"));
+        using (var copy = Database.Open(Path.Combine(o.BackupPath, "auto-20261105.sqlite3")))
+            Assert.Equal(1L, copy.Scalar("SELECT COUNT(*) FROM notes"));
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        // 途中で止まって壊れた今日の写しは、取り直す
+        File.WriteAllText(Path.Combine(o.BackupPath, "auto-20261105.sqlite3"), "壊れた");
+        Assert.NotNull(BackupWorker.RunOnce(o, day.AddDays(4)));
+        using (var again = Database.Open(Path.Combine(o.BackupPath, "auto-20261105.sqlite3")))
+            Assert.Equal(1L, again.Scalar("SELECT COUNT(*) FROM notes"));
         // 手で取った写しには触らない
         File.WriteAllText(Path.Combine(o.BackupPath, "yamaori-20200101-000000.sqlite3"), "");
         BackupWorker.RunOnce(o, day.AddDays(10));

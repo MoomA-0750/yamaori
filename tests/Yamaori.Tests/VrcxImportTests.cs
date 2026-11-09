@@ -164,6 +164,19 @@ public sealed class VrcxImportTests : IDisposable
         Assert.Equal(new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), a.LeftAt);
     }
 
+    [Fact]
+    public void ログのアカウントが別なら_取り込む訪問は切らない()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        using (var cmd = db.Command("""
+            INSERT INTO sessions (device_id, log_file, started_at, ended_at, self_id) VALUES ('d_test', 'x', '2024-05-01T12:10:00Z', '2024-05-01T12:20:00Z', 'usr_someone_else')
+            """)) cmd.ExecuteNonQuery();
+        new VrcxImport(db, "d_test").Import(vrcx);
+        var a = new Queries(db, TimeZoneInfo.Utc).Visits().Items.Single(v => v.WorldId == "wrld_a");
+        Assert.Equal(new DateTime(2024, 5, 1, 12, 30, 0, DateTimeKind.Utc), a.LeftAt);
+    }
+
     static long Count(Database db, string sql) => (long)db.Scalar(sql)!;
 
     public void Dispose()

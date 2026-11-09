@@ -29,13 +29,31 @@ public sealed class BackupWorker(IOptions<YamaoriOptions> options, ILogger<Backu
         }
     }
 
+    static bool Healthy(string path)
+    {
+        try
+        {
+            using var c = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = path, Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "PRAGMA quick_check";
+            return cmd.ExecuteScalar() as string == "ok";
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException) { return false; }
+    }
+
     /// <summary>今日の写しがまだなければ取り、古い写しを消す。取ったらその道。</summary>
     public static string? RunOnce(YamaoriOptions o, DateTime now)
     {
         var dir = o.BackupPath;
         var file = Path.Combine(dir, $"auto-{now:yyyyMMdd}.sqlite3");
-        if (File.Exists(file)) return null;
-        using (var db = Database.Open(o.DatabasePath)) db.Backup(file);
+        // 今日の写しが、確かめて読めるものならそれでよい（途中で止まって壊れた写しなら取り直す）
+        if (File.Exists(file) && Healthy(file)) return null;
+        // 別の名前に取って確かめてから、今日の名前に置き換える
+        var tmp = file + ".tmp";
+        using (var db = Database.Open(o.DatabasePath)) db.Backup(tmp);
+        if (!Healthy(tmp)) { File.Delete(tmp); throw new IOException("取った写しを確かめたら壊れていた"); }
+        File.Move(tmp, file, overwrite: true);
         if (Directory.Exists(dir))
             foreach (var old in Directory.GetFiles(dir, "auto-????????.sqlite3").Order(StringComparer.Ordinal).SkipLast(Math.Max(1, o.BackupKeep)))
                 File.Delete(old);

@@ -33,7 +33,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         var origin = rows.Count == 0 ? "empty" : rows.MinBy(r => r.Id) is { } first ? $"{first.Id}@{Database.Time(first.At)}" : "empty";
         ImportGuard.CheckOrigin(db, Source, origin, replace);
         accountId ??= ImportGuard.SingleAccount(db);
-        var covered = LogCoveredRanges();
+        var covered = ImportGuard.LogCoveredRanges(db, deviceId);
         var vrcxVisits = ImportGuard.VisitsOf(db, VrcxImport.Source);
         var inDuplicate = false; // VRCX から入れた訪問と同じ訪問の中（その間の会った人・動画も入れない）
         var selfNames = SelfNames(rows);
@@ -52,7 +52,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         void Close(DateTime? nextJoin)
         {
             if (visit == null) return;
-            var left = ImportGuard.ClipToCovered(visit.JoinedAt, nextJoin is { } n && n - lastActivity <= MaxGap ? n : lastActivity, covered);
+            var left = ImportGuard.ClipToCovered(visit.JoinedAt, nextJoin is { } n && n - lastActivity <= MaxGap ? n : lastActivity, visit.AccountId, covered);
             visits.Add(visit with { LeftAt = left, LeftReason = "estimated" });
             foreach (var e in met.Values) encounters.Add(e with { LeftAt = left });
             met.Clear();
@@ -175,16 +175,6 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
             string? S(int i) => r.IsDBNull(i) || r.GetString(i).Length == 0 ? null : r.GetString(i);
             list.Add(new Row(r.GetInt64(0), r.GetInt32(1), LogProjector.ToUtc(local, _tz), S(3), S(4), S(5), S(6), S(7), S(8), S(9)));
         }
-        return list;
-    }
-
-    /// <summary>この端末のログの記録がある期間（VRChat を起こしてから閉じるまで）。</summary>
-    List<(DateTime From, DateTime To)> LogCoveredRanges()
-    {
-        using var cmd = db.Command("SELECT started_at, ended_at FROM sessions WHERE device_id = $d AND started_at IS NOT NULL", null, ("$d", deviceId));
-        using var r = cmd.ExecuteReader();
-        var list = new List<(DateTime, DateTime)>();
-        while (r.Read()) list.Add((Database.ParseTime(r.GetString(0)), r.IsDBNull(1) ? DateTime.UtcNow : Database.ParseTime(r.GetString(1))));
         return list;
     }
 

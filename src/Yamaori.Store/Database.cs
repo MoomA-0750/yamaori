@@ -354,8 +354,10 @@ public sealed class Database : IDisposable
             WHEN NEW.user_id IN (SELECT key FROM forgotten_people)
             BEGIN DELETE FROM friend_snapshots WHERE account_id = NEW.account_id AND user_id = NEW.user_id; END;
         """,
-        // 12 版目: 忘れた人は、通知の受け手（送った招待など）と、訪問したインスタンスの持ち主にも残さない
+        // 12 版目: 忘れた人は、通知の受け手（送った招待など）と、訪問したインスタンスの持ち主にも残さない（前に忘れた人の分も、ここで消す）
         """
+        DELETE FROM events WHERE json_extract(data, '$.receiver_id') IN (SELECT key FROM forgotten_people);
+        UPDATE visits SET instance = replace(instance, owner_id, 'forgotten'), owner_id = NULL WHERE owner_id IN (SELECT key FROM forgotten_people);
         CREATE TRIGGER forget_event_receivers AFTER INSERT ON events
             WHEN json_extract(NEW.data, '$.receiver_id') IN (SELECT key FROM forgotten_people)
             BEGIN DELETE FROM events WHERE id = NEW.id; END;

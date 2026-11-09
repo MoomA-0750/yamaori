@@ -44,14 +44,26 @@ public static class ImportGuard
         others[world].Any(t => (t - joined).Duration() <= TimeSpan.FromMinutes(5));
 
     /// <summary>
-    /// 取り込む訪問の出た時刻を、ログの記録がある期間の始まりで切る。入ったのはログの前で、出た時刻（推定を含む）がログの期間にかかると、
-    /// ログの訪問と同じ時間を二重に数えるため。ログの期間の中で入った訪問は、もともと取り込まない。
+    /// 取り込む訪問の出た時刻を、この端末のログの記録がある期間（VRChat を起こしていた間）の始まりで切る。
+    /// 入ったのはログの前で、出た時刻（推定を含む）がログの期間にかかると、ログの訪問と同じ時間を二重に数えるため。
+    /// 同じ端末で VRChat は 1 つしか動かないので、ログの期間が始まった時刻には、前の訪問はもう終わっている。
+    /// ただし、ログのアカウントと取り込む訪問のアカウントがどちらも分かっていて違うときは、別のものとして切らない。
     /// </summary>
-    public static DateTime ClipToCovered(DateTime joined, DateTime left, IEnumerable<(DateTime From, DateTime To)> covered)
+    public static DateTime ClipToCovered(DateTime joined, DateTime left, string? account, IEnumerable<(DateTime From, DateTime To, string? Account)> covered)
     {
-        foreach (var (from, _) in covered)
-            if (from > joined && from < left) left = from;
+        foreach (var (from, _, a) in covered)
+            if (from > joined && from < left && (a == null || account == null || a == account)) left = from;
         return left;
+    }
+
+    /// <summary>この端末のログの記録がある期間と、そのログのアカウント。</summary>
+    public static List<(DateTime From, DateTime To, string? Account)> LogCoveredRanges(Database db, string deviceId)
+    {
+        using var cmd = db.Command("SELECT started_at, ended_at, self_id FROM sessions WHERE device_id = $d AND started_at IS NOT NULL", null, ("$d", deviceId));
+        using var r = cmd.ExecuteReader();
+        var list = new List<(DateTime, DateTime, string?)>();
+        while (r.Read()) list.Add((Database.ParseTime(r.GetString(0)), r.IsDBNull(1) ? DateTime.UtcNow : Database.ParseTime(r.GetString(1)), r.IsDBNull(2) ? null : r.GetString(2)));
+        return list;
     }
 
     /// <summary>この DB で遊んだアカウントが 1 つだけならそれ（セッションの最後のアカウントだけでなく、訪問に付いたアカウントも数える）。</summary>

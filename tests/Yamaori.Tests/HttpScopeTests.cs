@@ -145,8 +145,9 @@ public sealed class HttpScopeTests
         var t = Bearer(Token(h, TokenScopes.Extension));
         Assert.Equal(200, (await h.SendAsync("POST", "/api/worlds/save", body: """{"url":"https://vrchat.com/home/world/wrld_00000000-0000-0000-0000-00000000000a"}""", headers: t)).Response.StatusCode);
         Assert.Equal(200, (await h.SendAsync("POST", "/api/worlds/save", body: """{"url":"https://vrchat.com/home/world/wrld_00000000-0000-0000-0000-00000000000b","list":"保存"}""", headers: t)).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/worlds/save", body: """{"url":"https://vrchat.com/home/world/wrld_00000000-0000-0000-0000-00000000000c","list":" 保存 "}""", headers: t)).Response.StatusCode);
         using var db = h.OpenDb();
-        Assert.Equal(2L, db.Scalar("SELECT COUNT(*) FROM world_favorites WHERE list_name = 'saved'"));
+        Assert.Equal(3L, db.Scalar("SELECT COUNT(*) FROM world_favorites WHERE list_name = 'saved'"));
     }
 
     [Fact]

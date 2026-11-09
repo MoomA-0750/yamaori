@@ -40,13 +40,13 @@ public sealed class QueryTests : IDisposable
     public void 今いる訪問も_日とワールドの時間に数える()
     {
         using var db = Database.Open(Path.Combine(_dir, "open.sqlite3"));
-        var joined = DateTime.UtcNow.AddMinutes(-90);
+        var joined = DateTime.UtcNow.AddHours(-30);
         using (var cmd = db.Command("INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, region, joined_at) VALUES ('v_open', 'x', 'd', 'wrld_open', '1', '1', 'public', 'jp', $j)", null, ("$j", Database.Time(joined))))
             cmd.ExecuteNonQuery();
         using (var cmd = db.Command("INSERT INTO worlds (id, name) VALUES ('wrld_open', 'Open')")) cmd.ExecuteNonQuery();
         var q = new Queries(db, Tokyo);
-        Assert.InRange(Assert.Single(q.Days()).Minutes, 89, 91);
-        Assert.InRange(q.Worlds().Items.Single().Minutes, 89, 91);
+        Assert.InRange(Assert.Single(q.Days()).Minutes, 1799, 1801);
+        Assert.InRange(q.Worlds().Items.Single().Minutes, 1799, 1801);
     }
 
     [Fact]

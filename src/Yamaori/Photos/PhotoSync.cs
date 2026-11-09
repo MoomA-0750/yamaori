@@ -40,8 +40,33 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
     static bool SameFile(string a, string b) =>
         string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
+    /// <summary>消す前に、手元の写真をいったん移す名前の後ろに付けるもの。</summary>
+    public const string HoldSuffix = ".yamaori-deleting";
+
+    /// <summary>消す途中で止まって残った写真を、元の名前に戻す。</summary>
+    void RestoreHeld(Action<string>? log)
+    {
+        foreach (var root in localRoots.Where(Directory.Exists))
+        {
+            IEnumerable<string> held;
+            try { held = Directory.EnumerateFiles(root, "*" + HoldSuffix, SearchOption.AllDirectories).ToList(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+            foreach (var h in held)
+            {
+                var original = h[..^HoldSuffix.Length];
+                try
+                {
+                    if (!File.Exists(original)) File.Move(h, original);
+                    log?.Invoke($"消す途中で止まった {Path.GetFileName(original)} を元に戻した");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { log?.Invoke($"{h} を元に戻せなかった: {ex.Message}"); }
+            }
+        }
+    }
+
     public async Task<Result> RunAsync(string retention, int retentionDays, CancellationToken cancel, Action<string>? log = null)
     {
+        RestoreHeld(log);
         int uploaded = 0, already = 0, failed = 0, removed = 0;
         foreach (var p in catalog.PendingUploads(localRoots, target.Key))
         {
@@ -104,17 +129,29 @@ public sealed class PhotoSync(PhotoCatalog catalog, IPhotoTarget target, IReadOn
                     }
                     if (p.RemotePath == null) continue;
                     if (target.LocalPath(p.RemotePath) is { } same && SameFile(same, p.Path)) continue;
-                    // 送り先に、手元と中身まで同じファイルがあることを確かめてから消す（消すことだけは戻せない）
-                    if (await target.SizeAsync(p.RemotePath, cancel).ConfigureAwait(false) != p.Size
-                        || !await SameAsRemoteAsync(p.Path, p.RemotePath, cancel).ConfigureAwait(false))
+                    if (await target.SizeAsync(p.RemotePath, cancel).ConfigureAwait(false) != p.Size)
                     {
                         catalog.ForgetUpload(p.PhotoId, target.Key);
-                        log?.Invoke($"{p.FileName} が送り先で見つからないか中身が違うので、消さずに送り直す");
+                        log?.Invoke($"{p.FileName} が送り先で見つからないか大きさが違うので、消さずに送り直す");
                         continue;
                     }
                     if (thumbs != null)
                         foreach (var size in new[] { 320, 1600 }) await thumbs.GetAsync(p.PhotoId, p.Path, size, cancel).ConfigureAwait(false);
-                    File.Delete(p.Path);
+                    // 消すことだけは戻せないので、手元のファイルを Yamaori だけが使う名前へ移してから（ほかのソフトが途中で書き換えられないように）、
+                    // 移したファイルと送り先の中身が同じかを確かめ、同じときだけ消す。違えば元の名前に戻して送り直す
+                    var hold = p.Path + HoldSuffix;
+                    File.Move(p.Path, hold);
+                    bool matches;
+                    try { matches = await SameAsRemoteAsync(hold, p.RemotePath, cancel).ConfigureAwait(false); }
+                    catch { File.Move(hold, p.Path); throw; }
+                    if (!matches)
+                    {
+                        File.Move(hold, p.Path);
+                        catalog.ForgetUpload(p.PhotoId, target.Key);
+                        log?.Invoke($"{p.FileName} が送り先と中身が違うので、消さずに送り直す");
+                        continue;
+                    }
+                    File.Delete(hold);
                     catalog.RemoveLocation(p.Path);
                     removed++;
                 }

@@ -163,6 +163,28 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 版_11_で前に忘れた人の_受け手の通知と持ち主の_ID_は_版を上げると消える()
+    {
+        var path = Path.Combine(_dir, "v11.sqlite3");
+        Database.CreateAtVersion(path, 11);
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO events (id, source, device_id, at, kind, data) VALUES ('ev1', 'x', 'd', '2026-01-01T00:00:00Z', 'notification', '{"receiver_id":"usr_bob"}');
+                INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, owner_id, region, joined_at)
+                    VALUES ('v1', 'x', 'd', 'wrld_x', '1~private(usr_bob)', '1', 'private', 'usr_bob', 'jp', '2026-01-01T00:00:00Z');
+                INSERT INTO forgotten_people (key, label, forgotten_at) VALUES ('usr_bob', 'Bob', '2026-01-02T00:00:00Z');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        using var db = Database.Open(path);
+        Assert.Equal(0L, db.Scalar("SELECT COUNT(*) FROM events"));
+        Assert.Equal("1~private(forgotten)", db.Scalar("SELECT instance FROM visits"));
+    }
+
+    [Fact]
     public void 忘れた人は_通知の受け手とインスタンスの持ち主にも残らない()
     {
         using var db = Database.Open(Path.Combine(_dir, "o.sqlite3"));

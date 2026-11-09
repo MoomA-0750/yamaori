@@ -8,7 +8,12 @@ permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Windows でだけ通る道（秘密の暗号化・タイムゾーンの名前・ファイルの置き換え）も試す
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     env:
       # 試験で何十も起こすので、設定のファイルの見張りを切る
       DOTNET_hostBuilder__reloadConfigOnChange: "false"
