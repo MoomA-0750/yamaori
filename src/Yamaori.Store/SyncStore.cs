@@ -102,13 +102,32 @@ public sealed class SyncStore(Database db)
 
     // ---- 親
 
-    public void Apply(SyncProjection p)
+    // 子から受け取る量の上限（ログ 1 本分としては十分に大きく、DB を膨らませるほどではない）
+    public const int MaxVisits = 20_000, MaxEncounters = 500_000, MaxEvents = 200_000, MaxText = 2_000, MaxData = 20_000;
+
+    /// <summary>受け取ってよい形か。だめなら理由（端末にトークンを結び付ける前に確かめる）。</summary>
+    public string? Check(SyncProjection p)
     {
+        if (p.DeviceId is not { Length: > 0 and <= 64 } || p.DeviceName is not { Length: <= 200 } || p.Source is not { Length: <= 600 })
+            return "端末の ID・名前・出どころが長すぎる";
         if (!p.Source.StartsWith($"log:{p.DeviceId}/", StringComparison.Ordinal))
-            throw new ArgumentException("出どころは、その端末のログ（log:<端末>/…）だけ受け取る");
+            return "出どころは、その端末のログ（log:<端末>/…）だけ受け取る";
         // 親そのものの端末の記録は、子から入れ替えさせない
         if (db.Scalar("SELECT is_self FROM devices WHERE id = $id", ("$id", p.DeviceId)) is long self && self != 0)
-            throw new ArgumentException("親そのものの端末の記録は受け取らない");
+            return "親そのものの端末の記録は受け取らない";
+        var x = p.Projection;
+        if (x.Visits.Count > MaxVisits || x.Encounters.Count > MaxEncounters || x.Events.Count > MaxEvents) return "記録の数が多すぎる";
+        static bool Long(string? s) => s is { Length: > MaxText };
+        if (x.Visits.Any(v => Long(v.Id) || Long(v.WorldId) || Long(v.WorldName) || Long(v.Instance) || Long(v.OwnerId) || Long(v.GroupId) || Long(v.AccountId))
+            || x.Encounters.Any(e => Long(e.Id) || Long(e.VisitId) || Long(e.UserId) || Long(e.Name))
+            || x.Events.Any(e => Long(e.Id) || Long(e.Kind) || Long(e.UserId) || Long(e.Name) || e.Data.Sum(d => d.Key.Length + (d.Value?.Length ?? 0)) > MaxData))
+            return "記録の文字が長すぎる";
+        return null;
+    }
+
+    public void Apply(SyncProjection p)
+    {
+        if (Check(p) is { } bad) throw new ArgumentException(bad);
         using var tx = db.Connection.BeginTransaction();
         using (var cmd = db.Command("""
             INSERT INTO devices (id, name, is_self, created_at) VALUES ($id, $n, 0, $now)

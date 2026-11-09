@@ -102,6 +102,8 @@ public static class Auth
     static string? Forbidden(PathString path, string method, ApiToken? token)
     {
         if (AdminPaths.Any(a => path.StartsWithSegments(a, StringComparison.OrdinalIgnoreCase))) return "AdminOnly";
+        // 子の端末の口は、子の端末のトークンだけ（ほかのトークンが漏れても、子の記録を空で入れ替えて消させない）
+        if (token != null && token.Scope != TokenScopes.Sync && path.StartsWithSegments("/api/sync", StringComparison.OrdinalIgnoreCase)) return "OutOfScope";
         if (token == null || token.Scope == TokenScopes.Full) return null;
         var p = path.Value ?? "";
         var ok = ScopedPaths.Any(x => x.Scope == token.Scope && string.Equals(x.Method, method, StringComparison.OrdinalIgnoreCase)
@@ -251,11 +253,12 @@ public static class Auth
         auth.MapPost("/tokens", Results<Ok<TokenCreated>, BadRequest<string>> (Database db, TokenInput input) =>
         {
             if (string.IsNullOrWhiteSpace(input.Name)) return TypedResults.BadRequest("名前を付ける");
-            var scope = input.Scope ?? TokenScopes.Full;
+            // 範囲は必ず選ぶ（黙って「全部」のトークンを作らない）
+            if (input.Scope is not { } scope) return TypedResults.BadRequest($"範囲（scope）を選ぶ: {string.Join("・", TokenScopes.All)}");
             if (!TokenScopes.All.Contains(scope)) return TypedResults.BadRequest($"範囲は {string.Join("・", TokenScopes.All)}");
             var (token, secret) = new AuthStore(db).CreateToken(input.Name.Trim(), scope);
             return TypedResults.Ok(new TokenCreated(token, secret));
-        }).WithSummary("API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲: full（設定以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末）") ;
+        }).WithSummary("API のトークンを作る（中身はこのときしか返さない。Authorization: Bearer で使う。範囲は必須: full（設定と子の端末の口以外の全部）・extension（拡張機能とスマホの保存）・sync（子の端末）") ;
 
         auth.MapDelete("/tokens/{id}", Results<NoContent, NotFound> (Database db, string id) =>
             new AuthStore(db).DeleteToken(id) ? TypedResults.NoContent() : TypedResults.NotFound())

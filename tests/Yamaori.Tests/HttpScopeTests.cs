@@ -78,8 +78,60 @@ public sealed class HttpScopeTests
 
         string self;
         using (var db = h.OpenDb()) self = (string)db.Scalar("SELECT id FROM devices WHERE is_self = 1")!;
-        var full = Bearer(Token(h, TokenScopes.Full));
-        Assert.Equal(400, (await h.SendAsync("POST", "/api/sync/projection", body: Projection(self), headers: full)).Response.StatusCode);
+        Assert.Equal(400, (await h.SendAsync("POST", "/api/sync/projection", body: Projection(self), headers: Bearer(Token(h, TokenScopes.Sync)))).Response.StatusCode);
+    }
+
+    static string OneVisit(string deviceId) => JsonSerializer.Serialize(new
+    {
+        deviceId,
+        deviceName = "laptop",
+        source = $"log:{deviceId}/output_log_2026-11-08_02-33-56.txt",
+        projection = new
+        {
+            deviceId,
+            session = (object?)null,
+            visits = new[] { new { id = "v_child1", source = $"log:{deviceId}/output_log_2026-11-08_02-33-56.txt", worldId = "wrld_00000000-0000-0000-0000-000000000009",
+                worldName = "W", instance = "1", instanceNumber = "1", access = "public", ownerId = (string?)null, groupId = (string?)null, region = "jp",
+                joinedAt = "2026-11-08T00:00:00Z", leftAt = "2026-11-08T01:00:00Z", leftReason = "left" } },
+            encounters = Array.Empty<object>(),
+            events = Array.Empty<object>(),
+        },
+    });
+
+    [Fact]
+    public async Task 子の端末のトークンでないと_子の記録を入れ替えられない()
+    {
+        await using var h = new HttpHost();
+        var child = Bearer(Token(h, TokenScopes.Sync));
+        Assert.Equal(204, (await h.SendAsync("POST", "/api/sync/projection", body: OneVisit("d_aaaaaaaaaaaaaaaa"), headers: child)).Response.StatusCode);
+        foreach (var t in new[] { Bearer(Token(h, TokenScopes.Full)), Bearer(Token(h, TokenScopes.Extension)), Bearer(Token(h, TokenScopes.Sync)) })
+        {
+            // 別の子のトークンは、先に自分の端末へ結び付けておく（全部・拡張機能のトークンはここでも断られる）
+            await h.SendAsync("POST", "/api/sync/projection", body: Projection("d_cccccccccccccccc"), headers: t);
+            Assert.Equal(403, (await h.SendAsync("POST", "/api/sync/projection", body: Projection("d_aaaaaaaaaaaaaaaa"), headers: t)).Response.StatusCode);
+            Assert.Equal(403, (await h.SendAsync("POST", "/API/Sync/projection", body: Projection("d_aaaaaaaaaaaaaaaa"), headers: t)).Response.StatusCode);
+        }
+        using var db = h.OpenDb();
+        Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM visits WHERE id = 'v_child1'"));
+    }
+
+    [Fact]
+    public async Task 断った送り方では_子の端末のトークンを結び付けない()
+    {
+        await using var h = new HttpHost();
+        var t = Bearer(Token(h, TokenScopes.Sync));
+        // 出どころの形が違う → 断る。トークンはまだどこにも結び付かない
+        var bad = Projection("d_aaaaaaaaaaaaaaaa").Replace("log:d_aaaaaaaaaaaaaaaa/", "log:d_zzzzzzzzzzzzzzzz/");
+        Assert.Equal(400, (await h.SendAsync("POST", "/api/sync/projection", body: bad, headers: t)).Response.StatusCode);
+        Assert.Equal(204, (await h.SendAsync("POST", "/api/sync/projection", body: Projection("d_bbbbbbbbbbbbbbbb"), headers: t)).Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task トークンは範囲を選ばないと作れない()
+    {
+        await using var h = new HttpHost();
+        Assert.Equal(400, (await h.SendAsync("POST", "/api/auth/tokens", loopback: true, body: """{"name":"x"}""")).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/auth/tokens", loopback: true, body: """{"name":"x","scope":"extension"}""")).Response.StatusCode);
     }
 
     [Fact]

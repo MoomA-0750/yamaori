@@ -111,10 +111,13 @@ public static class Api
 
         api.MapPost("/sync/projection", Results<NoContent, BadRequest<string>, ProblemHttpResult> (HttpContext ctx, Database db, SyncProjection input) =>
         {
-            // 子の端末のトークンは、最初に送ってきた端末に結び付け、ほかの端末の記録は入れ替えさせない
+            // 形を確かめてから（断る送り方でトークンを結び付けてしまわない）、子の端末のトークンを最初に送ってきた端末に結び付け、
+            // ほかの端末の記録は入れ替えさせない
+            var sync = new SyncStore(db);
+            if (sync.Check(input) is { } bad) return TypedResults.BadRequest(bad);
             if (Auth.TokenOf(ctx) is { Scope: TokenScopes.Sync } t && !new AuthStore(db).BindTokenDevice(t.Id, input.DeviceId))
                 return TypedResults.Problem("このトークンは、ほかの端末に結び付いている", statusCode: StatusCodes.Status403Forbidden);
-            try { new SyncStore(db).Apply(input); }
+            try { sync.Apply(input); }
             catch (ArgumentException ex) { return TypedResults.BadRequest(ex.Message); }
             return TypedResults.NoContent();
         }).WithSummary("子の端末から、出どころ 1 つ分の記録を受け取って入れ替える");

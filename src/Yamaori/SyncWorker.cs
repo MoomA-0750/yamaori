@@ -57,7 +57,7 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
             var hash = SyncStore.Hash(payload);
             if (sync.PushedHash(parent, source) == hash) continue;
             using var res = await http.PostAsJsonAsync("api/sync/projection", payload, Web, cancel).ConfigureAwait(false);
-            res.EnsureSuccessStatusCode();
+            await EnsureAsync(res, cancel).ConfigureAwait(false);
             sync.MarkPushed(parent, source, hash);
             sources++;
         }
@@ -65,11 +65,27 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
         if (pending.Count > 0)
         {
             using var res = await http.PostAsJsonAsync("api/sync/notes", pending, Web, cancel).ConfigureAwait(false);
-            res.EnsureSuccessStatusCode();
+            await EnsureAsync(res, cancel).ConfigureAwait(false);
             sync.MarkPushed(parent, "notes", sync.NotesMark(parent, pending));
             notes = pending.Count;
         }
         return new PushResult(sources, notes);
+    }
+
+    /// <summary>断られたら、理由の分かる言葉で投げる（記録のファイルに残る）。</summary>
+    static async Task EnsureAsync(HttpResponseMessage res, CancellationToken cancel)
+    {
+        if (res.IsSuccessStatusCode) return;
+        var body = "";
+        try { body = (await res.Content.ReadAsStringAsync(cancel).ConfigureAwait(false)).Trim(); } catch (HttpRequestException) { }
+        if (body.Length > 300) body = body[..300];
+        var hint = res.StatusCode switch
+        {
+            System.Net.HttpStatusCode.Unauthorized => "トークンを確かめる",
+            System.Net.HttpStatusCode.Forbidden => "親の設定で「子の端末」の範囲のトークンを作り、この端末に入れ直す",
+            _ => "",
+        };
+        throw new HttpRequestException($"親が {(int)res.StatusCode} を返した。{hint} {body}".Trim(), null, res.StatusCode);
     }
 
     static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web) { NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict };
