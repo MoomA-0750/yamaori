@@ -49,6 +49,11 @@ public sealed class YamaoriOptions
     /// <summary>子のとき、親で作ったトークン（暗号化した形）。</summary>
     public string? ParentToken { get; set; }
 
+    /// <summary>入っているグループ（メンバーの端末で。まとめ役は DB の settings に持つ）。</summary>
+    public string? GroupId { get; set; }
+
+    public string? GroupName { get; set; }
+
     /// <summary>子のとき、親へ送る間隔（分）。</summary>
     public double SyncMinutes { get; set; } = 10;
 

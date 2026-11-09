@@ -417,6 +417,25 @@ public sealed class Database : IDisposable
             written_at TEXT                      -- 写真のファイルにも書いた時刻
         );
         """,
+        // 17 版目: 端末のグループ（まとめ役が持つ）。メンバーと役、招待の合言葉（ハッシュだけ）
+        """
+        CREATE TABLE group_members (
+            device_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            url TEXT,                      -- その端末の Yamaori のアドレス（分かれば）
+            roles TEXT NOT NULL,           -- 役（, 区切り）: hub・logs・photos・vrcx
+            token_id TEXT,                 -- その端末に渡したトークン（外すときに消す）
+            joined_at TEXT NOT NULL,
+            last_seen_at TEXT
+        );
+        CREATE TABLE group_invites (
+            code_hash TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            used_by TEXT
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

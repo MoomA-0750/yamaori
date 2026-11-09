@@ -17,7 +17,7 @@ public static class Auth
     const string AccessKey = "yamaori.access";
 
     // 認証なしでも開ける口（ログインの画面を出すため）。Host と Origin の見張りはここでも効かせる
-    static readonly string[] OpenApiPaths = ["/api/auth/state", "/api/auth/login"];
+    static readonly string[] OpenApiPaths = ["/api/auth/state", "/api/auth/login", "/api/group/hello", "/api/group/accept"];
 
     public static void UseAccess(WebApplication app)
     {
@@ -97,6 +97,7 @@ public static class Auth
         (TokenScopes.Extension, "POST", "/api/friends/snapshot", false),
         (TokenScopes.Sync, "GET", "/api/status", false),
         (TokenScopes.Sync, "POST", "/api/sync/", true),
+        (TokenScopes.Sync, "GET", "/api/sync/", true),
     ];
 
     /// <summary>本人でない要求が、この口を使えないなら理由を返す。token が null なら認証なしの公開（読むだけ）で通った要求。</summary>

@@ -83,6 +83,7 @@ public static class Server
         Auth.MapSyncSettings(app);
         ThumbSettings.Map(app);
         ImportSettings.Map(app);
+        GroupApi.Map(app);
         Api.Map(app);
         app.MapMcp("/mcp");
         return app;
