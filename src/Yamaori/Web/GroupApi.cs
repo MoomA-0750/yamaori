@@ -111,6 +111,9 @@ public static class GroupApi
             return TypedResults.Ok(View(db, cur, state));
         }).WithSummary("この端末をまとめ役にして、グループを作る");
 
+        g.MapGet("/discover", (YamaoriState state, CancellationToken cancel) => GroupDiscovery.FindAsync(state.DeviceId, cancel))
+            .WithSummary("同じ Tailscale のアカウントの端末から、Yamaori を見つける（まとめ役のアドレスを選ぶため）");
+
         g.MapPost("/invite", Results<Ok<GroupInvite>, BadRequest<string>> (Database db) =>
         {
             try { return TypedResults.Ok(new GroupStore(db).Invite()); }
