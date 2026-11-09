@@ -119,6 +119,8 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
         return new Page<EventView>(List($"SELECT id, at, kind, user_id, name, data FROM events {w} ORDER BY at DESC LIMIT $limit OFFSET $offset", ReadEvent, [.. args]), total);
     }
 
+    static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
+
     /// <summary>日ごとのまとめ（新しい順）。日は timeZone で区切り、入った時刻の日に数える。</summary>
     public IReadOnlyList<DaySummary> Days(DateOnly? from = null, DateOnly? to = null)
     {
@@ -134,7 +136,9 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
             if (from is { } f && g.Key < f) continue;
             if (to is { } t && g.Key > t) continue;
             // 足してから丸める（訪問ごとに丸めると、その日のページの合計とずれる）
-            var minutes = (int)Math.Round(g.Sum(v => v.Left is { } l ? (l - v.Joined).TotalMinutes : 0));
+            // 今いる訪問（出た時刻がまだない）は、今までの時間を数える（閉じ忘れた訪問で膨らまないよう 24 時間まで）
+            var now = DateTime.UtcNow;
+            var minutes = (int)Math.Round(g.Sum(v => ((v.Left ?? Min(now, v.Joined.AddHours(24))) - v.Joined).TotalMinutes));
             var key = g.Key.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             result.Add(new DaySummary(key, g.Count(), minutes, g.Select(v => v.World).Distinct().Count(),
                 g.SelectMany(v => people[v.Id]).Distinct().Count(), dayNotes.GetValueOrDefault(key)));
@@ -156,7 +160,7 @@ public sealed class Queries(Database db, TimeZoneInfo? timeZone = null)
     const string WorldColumns = """
         w.id, w.name,
         (SELECT COUNT(*) FROM visits v WHERE v.world_id = w.id),
-        (SELECT COALESCE(SUM((julianday(v.left_at) - julianday(v.joined_at)) * 1440), 0) FROM visits v WHERE v.world_id = w.id AND v.left_at IS NOT NULL),
+        (SELECT COALESCE(SUM((julianday(COALESCE(v.left_at, MIN(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', v.joined_at, '+24 hours')))) - julianday(v.joined_at)) * 1440), 0) FROM visits v WHERE v.world_id = w.id),
         (SELECT MIN(joined_at) FROM visits v WHERE v.world_id = w.id),
         (SELECT MAX(joined_at) FROM visits v WHERE v.world_id = w.id),
         (SELECT COUNT(*) FROM notes n WHERE n.target_type = 'world' AND n.target_id = w.id)
