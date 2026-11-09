@@ -72,6 +72,14 @@ public sealed class YamaoriOptions
     public string ArchivePath => string.IsNullOrEmpty(ArchiveDir) ? Path.Combine(DataDir, "logs") : ArchiveDir;
 
     public string DatabasePath => string.IsNullOrEmpty(Database) ? Path.Combine(DataDir, "yamaori.sqlite3") : Database;
+
+    /// <summary>毎日の DB の写しを何日分残すか。0 なら取らない。</summary>
+    public int BackupKeep { get; set; } = 7;
+
+    /// <summary>毎日の DB の写しを置くフォルダ。空なら DataDir の backups（同じディスクなので、ディスクの故障には別のディスクを指す）。</summary>
+    public string? BackupDir { get; set; }
+
+    public string BackupPath => string.IsNullOrEmpty(BackupDir) ? Path.Combine(DataDir, "backups") : BackupDir;
 }
 
 /// <summary>写真を送る設定。</summary>

@@ -39,6 +39,7 @@ public static class Server
         builder.Services.AddHostedService(s => s.GetRequiredService<LogWatcher>());
         builder.Services.AddHostedService<PhotoWatcher>();
         builder.Services.AddHostedService<SyncWorker>();
+        builder.Services.AddHostedService<BackupWorker>();
         builder.Services.AddSingleton(new Thumbnails(Path.Combine(options.DataDir, "thumbs")));
         // 要求ごとに DB へつなぐ（見張りとは別の接続）
         builder.Services.AddScoped(_ => Database.Open(options.DatabasePath));
