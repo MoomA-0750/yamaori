@@ -29,23 +29,23 @@ public sealed class LogIngestor(Database db, string deviceId)
     public Result Reparse(string name, Stream stream, bool closed, TimeZoneInfo? timeZone = null)
     {
         var tz = LoadState(name)?.TimeZone is { } id ? FindTimeZone(id) : timeZone;
-        Delete(name);
         var copy = new MemoryStream();
         stream.CopyTo(copy);
         copy.Position = 0;
-        return Ingest(name, "archive:" + name, copy, closed, tz);
+        // 消すことと入れ直すことを 1 回の書き込みにする（途中で落ちても、前の記録が残る）
+        return Ingest(name, "archive:" + name, copy, closed, tz, fromStart: true);
     }
 
-    Result Ingest(string name, string path, Stream stream, bool closed, TimeZoneInfo? timeZone)
+    Result Ingest(string name, string path, Stream stream, bool closed, TimeZoneInfo? timeZone, bool fromStart = false)
     {
-        var state = LoadState(name);
+        var state = fromStart ? null : LoadState(name);
         var length = stream.Length;
         if (state != null && length == state.Length && closed == state.Closed) return new Result(name, [], false);
         var offset = state?.Offset ?? 0;
         if (length < offset)
         {
             // 同じ名前で中身が替わった（短くなった）。頭から読み直す
-            Delete(name);
+            fromStart = true;
             state = null;
             offset = 0;
         }
@@ -59,6 +59,7 @@ public sealed class LogIngestor(Database db, string deviceId)
             if (LineParser.Parse(entry) is { } e) newEvents.Add((entry.Offset, e));
 
         using var tx = db.Connection.BeginTransaction();
+        if (fromStart) Delete(name, tx);
         foreach (var (at, e) in newEvents)
         {
             using var cmd = db.Command(
@@ -120,15 +121,13 @@ public sealed class LogIngestor(Database db, string deviceId)
         return list;
     }
 
-    void Delete(string name)
+    void Delete(string name, SqliteTransaction tx)
     {
-        using var tx = db.Connection.BeginTransaction();
         foreach (var sql in new[] { "DELETE FROM log_events WHERE device_id = $dev AND log_file = $f", "DELETE FROM log_files WHERE device_id = $dev AND name = $f" })
         {
             using var cmd = db.Command(sql, tx, ("$dev", deviceId), ("$f", name));
             cmd.ExecuteNonQuery();
         }
-        tx.Commit();
     }
 
     static string Kind(LogEvent e)

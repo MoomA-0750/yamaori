@@ -11,7 +11,7 @@ public sealed class LogArchive(string dir)
 {
     public string Dir { get; } = dir;
 
-    /// <summary>1 本のログを写す。写し終えて固めたものは何もしない。</summary>
+    /// <summary>1 本のログを写す。写し終えて固めたものは、元のログが伸びていなければ何もしない。</summary>
     public void Sync(string sourcePath, bool closed)
     {
         var name = Path.GetFileName(sourcePath);
@@ -20,7 +20,16 @@ public sealed class LogArchive(string dir)
         // 写す先が元のログそのもの（ログのフォルダと残すフォルダが同じ）なら何もしない。固めるときに元を消してしまうため
         if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(plain), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             return;
-        if (File.Exists(gz)) return;
+        if (File.Exists(gz))
+        {
+            // 固めたあとで元のログが伸びた（VRChat が閉じたあとに書き足した）なら、ほどいて続きを写し、固め直す。
+            // gzip の末尾 4 バイトに、ほどいたときの長さ（の下 32 ビット）が入っている
+            if (new FileInfo(sourcePath).Length <= GzipLength(gz)) return;
+            using (var input = new GZipStream(File.OpenRead(gz), CompressionMode.Decompress))
+            using (var output = File.Create(plain))
+                input.CopyTo(output);
+            File.Delete(gz);
+        }
         Directory.CreateDirectory(Dir);
 
         using (var src = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
@@ -42,6 +51,16 @@ public sealed class LogArchive(string dir)
             }
         }
         if (closed) Compress(plain, gz);
+    }
+
+    static long GzipLength(string gz)
+    {
+        using var f = File.OpenRead(gz);
+        if (f.Length < 4) return 0;
+        f.Seek(-4, SeekOrigin.End);
+        Span<byte> b = stackalloc byte[4];
+        f.ReadExactly(b);
+        return System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(b);
     }
 
     static void Compress(string plain, string gz)

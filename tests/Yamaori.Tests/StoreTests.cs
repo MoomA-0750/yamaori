@@ -202,6 +202,49 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void 固めたあとで元のログが伸びたら_続きも写す()
+    {
+        var bytes = Fixture();
+        var archive = new LogArchive(Path.Combine(_dir, "archive"));
+        var cut = bytes.Length / 2;
+        File.WriteAllBytes(LogPath, bytes[..cut]);
+        archive.Sync(LogPath, closed: true);
+        File.WriteAllBytes(LogPath, bytes); // 閉じたと見たあとで書き足された
+        archive.Sync(LogPath, closed: true);
+        var (_, open, closed) = Assert.Single(archive.List());
+        Assert.True(closed);
+        using var s = open();
+        using var m = new MemoryStream();
+        s.CopyTo(m);
+        Assert.Equal(bytes, m.ToArray());
+        // もう伸びていなければ、何もしない
+        var gz = Path.Combine(archive.Dir, FileName + ".gz");
+        var at = File.GetLastWriteTimeUtc(gz);
+        archive.Sync(LogPath, closed: true);
+        Assert.Equal(at, File.GetLastWriteTimeUtc(gz));
+    }
+
+    [Fact]
+    public void 読み直しは_前の記録を消すことと一緒に入れる()
+    {
+        File.WriteAllBytes(LogPath, Fixture());
+        using var db = Database.Open(Path.Combine(_dir, "r.sqlite3"));
+        var ingestor = new LogIngestor(db, "d_test");
+        ingestor.Ingest(LogPath, closed: true, Tokyo);
+        var before = Visits(db);
+        // 読めない中身で読み直そうとして落ちても、前の記録は残る
+        Assert.ThrowsAny<Exception>(() => ingestor.Reparse(FileName, new ThrowingStream(), closed: true));
+        Assert.Equal(before, Visits(db));
+        Assert.True((long)db.Scalar("SELECT COUNT(*) FROM log_events")! > 0);
+    }
+
+    sealed class ThrowingStream : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) => throw new IOException("読めない");
+        public override int Read(Span<byte> buffer) => throw new IOException("読めない");
+    }
+
+    [Fact]
     public void 端末が違えば同じ名前のログでもぶつからない()
     {
         File.WriteAllBytes(LogPath, Fixture());
