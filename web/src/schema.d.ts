@@ -1613,6 +1613,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/notes/deletions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 子の端末から、子で消したメモを受け取って消す（消したあとに親で直したものは残す） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SyncNoteDeletion"][];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SyncNotesResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/worlds/{id}/details": {
         parameters: {
             query?: never;
@@ -2333,6 +2373,11 @@ export interface components {
             timeZone: string;
             /** Format: date-time */
             now: string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            syncProtocol: number;
         };
         SyncNote: {
             id: string;
@@ -2344,6 +2389,12 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        SyncNoteDeletion: {
+            id: string;
+            deviceId: null | string;
+            /** Format: date-time */
+            deletedAt: string;
         };
         SyncNotesResult: {
             /** Format: int32 */

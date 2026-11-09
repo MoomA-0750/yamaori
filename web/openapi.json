@@ -1371,6 +1371,39 @@
         }
       }
     },
+    "/api/sync/notes/deletions": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "子の端末から、子で消したメモを受け取って消す（消したあとに親で直したものは残す）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SyncNoteDeletion"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncNotesResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/worlds/{id}/details": {
       "put": {
         "tags": [
@@ -3135,6 +3168,11 @@
           "now": {
             "type": "string",
             "format": "date-time"
+          },
+          "syncProtocol": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -3173,6 +3211,29 @@
             "format": "date-time"
           },
           "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SyncNoteDeletion": {
+        "required": [
+          "id",
+          "deviceId",
+          "deletedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deletedAt": {
             "type": "string",
             "format": "date-time"
           }
