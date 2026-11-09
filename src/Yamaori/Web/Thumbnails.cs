@@ -5,28 +5,71 @@ namespace Yamaori.Web;
 /// <summary>
 /// 写真の縮小（JPEG）を作って、データのフォルダの thumbs に置いておく。大きさは決まった幾つかだけ（キャッシュを散らさない）。
 /// 8K の PNG は読むのに重いので、同時に作るのは 2 枚まで。
+/// 写真のフォルダの .yamaori/thumbs に縮小があれば（NAS の上で作ったもの。yamaori-thumbs.py か、NAS で動かした Yamaori）、
+/// 写真を読まずにそれを写して使う。writeSidecar なら、作った縮小をそこにも置く（NAS で動かした Yamaori が、ほかの端末のために作る）。
 /// </summary>
-public sealed class Thumbnails(string dir)
+public sealed class Thumbnails(string dir, IReadOnlyList<string>? photoRoots = null, bool writeSidecar = false)
 {
     public static readonly int[] Sizes = [320, 800, 1600];
+    /// <summary>写真のフォルダの中で、Yamaori が使うフォルダ（写真の目録には入れない）。</summary>
+    public const string SidecarDir = ".yamaori";
     readonly SemaphoreSlim _gate = new(2);
+    readonly IReadOnlyList<string> _roots = photoRoots ?? [];
 
     public static int Fit(int requested) => Sizes.FirstOrDefault(s => s >= requested, Sizes[^1]);
 
-    /// <summary>縮小の置き場所（なければ作る）。読めなければ null。</summary>
+    public string LocalPath(string photoId, int size) => Path.Combine(dir, photoId[..4], $"{photoId}_{Fit(size)}.jpg");
+
+    public static string SidecarPath(string root, string photoId, int size) =>
+        Path.Combine(root, SidecarDir, "thumbs", photoId[..4], $"{photoId}_{Fit(size)}.jpg");
+
+    /// <summary>縮小がもう手元にあるか（作らずに分かる）。</summary>
+    public bool Has(string photoId, int size) => File.Exists(LocalPath(photoId, size));
+
+    /// <summary>縮小の置き場所（なければ、写真のフォルダの縮小を写すか、作る）。読めなければ null。</summary>
     public async Task<string?> GetAsync(string photoId, string source, int size, CancellationToken cancel)
     {
         size = Fit(size);
-        var path = Path.Combine(dir, photoId[..4], $"{photoId}_{size}.jpg");
+        var path = LocalPath(photoId, size);
         if (File.Exists(path)) return path;
+        // NAS の上で作った縮小があれば写す（数十 KB なので、写真を読むより何十倍も速い）
+        foreach (var root in _roots)
+        {
+            var side = SidecarPath(root, photoId, size);
+            try
+            {
+                if (!File.Exists(side)) continue;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                var tmp = path + ".tmp";
+                File.Copy(side, tmp, overwrite: true);
+                File.Move(tmp, path, overwrite: true);
+                return path;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
         await _gate.WaitAsync(cancel).ConfigureAwait(false);
         try
         {
             if (File.Exists(path)) return path;
-            return await Task.Run(() => Make(source, path, size), cancel).ConfigureAwait(false);
+            var made = await Task.Run(() => Make(source, path, size), cancel).ConfigureAwait(false);
+            if (made != null && writeSidecar && RootOf(source) is { } r)
+            {
+                try
+                {
+                    var side = SidecarPath(r, photoId, size);
+                    Directory.CreateDirectory(Path.GetDirectoryName(side)!);
+                    File.Copy(made, side + ".tmp", overwrite: true);
+                    File.Move(side + ".tmp", side, overwrite: true);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+            return made;
         }
         finally { _gate.Release(); }
     }
+
+    string? RootOf(string source) =>
+        _roots.FirstOrDefault(r => source.StartsWith(Path.TrimEndingDirectorySeparator(r) + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
 
     static string? Make(string source, string path, int size)
     {

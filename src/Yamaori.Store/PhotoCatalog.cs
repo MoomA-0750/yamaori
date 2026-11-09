@@ -38,6 +38,8 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         {
             cancel.ThrowIfCancellationRequested();
             if (!PhotoMetaReader.IsPhoto(path)) continue;
+            // 写真のフォルダの中の .yamaori（NAS で作った縮小など）は写真ではない
+            if (path.Contains(Path.DirectorySeparatorChar + ".yamaori" + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
             seen++;
             present.Add(path);
             FileInfo info;
@@ -148,6 +150,19 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
     }
 
     static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+
+    /// <summary>写真の ID と置き場所の一つ（新しい順）。縮小を前もって作るため。</summary>
+    public IReadOnlyList<(string Id, string Path)> AllNewestFirst()
+    {
+        using var cmd = db.Command("""
+            SELECT p.id, (SELECT l.path FROM photo_locations l WHERE l.photo_id = p.id ORDER BY (l.device_id IS NULL), l.path LIMIT 1)
+            FROM photos p ORDER BY p.taken_at DESC
+            """);
+        using var r = cmd.ExecuteReader();
+        var list = new List<(string, string)>();
+        while (r.Read()) if (!r.IsDBNull(1)) list.Add((r.GetString(0), r.GetString(1)));
+        return list;
+    }
 
     // ---- 送る
 

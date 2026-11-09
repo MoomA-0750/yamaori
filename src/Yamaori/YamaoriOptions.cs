@@ -73,6 +73,18 @@ public sealed class YamaoriOptions
 
     public string DatabasePath => string.IsNullOrEmpty(Database) ? Path.Combine(DataDir, "yamaori.sqlite3") : Database;
 
+    /// <summary>
+    /// 作った縮小を、写真のフォルダの .yamaori/thumbs にも置く。NAS の上で Yamaori を動かすときに有効にすると、
+    /// 同じ写真のフォルダを見るほかの端末の Yamaori は、写真を読まずにその縮小を使う。
+    /// </summary>
+    public bool ThumbSidecar { get; set; }
+
+    /// <summary>縮小を前もって作る時間帯（この端末の時刻、"01:00-07:00" の形）。空なら夜には作らない（「今すぐ作る」だけ）。</summary>
+    public string ThumbNight { get; set; } = "01:00-07:00";
+
+    /// <summary>写真のある機械（NAS）の上で縮小を作る（SSH で入って yamaori-thumbs.py を動かす）。</summary>
+    public RemoteThumbOptions RemoteThumbs { get; set; } = new();
+
     /// <summary>毎日の DB の写しを何日分残すか。0 なら取らない。</summary>
     public int BackupKeep { get; set; } = 7;
 
@@ -80,6 +92,29 @@ public sealed class YamaoriOptions
     public string? BackupDir { get; set; }
 
     public string BackupPath => string.IsNullOrEmpty(BackupDir) ? Path.Combine(DataDir, "backups") : BackupDir;
+}
+
+/// <summary>写真のある機械（NAS）に SSH で入って縮小を作る設定。</summary>
+public sealed class RemoteThumbOptions
+{
+    /// <summary>NAS のアドレス（空なら使わない）。</summary>
+    public string Host { get; set; } = "";
+    public int Port { get; set; } = 22;
+    public string User { get; set; } = "";
+    /// <summary>Yamaori が作った鍵（Secrets.Protect の形の PEM）。公開鍵を NAS のユーザーに登録する。</summary>
+    public string? PrivateKey { get; set; }
+    /// <summary>その公開鍵（OpenSSH の形。NAS のユーザーの authorized_keys に貼る）。</summary>
+    public string? PublicKey { get; set; }
+    /// <summary>写真のフォルダの組（この端末から見た道 → NAS の上の道）。</summary>
+    public List<RemoteDir> Dirs { get; set; } = [];
+    /// <summary>NAS で同時に読む数。</summary>
+    public int Jobs { get; set; } = 2;
+}
+
+public sealed class RemoteDir
+{
+    public string Local { get; set; } = "";
+    public string Remote { get; set; } = "";
 }
 
 /// <summary>写真を送る設定。</summary>

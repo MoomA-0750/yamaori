@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ThumbSettings from '../components/ThumbSettings.svelte'
   import { api, ApiError, type AccountView, type ApiToken, type AuthState, type DeviceView, type SettingsView, type TokenScope } from '../api'
   import { dateTime } from '../format'
 
@@ -248,6 +249,7 @@
         <div class="row"><button class="primary" onclick={savePhoto}>保存</button>{#if restartNeeded}<button onclick={restart} disabled={restarting}>{restarting ? '起こし直しています…' : 'Yamaori を起こし直す'}</button>{/if}</div>
         {#if photoMsg}<p class="muted">{photoMsg}</p>{/if}
       </section>
+      <ThumbSettings photoDirs={photo.effectivePhotoDirs} />
     {/if}
 
     {#if sync}

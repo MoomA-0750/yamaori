@@ -626,6 +626,336 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/thumbs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 縮小を前もって作る設定と、今の様子 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbSettingsView"];
+                    };
+                };
+            };
+        };
+        /** 縮小を作る設定を変える（夜の時間帯は起こし直すと効く。NAS の設定はすぐ効く） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ThumbSettingsInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbSettingsView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** この端末で、縮小を今すぐ全部作る */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbJobView"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** この端末で縮小を作るのをやめる */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbJobView"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/remote/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** NAS に入るための鍵を作り直す（返す公開鍵を NAS のユーザーに登録する） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbMessage"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/remote/forget-host-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 覚えている NAS の鍵を忘れる（NAS を作り直したとき） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbMessage"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/remote/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** NAS に試しにつなぐ（Python と Pillow、写真のフォルダに書けるか） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbMessage"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/remote/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** NAS で縮小を今すぐ作り始める */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ThumbMessage"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/thumbs/remote/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** NAS で縮小を作っている様子 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RemoteThumbStatus"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -2325,6 +2655,38 @@ export interface components {
             encounters: components["schemas"]["Encounter"][];
             events: components["schemas"]["ActivityEvent"][];
         };
+        RemoteThumbDir: {
+            local: string;
+            remote: string;
+        };
+        RemoteThumbStatus: {
+            local: string;
+            remote: string;
+            running: boolean;
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            made: number;
+            /** Format: int32 */
+            skipped: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: date-time */
+            updated: null | string;
+            errors: string[];
+            problem: null | string;
+        };
+        RemoteThumbView: {
+            host: string;
+            /** Format: int32 */
+            port: number;
+            user: string;
+            keySet: boolean;
+            publicKey: null | string;
+            dirs: components["schemas"]["RemoteThumbDir"][];
+            /** Format: int32 */
+            jobs: number;
+        };
         SaveWorldInput: {
             url: null | string;
             text: null | string;
@@ -2420,6 +2782,43 @@ export interface components {
             parentTokenSet: boolean;
             /** Format: double */
             syncMinutes: number;
+        };
+        ThumbJobView: {
+            running: boolean;
+            mode: null | string;
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            made: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: date-time */
+            startedAt: null | string;
+            /** Format: date-time */
+            finishedAt: null | string;
+            nowRequested: boolean;
+        };
+        ThumbMessage: {
+            ok: boolean;
+            text: string;
+        };
+        ThumbSettingsInput: {
+            night: null | string;
+            host: null | string;
+            /** Format: int32 */
+            port: null | number;
+            user: null | string;
+            dirs: null | components["schemas"]["RemoteThumbDir"][];
+            /** Format: int32 */
+            jobs: null | number;
+        };
+        ThumbSettingsView: {
+            night: string;
+            sidecar: boolean;
+            remote: components["schemas"]["RemoteThumbView"];
+            job: components["schemas"]["ThumbJobView"];
         };
         TokenCreated: {
             token: components["schemas"]["ApiToken"];

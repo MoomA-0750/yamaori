@@ -40,7 +40,10 @@ public static class Server
         builder.Services.AddHostedService<PhotoWatcher>();
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<BackupWorker>();
-        builder.Services.AddSingleton(new Thumbnails(Path.Combine(options.DataDir, "thumbs")));
+        builder.Services.AddSingleton<ThumbJob>();
+        builder.Services.AddSingleton<Photos.RemoteThumbs>();
+        builder.Services.AddHostedService<ThumbWorker>();
+        builder.Services.AddSingleton(new Thumbnails(Path.Combine(options.DataDir, "thumbs"), options.EffectivePhotoDirs, options.ThumbSidecar));
         // 要求ごとに DB へつなぐ（見張りとは別の接続）
         builder.Services.AddScoped(_ => Database.Open(options.DatabasePath));
         builder.Services.AddScoped(s => new Queries(s.GetRequiredService<Database>()));
@@ -76,6 +79,7 @@ public static class Server
         Auth.Map(app);
         Auth.MapPhotoSettings(app);
         Auth.MapSyncSettings(app);
+        ThumbSettings.Map(app);
         Api.Map(app);
         app.MapMcp("/mcp");
         return app;

@@ -446,6 +446,217 @@
         }
       }
     },
+    "/api/settings/thumbs": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "縮小を前もって作る設定と、今の様子",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "縮小を作る設定を変える（夜の時間帯は起こし直すと効く。NAS の設定はすぐ効く）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThumbSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/now": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "この端末で、縮小を今すぐ全部作る",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbJobView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/stop": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "この端末で縮小を作るのをやめる",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbJobView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/remote/key": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "NAS に入るための鍵を作り直す（返す公開鍵を NAS のユーザーに登録する）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/remote/forget-host-key": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "覚えている NAS の鍵を忘れる（NAS を作り直したとき）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/remote/test": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "NAS に試しにつなぐ（Python と Pillow、写真のフォルダに書けるか）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/remote/start": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "NAS で縮小を今すぐ作り始める",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/thumbs/remote/status": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "NAS で縮小を作っている様子",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RemoteThumbStatus"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/status": {
       "get": {
         "tags": [
@@ -2947,6 +3158,125 @@
           }
         }
       },
+      "RemoteThumbDir": {
+        "required": [
+          "local",
+          "remote"
+        ],
+        "type": "object",
+        "properties": {
+          "local": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "string"
+          }
+        }
+      },
+      "RemoteThumbStatus": {
+        "required": [
+          "local",
+          "remote",
+          "running",
+          "total",
+          "made",
+          "skipped",
+          "failed",
+          "updated",
+          "errors",
+          "problem"
+        ],
+        "type": "object",
+        "properties": {
+          "local": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "made": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "problem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RemoteThumbView": {
+        "required": [
+          "host",
+          "port",
+          "user",
+          "keySet",
+          "publicKey",
+          "dirs",
+          "jobs"
+        ],
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "user": {
+            "type": "string"
+          },
+          "keySet": {
+            "type": "boolean"
+          },
+          "publicKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dirs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemoteThumbDir"
+            }
+          },
+          "jobs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "SaveWorldInput": {
         "required": [
           "url",
@@ -3340,6 +3670,156 @@
           "syncMinutes": {
             "type": "number",
             "format": "double"
+          }
+        }
+      },
+      "ThumbJobView": {
+        "required": [
+          "running",
+          "mode",
+          "total",
+          "done",
+          "made",
+          "failed",
+          "startedAt",
+          "finishedAt",
+          "nowRequested"
+        ],
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "made": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "nowRequested": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ThumbMessage": {
+        "required": [
+          "ok",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ThumbSettingsInput": {
+        "required": [
+          "night",
+          "host",
+          "port",
+          "user",
+          "dirs",
+          "jobs"
+        ],
+        "type": "object",
+        "properties": {
+          "night": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "host": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "port": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "user": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dirs": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RemoteThumbDir"
+            }
+          },
+          "jobs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ThumbSettingsView": {
+        "required": [
+          "night",
+          "sidecar",
+          "remote",
+          "job"
+        ],
+        "type": "object",
+        "properties": {
+          "night": {
+            "type": "string"
+          },
+          "sidecar": {
+            "type": "boolean"
+          },
+          "remote": {
+            "$ref": "#/components/schemas/RemoteThumbView"
+          },
+          "job": {
+            "$ref": "#/components/schemas/ThumbJobView"
           }
         }
       },

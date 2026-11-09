@@ -104,4 +104,13 @@ export const api = {
   saveSyncSettings: (s: Partial<S['SyncSettingsInput']>) => call<S['SyncSettingsView']>('PUT', '/api/settings/sync/', s),
   testParent: (s: Partial<S['SyncSettingsInput']>) => call<S['ConnectionTest']>('POST', '/api/settings/sync/test', s),
   restart: () => call<void>('POST', '/api/settings/restart'),
+  thumbSettings: () => call<S['ThumbSettingsView']>('GET', '/api/settings/thumbs/'),
+  saveThumbSettings: (s: Partial<S['ThumbSettingsInput']>) => call<S['ThumbSettingsView']>('PUT', '/api/settings/thumbs/', s),
+  thumbsNow: () => call<S['ThumbJobView']>('POST', '/api/settings/thumbs/now'),
+  thumbsStop: () => call<S['ThumbJobView']>('POST', '/api/settings/thumbs/stop'),
+  remoteThumbKey: () => call<S['ThumbMessage']>('POST', '/api/settings/thumbs/remote/key'),
+  remoteThumbForgetHostKey: () => call<S['ThumbMessage']>('POST', '/api/settings/thumbs/remote/forget-host-key'),
+  remoteThumbTest: () => call<S['ThumbMessage']>('POST', '/api/settings/thumbs/remote/test'),
+  remoteThumbStart: () => call<S['ThumbMessage']>('POST', '/api/settings/thumbs/remote/start'),
+  remoteThumbStatus: () => call<S['RemoteThumbStatus'][]>('GET', '/api/settings/thumbs/remote/status'),
 }

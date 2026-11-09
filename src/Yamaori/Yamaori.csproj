@@ -5,6 +5,11 @@
     <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- NAS の上で縮小を作るスクリプト（SSH で送る） -->
+  <ItemGroup>
+    <EmbeddedResource Include="Photos\Remote\yamaori-thumbs.py" LogicalName="Yamaori.Photos.Remote.yamaori-thumbs.py" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Yamaori.Core\Yamaori.Core.csproj" />
     <ProjectReference Include="..\Yamaori.Store\Yamaori.Store.csproj" />
