@@ -36,7 +36,7 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
                     if (warnedOldParent) return;
                     warnedOldParent = true;
                     logger.LogWarning("親の Yamaori（{Version}）がこの端末より古い。消したメモなど、新しい分は親を更新するまで送らない（親は子と同じか新しい版にする）", v);
-                }, sendLogs: roles.Has(GroupRoles.Logs)).ConfigureAwait(false);
+                }).ConfigureAwait(false);
                 if (r.Sources + r.Notes > 0) logger.LogInformation("親へ送った: 出どころ {Sources}・メモ {Notes}", r.Sources, r.Notes);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
@@ -53,6 +53,8 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
 
     public sealed record PushResult(int Sources, int Notes);
 
+    int _refused;
+
     async Task FetchRolesAsync(HttpClient http, YamaoriOptions o, CancellationToken cancel)
     {
         try
@@ -62,10 +64,19 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
             using var db = Database.Open(o.DatabasePath);
             new AuthStore(db).Set(GroupApi.RolesKey, string.Join(',', g.Roles));
             roles.Invalidate();
+            _refused = 0;
         }
         catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
-            logger.LogWarning("まとめ役に断られた（グループから外されたかもしれない）。設定の「グループ」で確かめる");
+            // 3 回続けて断られたら、外されたとみなして、この端末は全部の役に戻る（記録は手元に集め続ける）
+            if (++_refused >= 3)
+            {
+                using var db = Database.Open(o.DatabasePath);
+                new AuthStore(db).Set(GroupApi.RolesKey, null);
+                roles.Invalidate();
+            }
+            logger.LogWarning("まとめ役に断られた（グループから外されたかもしれない）。設定の「端末のグループ」で確かめる");
+            return;
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { /* 古いまとめ役（グループを知らない） */ }
     }

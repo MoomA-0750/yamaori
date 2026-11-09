@@ -63,6 +63,7 @@ public static class Server
 
         var app = builder.Build();
         if (ConfigFile.LastRecovered is { } broken) app.Logger.LogWarning("yamaori.json を読めなかったので {Broken} へ退けた。既定の設定で起きている", broken);
+        app.Services.GetRequiredService<ImportJobs>().CleanTemp();
         var hub = app.Services.GetRequiredService<LiveHub>();
         app.Services.GetRequiredService<LogWatcher>().Live += (file, e) =>
         {

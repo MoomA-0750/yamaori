@@ -26,20 +26,38 @@ public static class GroupApi
     public sealed record GroupSync(string GroupId, string GroupName, IReadOnlyList<string> Roles, IReadOnlyList<GroupMember> Members);
     public sealed record JoinResult(bool Ok, string Message, bool RestartRequired);
 
-    // 合言葉を試せる回数（全体で 10 分に 30 回）
-    static readonly Queue<DateTime> Attempts = new();
+    // 合言葉を試せる回数（接続元ごとに 10 分に 10 回、全体で 10 分に 300 回）。でたらめな合言葉を送り続けても、ほかの端末は入れる
+    static readonly Dictionary<string, Queue<DateTime>> Attempts = [];
+    static readonly Queue<DateTime> AllAttempts = new();
     static readonly Lock AttemptGate = new();
 
-    static bool AllowAttempt()
+    static bool AllowAttempt(string from)
     {
         lock (AttemptGate)
         {
             var now = DateTime.UtcNow;
-            while (Attempts.Count > 0 && now - Attempts.Peek() > TimeSpan.FromMinutes(10)) Attempts.Dequeue();
-            if (Attempts.Count >= 30) return false;
-            Attempts.Enqueue(now);
+            static void Trim(Queue<DateTime> q, DateTime now) { while (q.Count > 0 && now - q.Peek() > TimeSpan.FromMinutes(10)) q.Dequeue(); }
+            Trim(AllAttempts, now);
+            if (!Attempts.TryGetValue(from, out var q)) Attempts[from] = q = new Queue<DateTime>();
+            Trim(q, now);
+            if (q.Count >= 10 || AllAttempts.Count >= 300) return false;
+            q.Enqueue(now);
+            AllAttempts.Enqueue(now);
+            if (Attempts.Count > 1000) foreach (var k in Attempts.Where(x => x.Value.Count == 0).Select(x => x.Key).ToList()) Attempts.Remove(k);
             return true;
         }
+    }
+
+    /// <summary>
+    /// まとめ役のアドレスとして許すか。トークンを受け取って送り続けるので、https か、Tailscale の中（100.64.0.0/10・*.ts.net）か、この PC だけ。
+    /// </summary>
+    public static bool SafeHubUrl(Uri u)
+    {
+        if (u.Scheme == Uri.UriSchemeHttps) return true;
+        if (u.Scheme != Uri.UriSchemeHttp) return false;
+        if (u.IsLoopback || u.Host.EndsWith(".ts.net", StringComparison.OrdinalIgnoreCase)) return true;
+        return System.Net.IPAddress.TryParse(u.Host, out var ip) && ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+            && ip.GetAddressBytes() is [100, var b, _, _] && b is >= 64 and <= 127;
     }
 
     public const string RolesKey = "group_roles";
@@ -81,11 +99,11 @@ public static class GroupApi
             return new Hello("yamaori", typeof(GroupApi).Assembly.GetName().Version?.ToString() ?? "", state.DeviceId, state.DeviceName, info?.Id, info?.Name, info != null);
         }).WithSummary("Yamaori の挨拶（同じ tailnet の Yamaori を見つけるため。認証なし）");
 
-        app.MapPost("/api/group/accept", Results<Ok<GroupJoined>, ProblemHttpResult> (Database db, YamaoriState state, AcceptInput input) =>
+        app.MapPost("/api/group/accept", Results<Ok<GroupJoined>, ProblemHttpResult> (HttpContext ctx, Database db, YamaoriState state, AcceptInput input) =>
         {
-            if (!AllowAttempt()) return TypedResults.Problem("合言葉を試す回数が多すぎる。少し待つ", statusCode: StatusCodes.Status429TooManyRequests);
+            if (!AllowAttempt(ctx.Connection.RemoteIpAddress?.ToString() ?? "?")) return TypedResults.Problem("合言葉を試す回数が多すぎる。少し待つ", statusCode: StatusCodes.Status429TooManyRequests);
             var joined = new GroupStore(db).Accept(input.Code ?? "", input.DeviceId ?? "", input.DeviceName ?? "", input.Url, state.DeviceId);
-            return joined != null ? TypedResults.Ok(joined) : TypedResults.Problem("合言葉が違うか、使い終わったか、時間が切れた", statusCode: StatusCodes.Status403Forbidden);
+            return joined != null ? TypedResults.Ok(joined) : TypedResults.Problem("合言葉が違うか、使い終わったか、時間が切れた（もう入っている端末は、まとめ役で外してから入り直す）", statusCode: StatusCodes.Status403Forbidden);
         }).WithSummary("招待の合言葉で、端末をグループに入れる（まとめ役で。認証なし）");
 
         // ---- メンバーのトークンで
@@ -131,8 +149,11 @@ public static class GroupApi
         g.MapPost("/join", async Task<Results<Ok<JoinResult>, BadRequest<string>>> (Database db, IOptions<YamaoriOptions> o, YamaoriState state, JoinInput input, CancellationToken cancel) =>
         {
             if (new GroupStore(db).IsHub) return TypedResults.BadRequest("この端末はまとめ役（ほかのグループには入れない）");
+            var cur = Current(o);
+            if (cur.Role == "child") return TypedResults.BadRequest("もうグループ（か前の形の親）につながっている。先に抜ける");
             if (!(Uri.TryCreate(input.HubUrl?.Trim(), UriKind.Absolute, out var hub) && (hub.Scheme == Uri.UriSchemeHttp || hub.Scheme == Uri.UriSchemeHttps)))
-                return TypedResults.BadRequest("まとめ役のアドレスは http://… か https://…");
+                return TypedResults.BadRequest("まとめ役のアドレスは https://… か http://…");
+            if (!SafeHubUrl(hub)) return TypedResults.BadRequest("まとめ役のアドレスは https://… か Tailscale のアドレス（*.ts.net・100.x.x.x）にする（トークンを平文で送らないため）");
             using var http = new HttpClient { BaseAddress = new Uri(hub.ToString().TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(20) };
             GroupJoined? joined;
             try
@@ -165,7 +186,7 @@ public static class GroupApi
                 json.Remove("GroupName");
             });
             new AuthStore(db).Set(RolesKey, null);
-            return new JoinResult(true, "グループから抜けた（手元の記録は残す）。起こし直すと送るのをやめる", true);
+            return new JoinResult(true, "グループから抜けた（手元の記録は残す）。起こし直すと送るのをやめる。まとめ役の画面でも、この端末を外しておく（渡したトークンが消える）", true);
         }).WithSummary("グループから抜ける（まとめ役で外すのとは別に、この端末の設定を消す）");
     }
 }

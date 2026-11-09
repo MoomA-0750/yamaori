@@ -33,14 +33,63 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
         return o;
     }
 
-    /// <summary>送られてきた本文を、取り込み用の一時ファイルに書く。</summary>
+    /// <summary>送れる大きさの上限（何年分もの VAT・VRCX の DB でも入る大きさ）。</summary>
+    public const long MaxUpload = 8L << 30;
+
+    /// <summary>
+    /// 送られてきた本文を、取り込み用の一時ファイルに書く。先に <see cref="TryReserve"/> で取り込みの枠を取っておく
+    /// （取り込みが動いている間に、大きな本文を何本も受け取ってディスクを埋めないため）。途中で切れたら、書きかけは消す。
+    /// </summary>
     public async Task<string> SaveUploadAsync(Stream body, CancellationToken cancel)
     {
         Directory.CreateDirectory(TempDir);
         var path = Path.Combine(TempDir, $"upload-{Guid.NewGuid():N}.db");
-        await using (var f = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
-            await body.CopyToAsync(f, cancel).ConfigureAwait(false);
-        return path;
+        try
+        {
+            await using var f = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+            var buffer = new byte[1 << 20];
+            long total = 0;
+            int n;
+            while ((n = await body.ReadAsync(buffer, cancel).ConfigureAwait(false)) > 0)
+            {
+                total += n;
+                if (total > MaxUpload) throw new InvalidDataException("大きすぎる");
+                await f.WriteAsync(buffer.AsMemory(0, n), cancel).ConfigureAwait(false);
+            }
+            return path;
+        }
+        catch
+        {
+            TryDelete(path);
+            throw;
+        }
+    }
+
+    /// <summary>起きたときに、前の回の書きかけの一時ファイルを片付ける。</summary>
+    public void CleanTemp()
+    {
+        try
+        {
+            if (Directory.Exists(TempDir)) foreach (var f in Directory.GetFiles(TempDir)) TryDelete(f);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>取り込みの枠を取る（もう動いているか取られていれば false）。取ったら、Start か Release を必ず呼ぶ。</summary>
+    public bool TryReserve(string kind)
+    {
+        lock (_gate)
+        {
+            if (_status.Running) return false;
+            _status = new ImportStatus(true, kind, DateTime.UtcNow, null, null, null, false);
+            return true;
+        }
+    }
+
+    /// <summary>取った枠を返す（本文を受け取れなかったときなど）。</summary>
+    public void Release(string message)
+    {
+        lock (_gate) _status = _status with { Running = false, FinishedAt = DateTime.UtcNow, Ok = false, Message = message };
     }
 
     /// <summary>使われている SQLite のファイルを、壊さずに写す（読むだけで開く）。</summary>
@@ -57,31 +106,26 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
         return path;
     }
 
-    /// <summary>取り込みを始める（もう動いていれば false）。file は取り込み終わったら消す一時ファイル。</summary>
-    public bool Start(string kind, string file, bool replace, string? accountId = null)
+    /// <summary>
+    /// 取り込みを始める。枠をまだ取っていなければ取る（取れなければ false）。file は取り込み終わったら消す一時ファイル。
+    /// deviceId は、その記録を集めた端末（メンバーから送られたらその端末。ログとの重なりもその端末のログで見る）。
+    /// </summary>
+    public bool Start(string kind, string file, bool replace, string? accountId = null, string? deviceId = null, bool reserved = false)
     {
-        lock (_gate)
-        {
-            if (_status.Running) { TryDelete(file); return false; }
-            _status = new ImportStatus(true, kind, DateTime.UtcNow, null, null, null, false);
-        }
-        _ = Task.Run(() => Run(kind, file, replace, accountId));
+        if (!reserved && !TryReserve(kind)) { TryDelete(file); return false; }
+        _ = Task.Run(() => Run(kind, file, replace, accountId, deviceId));
         return true;
     }
 
-    /// <summary>取り込みを、この呼び出しの中で終わるまで動かす（VRCX の連携から）。</summary>
-    public ImportStatus RunNow(string kind, string file, bool replace)
+    /// <summary>取り込みを、この呼び出しの中で終わるまで動かす（VRCX の連携から）。ほかの取り込みが動いていれば null（次の回に試す）。</summary>
+    public ImportStatus? RunNow(string kind, string file, bool replace)
     {
-        lock (_gate)
-        {
-            if (_status.Running) { TryDelete(file); return _status; }
-            _status = new ImportStatus(true, kind, DateTime.UtcNow, null, null, null, false);
-        }
-        Run(kind, file, replace, null);
+        if (!TryReserve(kind)) { TryDelete(file); return null; }
+        Run(kind, file, replace, null, null);
         return Current;
     }
 
-    void Run(string kind, string file, bool replace, string? accountId)
+    void Run(string kind, string file, bool replace, string? accountId, string? deviceId)
     {
         bool ok = false, needsReplace = false;
         string message;
@@ -91,13 +135,13 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
             object result;
             if (kind == "vat")
             {
-                var r = new VatImport(db, state.DeviceId).Import(file, accountId, replace);
+                var r = new VatImport(db, deviceId ?? state.DeviceId).Import(file, accountId, replace);
                 result = r;
                 message = $"訪問 {r.Visits}・会った人 {r.Encounters}（うち ID が分かった {r.Resolved}）・出来事 {r.Events}・ログと重なって飛ばした行 {r.Skipped}";
             }
             else
             {
-                var r = new VrcxImport(db, state.DeviceId).Import(file, replace);
+                var r = new VrcxImport(db, deviceId ?? state.DeviceId).Import(file, replace);
                 result = r;
                 message = $"訪問 {r.Visits}・会った人 {r.Encounters}・出来事 {r.Events}（うちフレンドの記録 {r.FriendEvents}）・ワールドの情報 {r.Worlds}・お気に入り {r.Favorites}・メモ {r.Notes}・ログと重なって飛ばした訪問 {r.Skipped}";
             }
@@ -200,10 +244,12 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
                             // メンバーは、まとめ役へ送って取り込んでもらう
                             var problem = await jobs.ForwardAsync("vrcx", jobs.Snapshot(path), replace: false, null, stoppingToken).ConfigureAwait(false);
                             if (problem == null) { store.Set("vrcx_auto_mtime", mtime); logger.LogInformation("VRCX の DB をまとめ役へ送った"); }
+                            else if (problem.Contains("ほかの取り込みが動いている", StringComparison.Ordinal)) lastTry = DateTime.MinValue;
                             else logger.LogWarning("VRCX の DB をまとめ役へ送れなかった（次の回にやり直す）: {Problem}", problem);
                             continue;
                         }
                         var s = jobs.RunNow("vrcx", jobs.Snapshot(path), replace: false);
+                        if (s == null) { lastTry = DateTime.MinValue; continue; } // ほかの取り込みが動いていた。次の回に試す
                         if (s.Ok == true) store.Set("vrcx_auto_mtime", mtime);
                         else
                         {

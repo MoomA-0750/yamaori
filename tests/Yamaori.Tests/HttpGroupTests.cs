@@ -58,6 +58,14 @@ public sealed class HttpGroupTests
             c.Request.Body = new MemoryStream([1, 2, 3]);
         });
         Assert.Equal(200, junk.Response.StatusCode);
+        // 入れ替えはメンバーからはできない。グループのメンバーでないトークンからも受け取らない
+        Assert.Equal(400, (await hub.SendAsync("POST", "/api/sync/import/vrcx?replace=true", body: "{}", headers: bearer)).Response.StatusCode);
+        string stray;
+        using (var db = hub.OpenDb()) stray = new AuthStore(db).CreateToken("stray", TokenScopes.Sync).Secret;
+        Assert.Equal(403, (await hub.SendAsync("POST", "/api/sync/import/vat", body: "{}", headers: [("Authorization", "Bearer " + stray)])).Response.StatusCode);
+        // もう入っている端末は、別の合言葉でも入り直せない（前のトークンを奪わせない）
+        var again = (await Json(await hub.SendAsync("POST", "/api/settings/group/invite", loopback: true))).GetProperty("code").GetString()!;
+        Assert.Equal(403, (await hub.SendAsync("POST", "/api/group/accept", body: JsonSerializer.Serialize(new { code = again, deviceId = "d_laptop", deviceName = "x" }))).Response.StatusCode);
         // メンバーのトークンは、記録を読む口には届かない
         Assert.Equal(403, (await hub.SendAsync("GET", "/api/days", headers: bearer)).Response.StatusCode);
 
@@ -67,6 +75,35 @@ public sealed class HttpGroupTests
         Assert.Equal(400, (await hub.SendAsync("DELETE", $"/api/settings/group/members/{self}", loopback: true)).Response.StatusCode);
         Assert.Equal(200, (await hub.SendAsync("DELETE", "/api/settings/group/members/d_laptop", loopback: true)).Response.StatusCode);
         Assert.Equal(401, (await hub.SendAsync("GET", "/api/sync/group", headers: bearer)).Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("https://nas.example", true)]
+    [InlineData("http://truenas.zonkey-musical.ts.net:47800", true)]
+    [InlineData("http://100.73.248.17:47800", true)]
+    [InlineData("http://127.0.0.1:47800", true)]
+    [InlineData("http://192.168.1.101:47800", false)]
+    [InlineData("http://100.200.0.1:47800", false)]
+    public void まとめ役のアドレスは_https_か_Tailscale_の中だけ(string url, bool ok) =>
+        Assert.Equal(ok, Yamaori.Web.GroupApi.SafeHubUrl(new Uri(url)));
+
+    [Fact]
+    public void VRCX_と連携する役はグループで_1_台だけ()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "yamaori-group-" + Guid.NewGuid().ToString("N") + ".sqlite3");
+        using var db = Database.Open(path);
+        var g = new GroupStore(db);
+        g.Create("g", "d_hub", "hub");
+        var a = g.Accept(g.Invite().Code, "d_a", "a", null, "d_hub");
+        var b = g.Accept(g.Invite().Code, "d_b", "b", null, "d_hub");
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        g.SetRoles("d_a", ["logs", "vrcx"]);
+        g.SetRoles("d_b", ["vrcx"]);
+        Assert.DoesNotContain("vrcx", g.RolesOf("d_a"));
+        Assert.Contains("vrcx", g.RolesOf("d_b"));
+        // 渡したトークンは、その端末に結び付いて使える
+        Assert.Equal("d_a", new AuthStore(db).FindToken(a!.Token)!.DeviceId);
     }
 
     [Fact]

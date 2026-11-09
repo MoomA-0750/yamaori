@@ -14,7 +14,22 @@ public static class ImportSettings
     public sealed record ImportStarted(bool Started, string Message);
 
     // VAT・VRCX の DB は何年分もあると大きいので、送れる大きさを広げる（この口だけ）
-    const long MaxUpload = 8L << 30;
+    const long MaxUpload = ImportJobs.MaxUpload;
+
+    /// <summary>枠を取ってから本文を受け取り、取り込みを始める（枠が取れなければ本文を読まずに断る）。</summary>
+    static async Task<ImportStarted> ReceiveAndStart(HttpRequest req, ImportJobs jobs, string kind, bool replace, string? account, string? deviceId, CancellationToken cancel)
+    {
+        if (!jobs.TryReserve(kind)) return new ImportStarted(false, "ほかの取り込みが動いている");
+        string file;
+        try { file = await jobs.SaveUploadAsync(req.Body, cancel); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or OperationCanceledException or Microsoft.AspNetCore.Http.BadHttpRequestException)
+        {
+            jobs.Release($"受け取れなかった: {ex.Message}");
+            return new ImportStarted(false, $"受け取れなかった: {ex.Message}");
+        }
+        jobs.Start(kind, file, replace, account, deviceId, reserved: true);
+        return new ImportStarted(true, "取り込み始めた");
+    }
 
     static ImportView View(ImportJobs jobs, Database db)
     {
@@ -34,15 +49,23 @@ public static class ImportSettings
 
     public static void Map(WebApplication app)
     {
-        // まとめ役で、メンバーから送られた DB を取り込む（メンバーのトークンで）
-        app.MapPost("/api/sync/import/{kind}", async Task<Results<Ok<ImportStarted>, BadRequest<string>, Conflict<string>>> (HttpRequest req, ImportJobs jobs, string kind, bool? replace, string? account, CancellationToken cancel) =>
+        // まとめ役で、メンバーから送られた DB を取り込む（グループのメンバーのトークンで）
+        app.MapPost("/api/sync/import/{kind}", async Task<Results<Ok<ImportStarted>, BadRequest<string>, Conflict<string>, ProblemHttpResult>> (HttpContext ctx, Database db, YamaoriState state, ImportJobs jobs, string kind, bool? replace, string? account, CancellationToken cancel) =>
         {
             if (kind is not ("vat" or "vrcx")) return TypedResults.BadRequest("vat か vrcx");
             if (account is { Length: > 0 } a && !a.StartsWith("usr_", StringComparison.Ordinal)) return TypedResults.BadRequest("アカウントは usr_…");
-            var file = await jobs.SaveUploadAsync(req.Body, cancel);
-            return jobs.Start(kind, file, replace ?? false, account) ? TypedResults.Ok(new ImportStarted(true, "取り込み始めた")) : TypedResults.Conflict("ほかの取り込みが動いている");
+            // グループのメンバーで、端末に結び付いたトークンだけ。VRCX は「VRCX と連携する」の役の端末だけ
+            var groups = new GroupStore(db);
+            if (Auth.BearerToken(ctx, new AuthStore(db)) is not { DeviceId: { } device } || !groups.IsHub || groups.Info(state.DeviceId)?.Members.All(m => m.DeviceId != device) != false)
+                return TypedResults.Problem("グループのメンバーの端末からだけ受け取る", statusCode: StatusCodes.Status403Forbidden);
+            if (kind == "vrcx" && !groups.RolesOf(device).Contains(GroupRoles.Vrcx))
+                return TypedResults.Problem("この端末には「VRCX と連携する」の役がない（まとめ役の画面で付ける）", statusCode: StatusCodes.Status403Forbidden);
+            // 前の取り込みとの入れ替えは、まとめ役の画面で本人が決める
+            if (replace == true) return TypedResults.BadRequest("前の取り込みとの入れ替えは、まとめ役の画面で行う");
+            var r = await ReceiveAndStart(ctx.Request, jobs, kind, false, account, device, cancel);
+            return r.Started ? TypedResults.Ok(r) : TypedResults.Conflict(r.Message);
         }).WithMetadata(new RequestSizeLimitAttribute(MaxUpload))
-          .WithSummary("メンバーの端末から、VAT・VRCX の DB を受け取って取り込む（まとめ役で）");
+          .WithSummary("メンバーの端末から、VAT・VRCX の DB を受け取って取り込む（まとめ役で。その端末の記録として入れる）");
 
         var g = app.MapGroup("/api/settings/import");
         g.MapGet("/", (ImportJobs jobs, Database db) => View(jobs, db)).WithSummary("取り込みの様子（動いているもの・前の結果・この PC の VRCX）");
@@ -65,17 +88,15 @@ public static class ImportSettings
         g.MapPost("/vat", async Task<Results<Ok<ImportStarted>, BadRequest<string>>> (HttpRequest req, ImportJobs jobs, DeviceRoles roles, bool? replace, string? account, CancellationToken cancel) =>
         {
             if (account is { Length: > 0 } a && !a.StartsWith("usr_", StringComparison.Ordinal)) return TypedResults.BadRequest("アカウントは usr_…");
-            var file = await jobs.SaveUploadAsync(req.Body, cancel);
-            if (roles.IsMember) return TypedResults.Ok(await Forward(jobs, "vat", file, replace ?? false, account, cancel));
-            return TypedResults.Ok(jobs.Start("vat", file, replace ?? false, account) ? new ImportStarted(true, "取り込み始めた") : new ImportStarted(false, "ほかの取り込みが動いている"));
+            if (roles.IsMember) return TypedResults.Ok(await Forward(jobs, "vat", await jobs.SaveUploadAsync(req.Body, cancel), replace ?? false, account, cancel));
+            return TypedResults.Ok(await ReceiveAndStart(req, jobs, "vat", replace ?? false, account, null, cancel));
         }).WithMetadata(new RequestSizeLimitAttribute(MaxUpload))
           .WithSummary("VRChatActivityTools の DB（VRChatActivityLog.db）を本文で送って取り込む（移行。replace で前の取り込みと入れ替える）");
 
         g.MapPost("/vrcx", async Task<Ok<ImportStarted>> (HttpRequest req, ImportJobs jobs, DeviceRoles roles, bool? replace, CancellationToken cancel) =>
         {
-            var file = await jobs.SaveUploadAsync(req.Body, cancel);
-            if (roles.IsMember) return TypedResults.Ok(await Forward(jobs, "vrcx", file, replace ?? false, null, cancel));
-            return TypedResults.Ok(jobs.Start("vrcx", file, replace ?? false) ? new ImportStarted(true, "取り込み始めた") : new ImportStarted(false, "ほかの取り込みが動いている"));
+            if (roles.IsMember) return TypedResults.Ok(await Forward(jobs, "vrcx", await jobs.SaveUploadAsync(req.Body, cancel), replace ?? false, null, cancel));
+            return TypedResults.Ok(await ReceiveAndStart(req, jobs, "vrcx", replace ?? false, null, null, cancel));
         }).WithMetadata(new RequestSizeLimitAttribute(MaxUpload))
           .WithSummary("VRCX の DB（VRCX.sqlite3）を本文で送って取り込む");
 

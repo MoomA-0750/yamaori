@@ -85,31 +85,30 @@ public sealed class GroupStore(Database db)
 
     /// <summary>
     /// 招待を受ける（まとめ役で）。合言葉が正しければ、その端末をメンバーにして、端末に結び付いたトークンを返す。正しくなければ null。
-    /// 前に入っていた端末が入り直したときは、前のトークンを消して入れ替える。
+    /// もうメンバーの端末は入れない（前のトークンを奪って成り代わらせないため。入り直すときは、まとめ役で外してから）。
+    /// 合言葉を使う・メンバーにする・トークンを作るを、1 回の書き込みで行う（同じ端末が同時に入っても、トークンが 2 つできない）。
     /// </summary>
     public GroupJoined? Accept(string code, string deviceId, string deviceName, string? url, string selfDeviceId)
     {
         if (Info(selfDeviceId) is not { } group) return null;
-        if (deviceId == selfDeviceId || deviceId.Length is 0 or > 64) return null;
+        if (deviceId == selfDeviceId || deviceId.Length is 0 or > 64 || !deviceId.StartsWith("d_", StringComparison.Ordinal)) return null;
         var now = Database.Time(DateTime.UtcNow);
+        var secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var tokenId = "t_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
         using var tx = db.Connection.BeginTransaction();
         using (var use = db.Command("UPDATE group_invites SET used_at = $now, used_by = $d WHERE code_hash = $h AND used_at IS NULL AND expires_at > $now", tx,
             ("$h", Hash(code)), ("$now", now), ("$d", deviceId)))
             if (use.ExecuteNonQuery() == 0) { tx.Rollback(); return null; }
-        string? oldToken;
-        using (var o = db.Command("SELECT token_id FROM group_members WHERE device_id = $d", tx, ("$d", deviceId))) oldToken = o.ExecuteScalar() as string;
-        if (oldToken != null) using (var del = db.Command("DELETE FROM api_tokens WHERE id = $id", tx, ("$id", oldToken))) del.ExecuteNonQuery();
-        tx.Commit();
-        var auth = new AuthStore(db);
-        var (token, secret) = auth.CreateToken($"グループ: {Clean(deviceName, 64)}", TokenScopes.Sync);
-        auth.BindTokenDevice(token.Id, deviceId);
+        using (var exists = db.Command("SELECT 1 FROM group_members WHERE device_id = $d", tx, ("$d", deviceId)))
+            if (exists.ExecuteScalar() != null) { tx.Rollback(); return null; }
+        AuthStore.InsertToken(db, tx, tokenId, $"グループ: {Clean(deviceName, 64)}", secret, TokenScopes.Sync, deviceId);
         using (var cmd = db.Command("""
             INSERT INTO group_members (device_id, name, url, roles, token_id, joined_at) VALUES ($d, $n, $u, $r, $t, $now)
-            ON CONFLICT (device_id) DO UPDATE SET name = $n, url = $u, token_id = $t
-            """, null, ("$d", deviceId), ("$n", Clean(deviceName, 100)), ("$u", CleanUrl(url)), ("$r", string.Join(',', GroupRoles.Default)), ("$t", token.Id), ("$now", now)))
+            """, tx, ("$d", deviceId), ("$n", Clean(deviceName, 100)), ("$u", CleanUrl(url)), ("$r", string.Join(',', GroupRoles.Default)), ("$t", tokenId), ("$now", now)))
             cmd.ExecuteNonQuery();
+        tx.Commit();
         var hub = group.Members.FirstOrDefault(m => m.DeviceId == group.HubDeviceId);
-        return new GroupJoined(group.Id, group.Name, group.HubDeviceId, hub?.Name ?? "", secret, RolesOf(deviceId));
+        return new GroupJoined(group.Id, group.Name, group.HubDeviceId, hub?.Name ?? "", "ymt_" + secret, RolesOf(deviceId));
     }
 
     public IReadOnlyList<string> RolesOf(string deviceId) =>
@@ -121,6 +120,19 @@ public sealed class GroupStore(Database db)
         var current = RolesOf(deviceId);
         var next = roles.Where(r => GroupRoles.All.Contains(r) && r != GroupRoles.Hub).Distinct().ToList();
         if (current.Contains(GroupRoles.Hub)) next.Insert(0, GroupRoles.Hub);
+        // 「VRCX と連携する」はグループの中で 1 台だけ（取り込みは 1 つの VRCX の DB の続きとして入れるので、2 台で取り合わない）
+        if (next.Contains(GroupRoles.Vrcx) && !current.Contains(GroupRoles.Vrcx))
+        {
+            var others = new List<(string Id, string Roles)>();
+            using (var o = db.Command("SELECT device_id, roles FROM group_members WHERE device_id <> $d", null, ("$d", deviceId)))
+            using (var r = o.ExecuteReader())
+                while (r.Read()) others.Add((r.GetString(0), r.GetString(1)));
+            foreach (var (id, csv) in others.Where(x => GroupRoles.Parse(x.Roles).Contains(GroupRoles.Vrcx)))
+            {
+                using var u = db.Command("UPDATE group_members SET roles = $r WHERE device_id = $d", null, ("$d", id), ("$r", string.Join(',', GroupRoles.Parse(csv).Where(x => x != GroupRoles.Vrcx))));
+                u.ExecuteNonQuery();
+            }
+        }
         using var cmd = db.Command("UPDATE group_members SET roles = $r, name = COALESCE($n, name) WHERE device_id = $d", null,
             ("$d", deviceId), ("$r", string.Join(',', next)), ("$n", name is { Length: > 0 } n ? Clean(n, 100) : null));
         return cmd.ExecuteNonQuery() > 0;

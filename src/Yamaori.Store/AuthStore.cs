@@ -121,6 +121,14 @@ public sealed class AuthStore(Database db)
         return (new ApiToken(id, name, now, null, scope), secret);
     }
 
+    /// <summary>トークンを書き込みの中で入れる（グループに入るときに、端末に結び付けて作る）。secret は呼ぶ側で作る。</summary>
+    internal static void InsertToken(Database db, Microsoft.Data.Sqlite.SqliteTransaction tx, string id, string name, string secret, string scope, string? deviceId)
+    {
+        using var cmd = db.Command("INSERT INTO api_tokens (id, name, hash, created_at, scope, device_id) VALUES ($id, $n, $h, $now, $s, $d)", tx,
+            ("$id", id), ("$n", name), ("$h", Hash("ymt_" + secret)), ("$now", Database.Time(DateTime.UtcNow)), ("$s", scope), ("$d", deviceId));
+        cmd.ExecuteNonQuery();
+    }
+
     public bool ValidToken(string? secret) => FindToken(secret) != null;
 
     /// <summary>トークンを探す（見つかれば使った時刻を記録する）。</summary>
