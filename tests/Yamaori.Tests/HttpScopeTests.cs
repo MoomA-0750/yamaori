@@ -127,6 +127,18 @@ public sealed class HttpScopeTests
     }
 
     [Fact]
+    public async Task 人を忘れることと忘れた人の一覧は_本人だけ()
+    {
+        await using var h = new HttpHost();
+        var t = Bearer(Token(h, TokenScopes.Full));
+        Assert.Equal(403, (await h.SendAsync("GET", "/api/people/forgotten", headers: t)).Response.StatusCode);
+        Assert.Equal(403, (await h.SendAsync("POST", "/api/people/usr_x/forget", body: "{}", headers: t)).Response.StatusCode);
+        Assert.Equal(403, (await h.SendAsync("POST", "/API/People/usr_x/Forget/", body: "{}", headers: t)).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("GET", "/api/people/forgotten", loopback: true)).Response.StatusCode);
+        Assert.Equal(200, (await h.SendAsync("POST", "/api/people/usr_x/forget", loopback: true, body: "{}")).Response.StatusCode);
+    }
+
+    [Fact]
     public async Task トークンは範囲を選ばないと作れない()
     {
         await using var h = new HttpHost();

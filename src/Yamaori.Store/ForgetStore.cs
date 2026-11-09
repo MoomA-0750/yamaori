@@ -3,8 +3,10 @@ namespace Yamaori.Store;
 public sealed record ForgottenPerson(string Key, string? Label, DateTime ForgottenAt);
 
 /// <summary>
-/// 人を忘れる。会った記録・その人の出来事（動画・通知・フレンドの増減）・フレンドの一覧の写し・その人へのメモを消し、
+/// 人を忘れる。会った記録・その人の出来事（動画・通知（受け手としても）・フレンドの増減）・フレンドの一覧の写し・その人へのメモを消し、
+/// 訪問したインスタンスの持ち主としての ID を伏せ、
 /// あとから読み直し・取り込み・同期で入ってきても入れない（表のトリガー）。生のログ（logs）と log_events には残る。
+/// 忘れるのはこの端末の DB だけ（親と子は、それぞれで忘れる）。
 /// </summary>
 public sealed class ForgetStore(Database db)
 {
@@ -26,8 +28,10 @@ public sealed class ForgetStore(Database db)
         if (name == null)
         {
             n += Exec("DELETE FROM encounters WHERE user_id = $k", ("$k", key));
-            n += Exec("DELETE FROM events WHERE user_id = $k", ("$k", key));
+            n += Exec("DELETE FROM events WHERE user_id = $k OR json_extract(data, '$.receiver_id') = $k", ("$k", key));
             n += Exec("DELETE FROM friend_snapshots WHERE user_id = $k", ("$k", key));
+            // 訪問は消さず（本人がいた記録なので）、インスタンスの持ち主としての ID だけを伏せる
+            n += Exec("UPDATE visits SET instance = replace(instance, $k, 'forgotten'), owner_id = NULL WHERE owner_id = $k OR instance LIKE '%' || $k || '%'", ("$k", key));
         }
         else
         {

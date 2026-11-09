@@ -121,18 +121,60 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
-    public void 表の版を上げる前に写しを取り_新しい版の_DB_は開かない()
+    public void 版_9_の_DB_を上げても中身は残り_上げる前の写しを取り_新しい版の_DB_は開かない()
     {
         var path = Path.Combine(_dir, "m.sqlite3");
-        using (var db = Database.Open(path))
-        using (var cmd = db.Command($"DROP TRIGGER forget_encounters; DROP TRIGGER forget_events; DROP TRIGGER forget_friends; DROP TRIGGER forget_notes; DROP TABLE forgotten_people; PRAGMA user_version = {Database.SchemaVersion - 1};"))
+        Database.CreateAtVersion(path, 9);
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO api_tokens (id, name, hash, created_at) VALUES ('t_old', 'extension', 'h', '2026-11-01T00:00:00Z');
+                INSERT INTO notes (id, target_type, target_id, body, created_at, updated_at) VALUES ('n_old', 'day', '2026-11-01', 'メモ', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z');
+                INSERT INTO sync_state (parent, source, hash, pushed_at) VALUES ('http://p/', 'notes', 'x', '2026-11-01T00:00:00Z');
+                INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, owner_id, region, joined_at)
+                    VALUES ('v_old', 'log:d/x', 'd', 'wrld_x', '1~private(usr_owner)', '1', 'private', 'usr_owner', 'jp', '2026-11-01T00:00:00Z');
+                """;
             cmd.ExecuteNonQuery();
-        using (Database.Open(path)) { }
-        Assert.True(File.Exists(path + $".bak-v{Database.SchemaVersion - 1}"));
+        }
+        using (var db = Database.Open(path))
+        {
+            Assert.Equal((long)Database.SchemaVersion, db.Scalar("PRAGMA user_version"));
+            Assert.Equal("full", db.Scalar("SELECT scope FROM api_tokens WHERE id = 't_old'"));
+            Assert.Equal("メモ", db.Scalar("SELECT body FROM notes WHERE id = 'n_old'"));
+            Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM sync_state"));
+            // 上げたあとの表でも、忘れることが効く
+            new ForgetStore(db).Forget("usr_owner", "持ち主");
+            Assert.Equal(DBNull.Value, db.Scalar("SELECT owner_id FROM visits WHERE id = 'v_old'"));
+            Assert.DoesNotContain("usr_owner", (string)db.Scalar("SELECT instance FROM visits WHERE id = 'v_old'")!);
+        }
+        using (var bak = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}.bak-v9;Pooling=False"))
+        {
+            bak.Open();
+            using var cmd = bak.CreateCommand();
+            cmd.CommandText = "PRAGMA user_version";
+            Assert.Equal(9L, cmd.ExecuteScalar());
+        }
 
         using (var db = Database.Open(path))
         using (var cmd = db.Command("PRAGMA user_version = 999")) cmd.ExecuteNonQuery();
         Assert.Throws<InvalidOperationException>(() => Database.Open(path));
+    }
+
+    [Fact]
+    public void 忘れた人は_通知の受け手とインスタンスの持ち主にも残らない()
+    {
+        using var db = Database.Open(Path.Combine(_dir, "o.sqlite3"));
+        new ForgetStore(db).Forget("usr_bob", "Bob");
+        void Exec(string sql) { using var cmd = db.Command(sql); cmd.ExecuteNonQuery(); }
+        Exec("""INSERT INTO events (id, source, device_id, at, kind, data) VALUES ('ev1', 'x', 'd', '2026-01-01T00:00:00Z', 'notification', '{"receiver_id":"usr_bob","type":"invite"}')""");
+        Exec("""INSERT INTO events (id, source, device_id, at, kind, data) VALUES ('ev2', 'x', 'd', '2026-01-01T00:00:00Z', 'notification', '{"receiver_id":"usr_carol","type":"invite"}')""");
+        Assert.Equal("ev2", db.Scalar("SELECT group_concat(id) FROM events"));
+        Exec("INSERT INTO visits (id, source, device_id, world_id, instance, instance_number, access, owner_id, region, joined_at) VALUES ('v1', 'x', 'd', 'wrld_x', '1~private(usr_bob)~region(jp)', '1', 'private', 'usr_bob', 'jp', '2026-01-01T00:00:00Z')");
+        Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM visits"));
+        Assert.Equal(DBNull.Value, db.Scalar("SELECT owner_id FROM visits"));
+        Assert.Equal("1~private(forgotten)~region(jp)", db.Scalar("SELECT instance FROM visits"));
     }
 
     [Fact]

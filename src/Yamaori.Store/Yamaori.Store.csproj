@@ -11,4 +11,7 @@
   <PropertyGroup>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yamaori.Tests" />
+  </ItemGroup>
 </Project>

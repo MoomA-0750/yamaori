@@ -83,8 +83,9 @@ public static class Auth
     // この PC から直接なら、この PC でもログインを求める設定でも通す口（インストーラーが更新の前に止めるため。ほかのサイトからは Origin で断る）
     static readonly string[] LocalAlways = ["/api/settings/shutdown"];
 
-    // 本人だけ（ログイン・この PC から）が触れる口。トークンや認証なしの公開では触れない（トークンを作り足して居座る、設定を変える、止める、を防ぐ）
-    static readonly string[] AdminPaths = ["/api/auth/tokens", "/api/auth/password", "/api/settings"];
+    // 本人だけ（ログイン・この PC から）が触れる口。トークンや認証なしの公開では触れない（トークンを作り足して居座る、設定を変える、止める、を防ぐ）。
+    // 人を忘れる口（/api/people/{id}/forget）も本人だけ（Forbidden で見る）
+    static readonly string[] AdminPaths = ["/api/auth/tokens", "/api/auth/password", "/api/settings", "/api/people/forgotten"];
 
     // 範囲ごとに通す口（方法と道の頭）
     static readonly (string Scope, string Method, string Path, bool Prefix)[] ScopedPaths =
@@ -102,6 +103,8 @@ public static class Auth
     static string? Forbidden(PathString path, string method, ApiToken? token)
     {
         if (AdminPaths.Any(a => path.StartsWithSegments(a, StringComparison.OrdinalIgnoreCase))) return "AdminOnly";
+        // 人を忘れるのも本人だけ（忘れた人の一覧は、忘れたい相手の名前を並べたものなので、読むことも本人だけ）
+        if (path.StartsWithSegments("/api/people", StringComparison.OrdinalIgnoreCase) && (path.Value ?? "").TrimEnd('/').EndsWith("/forget", StringComparison.OrdinalIgnoreCase)) return "AdminOnly";
         // 子の端末の口は、子の端末のトークンだけ（ほかのトークンが漏れても、子の記録を空で入れ替えて消させない）
         if (token != null && token.Scope != TokenScopes.Sync && path.StartsWithSegments("/api/sync", StringComparison.OrdinalIgnoreCase)) return "OutOfScope";
         if (token == null || token.Scope == TokenScopes.Full) return null;

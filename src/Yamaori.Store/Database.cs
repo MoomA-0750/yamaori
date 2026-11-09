@@ -50,6 +50,14 @@ public sealed class Database : IDisposable
         }
     }
 
+    /// <summary>試験用: 表の版 version までだけ作った DB を作る（古い版からの上げ方を試す）。</summary>
+    internal static void CreateAtVersion(string path, int version)
+    {
+        using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
+        c.Open();
+        for (var v = 0; v < version; v++) Exec(c, Migrations[v] + $"; PRAGMA user_version={v + 1};");
+    }
+
     /// <summary>今の DB の写しを作る（動いている間でもよい。WAL の分も含めて 1 つのファイルにする）。</summary>
     public void Backup(string target)
     {
@@ -345,6 +353,15 @@ public sealed class Database : IDisposable
         CREATE TRIGGER forget_friends AFTER INSERT ON friend_snapshots
             WHEN NEW.user_id IN (SELECT key FROM forgotten_people)
             BEGIN DELETE FROM friend_snapshots WHERE account_id = NEW.account_id AND user_id = NEW.user_id; END;
+        """,
+        // 12 版目: 忘れた人は、通知の受け手（送った招待など）と、訪問したインスタンスの持ち主にも残さない
+        """
+        CREATE TRIGGER forget_event_receivers AFTER INSERT ON events
+            WHEN json_extract(NEW.data, '$.receiver_id') IN (SELECT key FROM forgotten_people)
+            BEGIN DELETE FROM events WHERE id = NEW.id; END;
+        CREATE TRIGGER forget_visit_owners AFTER INSERT ON visits
+            WHEN NEW.owner_id IN (SELECT key FROM forgotten_people)
+            BEGIN UPDATE visits SET instance = replace(instance, NEW.owner_id, 'forgotten'), owner_id = NULL WHERE id = NEW.id; END;
         """,
     ];
 
