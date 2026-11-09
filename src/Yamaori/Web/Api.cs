@@ -170,9 +170,15 @@ public static class Api
 
         // ---- 写真
 
-        api.MapGet("/photos", (PhotoCatalog photos, DateTime? from, DateTime? to, string? world, string? visit, int? limit, int? offset) =>
-            photos.List(Utc(from), Utc(to), world, visit, limit ?? 100, offset ?? 0))
-            .WithSummary("写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に）");
+        api.MapGet("/photos", (PhotoCatalog photos, DateTime? from, DateTime? to, string? world, string? visit, string? person, int? limit, int? offset) =>
+            photos.List(Utc(from), Utc(to), world, visit, limit ?? 100, offset ?? 0, person))
+            .WithSummary("写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に。person を渡すと、その人が同じインスタンスにいたときの写真）");
+
+        api.MapGet("/photos/by-world", (PhotoCatalog photos, int? limit) => photos.ByWorld(limit ?? 200))
+            .WithSummary("ワールドごとの写真の数（多い順。表紙はいちばん新しい写真）");
+
+        api.MapGet("/photos/by-person", (PhotoCatalog photos, int? limit) => photos.ByPerson(limit ?? 200))
+            .WithSummary("撮ったときに同じインスタンスにいた人ごとの写真の数（多い順）");
 
         api.MapGet("/photos/{id}", Results<Ok<PhotoView>, NotFound> (PhotoCatalog photos, string id) =>
             photos.Get(id) is { } p ? TypedResults.Ok(p) : TypedResults.NotFound())

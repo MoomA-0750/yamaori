@@ -81,6 +81,7 @@
       <section>
         <h2 class="section-title">撮った写真 <span class="faint">{photoTotal}</span></h2>
         <PhotoGrid {photos} showDate />
+        {#if photoTotal > photos.length}<a class="more-link" href={href.photos({ world: w.id })}>全部見る（{photoTotal} 枚）→</a>{/if}
       </section>
     {/if}
     {#if w.visitCount}<section>
@@ -103,4 +104,5 @@
   .more { margin-top: .75rem; }
   .head { gap: .35rem; }
   .head p { margin: 0; }
+  .more-link { display: inline-block; margin-top: .5rem; }
 </style>

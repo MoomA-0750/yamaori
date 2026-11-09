@@ -5,6 +5,7 @@
   import VisitList from '../components/VisitList.svelte'
   import Notes from '../components/Notes.svelte'
   import Loading from '../components/Loading.svelte'
+  import PhotoGrid from '../components/PhotoGrid.svelte'
 
   let { id }: { id: string } = $props()
 
@@ -49,9 +50,14 @@
     }
   }
 
+  let photos = $state<import('../api').PhotoView[]>([])
+  let photoTotal = $state(0)
+
   $effect(() => {
     more = []
+    photos = []
     api.person(id).then((d) => (data = d)).catch((e) => (error = (e as Error).message))
+    api.photos({ person: id, limit: 24 }).then((p) => { photos = p.items; photoTotal = p.total }).catch(() => {})
   })
 </script>
 
@@ -102,6 +108,14 @@
 
     <Notes targetType="person" targetId={p.userId} notes={data.notes} placeholder="この人のことを書く（Markdown が使える）" />
 
+    {#if photos.length}
+      <section>
+        <h2 class="section-title">一緒にいたときの写真 <span class="faint">{photoTotal}</span></h2>
+        <PhotoGrid {photos} showDate />
+        {#if photoTotal > photos.length}<a class="more-link" href={href.photos({ person: p.userId })}>全部見る（{photoTotal} 枚）→</a>{/if}
+      </section>
+    {/if}
+
     <section>
       <h2 class="section-title">一緒にいたとき <span class="faint">{p.visitCount}</span></h2>
       <VisitList visits={[...data.visits, ...more]} showDate />
@@ -140,4 +154,5 @@
   .names { list-style: none; margin: 0; padding: .25rem 0; }
   .names li { padding: .4rem 1rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: .5rem 1rem; flex-wrap: wrap; }
   .names li:first-child { border-top: none; }
+  .more-link { display: inline-block; margin-top: .5rem; }
 </style>

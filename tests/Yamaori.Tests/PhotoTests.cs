@@ -84,6 +84,17 @@ public sealed class PhotoTests : IDisposable
         Assert.Single(catalog.List(visitId: visits[1].Id).Items);
         Assert.Equal(1, visits[0].ScreenshotCount); // ログにスクショの行はないが、目録の写真を数える
         Assert.Equal(1, catalog.List(worldId: "wrld_00000000-0000-0000-0000-00000000000a").Total);
+        // ワールドごと・その場にいた人ごと
+        var byWorld = catalog.ByWorld();
+        Assert.Equal(2, byWorld.Count);
+        Assert.All(byWorld, g => Assert.Equal(1, g.Count));
+        Assert.Contains(byWorld, g => g.Name == "Cushion Room");
+        var byPerson = catalog.ByPerson();
+        // Alice は 02:38:00 に出て 02:39:00 に戻ったので、02:38:21 の写真には居ない。Carol は 02:42 の写真のときに居た
+        Assert.DoesNotContain(byPerson, g => g.Name == "Alice");
+        var carol = Assert.Single(byPerson, g => g.Name == "Carol");
+        Assert.Equal("VRChat_2026-11-08_02-42-00.000_1920x1080.png", Assert.Single(catalog.List(personId: carol.Key).Items).FileName);
+        Assert.Equal(0, catalog.List(personId: "usr_00000000-0000-0000-0000-000000000002").Total);
 
         var id = first.Items[0].Id;
         Assert.Equal(a, catalog.FindFile(id));

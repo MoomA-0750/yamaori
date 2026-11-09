@@ -2126,7 +2126,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に） */
+        /** 写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に。person を渡すと、その人が同じインスタンスにいたときの写真） */
         get: {
             parameters: {
                 query?: {
@@ -2134,6 +2134,7 @@ export interface paths {
                     to?: string;
                     world?: string;
                     visit?: string;
+                    person?: string;
                     limit?: number;
                     offset?: number;
                 };
@@ -2150,6 +2151,82 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["PageOfPhotoView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/by-world": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ワールドごとの写真の数（多い順。表紙はいちばん新しい写真） */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoGroup"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/by-person": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 撮ったときに同じインスタンスにいた人ごとの写真の数（多い順） */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoGroup"][];
                     };
                 };
             };
@@ -2603,6 +2680,15 @@ export interface components {
             /** Format: int32 */
             noteCount: number;
             friend?: null | string;
+        };
+        PhotoGroup: {
+            key: string;
+            name: null | string;
+            /** Format: int32 */
+            count: number;
+            latestPhotoId: string;
+            /** Format: date-time */
+            latestAt: string;
         };
         PhotoSettingsInput: {
             photoDirs: null | string[];

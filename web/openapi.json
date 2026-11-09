@@ -1736,7 +1736,7 @@
         "tags": [
           "Yamaori"
         ],
-        "summary": "写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に）",
+        "summary": "写真の一覧（新しい順。visit を渡すと、その訪問の間に撮った写真を古い順に。person を渡すと、その人が同じインスタンスにいたときの写真）",
         "parameters": [
           {
             "name": "from",
@@ -1769,6 +1769,13 @@
             }
           },
           {
+            "name": "person",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -1792,6 +1799,72 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PageOfPhotoView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/by-world": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "ワールドごとの写真の数（多い順。表紙はいちばん新しい写真）",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoGroup"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/by-person": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "撮ったときに同じインスタンスにいた人ごとの写真の数（多い順）",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoGroup"
+                  }
                 }
               }
             }
@@ -2907,6 +2980,38 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PhotoGroup": {
+        "required": [
+          "key",
+          "name",
+          "count",
+          "latestPhotoId",
+          "latestAt"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latestPhotoId": {
+            "type": "string"
+          },
+          "latestAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

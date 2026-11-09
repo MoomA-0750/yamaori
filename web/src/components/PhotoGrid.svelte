@@ -32,7 +32,7 @@
     <li>
       <button class="cell" onclick={() => show(p)} aria-label={`写真 ${dateTime(p.takenAt)}`}>
         {#if p.available}
-          <img src={api.thumb(p.id, 320)} alt="" loading="lazy" decoding="async" />
+          <img src={api.thumb(p.id, 320)} alt="" loading="lazy" decoding="async" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
         {:else}
           <span class="missing faint">見つからない</span>
         {/if}
