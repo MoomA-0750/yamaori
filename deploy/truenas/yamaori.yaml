@@ -21,10 +21,7 @@ services:
       YAMAORI_ThumbSidecar: "true"         # 作った縮小を写真のフォルダにも置く
       YAMAORI_ThumbNight: "01:00-07:00"    # 縮小を前もって作る時間帯（空なら作らない。設定の画面から「今すぐ」もできる）
       YAMAORI_DeviceName: truenas
+    # ★ 左が NAS の道、右がコンテナの中の道。1 行目は DB・メモ・縮小・設定、2 行目は VRChat の写真
     volumes:
-      - type: bind
-        source: /mnt/HD/HD8/Applications/yamaori     # ★ DB・メモ・縮小・設定
-        target: /data
-      - type: bind
-        source: /mnt/HD/HD8/Applications/Plex/Pictures/VRChat   # ★ VRChat の写真
-        target: /photos
+      - /mnt/HD/HD8/Applications/yamaori:/data
+      - /mnt/HD/HD8/Applications/Plex/Pictures/VRChat:/photos
