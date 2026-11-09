@@ -150,6 +150,20 @@ public sealed class VrcxImportTests : IDisposable
         Assert.Equal(0, r.Skipped);
     }
 
+    [Fact]
+    public void ログの記録の前に入った訪問は_ログの始まりで切り_同じ時間を二重に数えない()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        // 12:10 からこの端末のログがある（World A の訪問は 12:00〜12:30）
+        using (var cmd = db.Command("""
+            INSERT INTO sessions (device_id, log_file, started_at, ended_at) VALUES ('d_test', 'x', '2024-05-01T12:10:00Z', '2024-05-01T12:20:00Z')
+            """)) cmd.ExecuteNonQuery();
+        new VrcxImport(db, "d_test").Import(vrcx);
+        var a = new Queries(db, TimeZoneInfo.Utc).Visits().Items.Single(v => v.WorldId == "wrld_a");
+        Assert.Equal(new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), a.LeftAt);
+    }
+
     static long Count(Database db, string sql) => (long)db.Scalar(sql)!;
 
     public void Dispose()

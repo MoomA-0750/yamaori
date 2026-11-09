@@ -43,6 +43,17 @@ public static class ImportGuard
     public static bool SameVisit(ILookup<string, DateTime> others, string world, DateTime joined) =>
         others[world].Any(t => (t - joined).Duration() <= TimeSpan.FromMinutes(5));
 
+    /// <summary>
+    /// 取り込む訪問の出た時刻を、ログの記録がある期間の始まりで切る。入ったのはログの前で、出た時刻（推定を含む）がログの期間にかかると、
+    /// ログの訪問と同じ時間を二重に数えるため。ログの期間の中で入った訪問は、もともと取り込まない。
+    /// </summary>
+    public static DateTime ClipToCovered(DateTime joined, DateTime left, IEnumerable<(DateTime From, DateTime To)> covered)
+    {
+        foreach (var (from, _) in covered)
+            if (from > joined && from < left) left = from;
+        return left;
+    }
+
     /// <summary>この DB で遊んだアカウントが 1 つだけならそれ（セッションの最後のアカウントだけでなく、訪問に付いたアカウントも数える）。</summary>
     public static string? SingleAccount(Database db)
     {

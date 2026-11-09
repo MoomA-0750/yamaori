@@ -70,6 +70,7 @@ public sealed class VrcxImport(Database db, string deviceId)
                     left = next is { } n && n - at <= MaxGap ? n : at;
                     reason = "estimated";
                 }
+                left = ImportGuard.ClipToCovered(at, left, covered);
                 var colon = row.Location.IndexOf(':', StringComparison.Ordinal);
                 var instance = colon > 0 ? row.Location[(colon + 1)..] : "";
                 var info = InstanceInfo.Parse(instance);

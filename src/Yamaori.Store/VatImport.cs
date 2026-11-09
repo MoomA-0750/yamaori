@@ -52,7 +52,7 @@ public sealed class VatImport(Database db, string deviceId, TimeZoneInfo? timeZo
         void Close(DateTime? nextJoin)
         {
             if (visit == null) return;
-            var left = nextJoin is { } n && n - lastActivity <= MaxGap ? n : lastActivity;
+            var left = ImportGuard.ClipToCovered(visit.JoinedAt, nextJoin is { } n && n - lastActivity <= MaxGap ? n : lastActivity, covered);
             visits.Add(visit with { LeftAt = left, LeftReason = "estimated" });
             foreach (var e in met.Values) encounters.Add(e with { LeftAt = left });
             met.Clear();
