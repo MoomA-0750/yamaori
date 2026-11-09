@@ -198,6 +198,22 @@ public static class Api
             try { return TypedResults.Ok(new CountResult(new PhotoAlbums(db).Remove(id, input.PhotoIds))); }
             catch (KeyNotFoundException) { return TypedResults.NotFound(); }
         }).WithSummary("写真をアルバムから外す（写真は消さない）");
+        api.MapGet("/photos/{id}/info", Results<Ok<PhotoInfo>, NotFound> (Database db, string id) =>
+            new PhotoEdits(db).Info(id) is { } i ? TypedResults.Ok(i) : TypedResults.NotFound())
+            .WithSummary("写真の情報（写真から読んだもの・手で直したもの・撮った時刻から当てたもの）");
+        api.MapPut("/photos/{id}/edit", Results<NoContent, NotFound, BadRequest<string>> (Database db, string id, PhotoEditInput input) =>
+        {
+            try { return new PhotoEdits(db).Save(id, input) ? TypedResults.NoContent() : TypedResults.NotFound(); }
+            catch (ArgumentException ex) { return TypedResults.BadRequest(ex.Message); }
+        }).WithSummary("写真の情報を直す（ワールド・撮った人・一緒にいた人。Yamaori の中だけ。ファイルに書くのは /write）");
+        api.MapDelete("/photos/{id}/edit", Results<NoContent, NotFound> (Database db, string id) =>
+            new PhotoEdits(db).Clear(id) ? TypedResults.NoContent() : TypedResults.NotFound()).WithSummary("直した情報を消す（写真から読んだものに戻る）");
+        api.MapPost("/photos/{id}/write", Results<Ok<PhotoEdits.WriteResult>, NotFound> (Database db, string id) =>
+        {
+            try { return TypedResults.Ok(new PhotoEdits(db).WriteToFiles(id)); }
+            catch (KeyNotFoundException) { return TypedResults.NotFound(); }
+        }).WithSummary("今の情報を、写真のファイル（PNG）に VRChat と同じ形の XMP で書く（この PC と NAS の置き場所の全部。本人だけ）");
+
         api.MapGet("/photos/{id}/albums", (Database db, string id) => new PhotoAlbums(db).AlbumsOf(id).Select(a => new AlbumRef(a.Id, a.Name)))
             .WithSummary("その写真が入っているアルバム");
 

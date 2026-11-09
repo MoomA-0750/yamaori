@@ -403,6 +403,19 @@ public sealed class Database : IDisposable
             purged_at TEXT                 -- ゴミ箱を空にして、ファイルを消した時刻
         );
         """,
+        // 16 版目: 写真の情報を手で直したもの（メタデータのない昔の写真など）。写真の行とは別に持つ（目録を読み直しても消えない）
+        """
+        CREATE TABLE photo_edits (
+            photo_id TEXT PRIMARY KEY,
+            world_id TEXT,
+            world_name TEXT,
+            author_id TEXT,
+            author_name TEXT,
+            people TEXT NOT NULL DEFAULT '[]',   -- 一緒にいた人 [{"id": "usr_…" か null, "name": "…"}]
+            edited_at TEXT NOT NULL,
+            written_at TEXT                      -- 写真のファイルにも書いた時刻
+        );
+        """,
     ];
 
     /// <summary>この DB を持つ端末の ID。初めてなら作る（名前は変わっていれば直す）。</summary>

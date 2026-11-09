@@ -2446,6 +2446,179 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/photos/{id}/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 写真の情報（写真から読んだもの・手で直したもの・撮った時刻から当てたもの） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoInfo"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{id}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 写真の情報を直す（ワールド・撮った人・一緒にいた人。Yamaori の中だけ。ファイルに書くのは /write） */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PhotoEditInput"];
+                };
+            };
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** 直した情報を消す（写真から読んだものに戻る） */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{id}/write": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 今の情報を、写真のファイル（PNG）に VRChat と同じ形の XMP で書く（この PC と NAS の置き場所の全部。本人だけ） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WriteResult"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/photos/{id}/albums": {
         parameters: {
             query?: never;
@@ -3186,6 +3359,24 @@ export interface components {
             noteCount: number;
             friend?: null | string;
         };
+        PhotoEdit: {
+            worldId: null | string;
+            worldName: null | string;
+            authorId: null | string;
+            authorName: null | string;
+            people: components["schemas"]["PhotoPerson"][];
+            /** Format: date-time */
+            editedAt: string;
+            /** Format: date-time */
+            writtenAt: null | string;
+        };
+        PhotoEditInput: {
+            worldId: null | string;
+            worldName: null | string;
+            authorId: null | string;
+            authorName: null | string;
+            people: null | components["schemas"]["PhotoPerson"][];
+        };
         PhotoGroup: {
             key: string;
             name: null | string;
@@ -3194,6 +3385,32 @@ export interface components {
             latestPhotoId: string;
             /** Format: date-time */
             latestAt: string;
+        };
+        PhotoInfo: {
+            photo: components["schemas"]["PhotoView"];
+            file: null | components["schemas"]["PhotoMeta"];
+            edit: null | components["schemas"]["PhotoEdit"];
+            suggestion: components["schemas"]["PhotoSuggestion"];
+            canWrite: boolean;
+        };
+        PhotoMeta: {
+            /** Format: date-time */
+            takenAt: string;
+            takenSource: string;
+            /** Format: int32 */
+            width: null | number;
+            /** Format: int32 */
+            height: null | number;
+            worldId: null | string;
+            worldName: null | string;
+            authorId: null | string;
+            authorName: null | string;
+            yamaoriId?: null | string;
+            players?: null | components["schemas"]["PhotoPerson"][];
+        };
+        PhotoPerson: {
+            id: null | string;
+            name: string;
         };
         PhotoSelection: {
             photoIds: string[];
@@ -3224,6 +3441,14 @@ export interface components {
             /** Format: double */
             intervalMinutes: number;
         };
+        PhotoSuggestion: {
+            visitId: null | string;
+            worldId: null | string;
+            worldName: null | string;
+            authorId: null | string;
+            authorName: null | string;
+            people: components["schemas"]["PhotoPerson"][];
+        };
         PhotoView: {
             id: string;
             fileName: string;
@@ -3241,6 +3466,8 @@ export interface components {
             authorId: null | string;
             authorName: null | string;
             available: boolean;
+            /** @default false */
+            edited: boolean;
         };
         Projection: {
             deviceId: string;
@@ -3529,6 +3756,11 @@ export interface components {
             lastVisitAt: null | string;
             /** Format: int32 */
             noteCount: number;
+        };
+        WriteResult: {
+            /** Format: int32 */
+            files: number;
+            skipped: string[];
         };
     };
     responses: never;

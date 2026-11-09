@@ -4,12 +4,14 @@
   import { href } from '../router.svelte'
 
   import AlbumPicker from './AlbumPicker.svelte'
+  import PhotoEditor from './PhotoEditor.svelte'
 
   // selecting のときは、押すと選ぶ（selected に ID が入る）。押さないときは大きく見る。
   // inTrash ならゴミ箱の写真（見るところで「戻す」）。onchange は、ゴミ箱に入れた・戻したあとに呼ぶ（一覧を読み直す）
   let { photos, showDate = false, selecting = false, selected = $bindable([]), inTrash = false, onchange }:
     { photos: PhotoView[]; showDate?: boolean; selecting?: boolean; selected?: string[]; inTrash?: boolean; onchange?: () => void } = $props()
   let picker = $state<string[] | null>(null)
+  let editing = $state<string | null>(null)
   let note = $state('')
 
   function toggle(id: string) {
@@ -77,7 +79,7 @@
       {#if note}<p class="note faint" role="status">{note}</p>{/if}
       <div class="meta spread">
         <div>
-          <div>{dateTime(open.takenAt)}{#if open.worldName}<span class="sep">·</span>{#if open.worldId}<a href={href.world(open.worldId)} onclick={close}>{open.worldName}</a>{:else}{open.worldName}{/if}{/if}</div>
+          <div>{dateTime(open.takenAt)}{#if open.edited}<span class="chip small-chip">直した情報</span>{/if}{#if open.worldName}<span class="sep">·</span>{#if open.worldId}<a href={href.world(open.worldId)} onclick={close}>{open.worldName}</a>{:else}{open.worldName}{/if}{/if}</div>
           <div class="faint">
             {#if open.authorName}撮った人 {open.authorName}<span class="sep">·</span>{/if}{#if open.width}{open.width}×{open.height}<span class="sep">·</span>{/if}{open.fileName}
           </div>
@@ -86,7 +88,7 @@
           <button class="ghost" onclick={() => step(-1)} aria-label="前の写真" disabled={index <= 0}>←</button>
           <button class="ghost" onclick={() => step(1)} aria-label="次の写真" disabled={index >= photos.length - 1}>→</button>
           {#if open.available}<a class="chip" href={api.photoFile(open.id)} target="_blank" rel="noopener">もとの大きさ ↗</a>{/if}
-          {#if !inTrash}<button onclick={() => (picker = [open!.id])}>アルバムに入れる</button>{/if}
+          {#if !inTrash}<button onclick={() => (editing = open!.id)}>情報を直す</button><button onclick={() => (picker = [open!.id])}>アルバムに入れる</button>{/if}
           <button onclick={() => trashOne(open!)}>{inTrash ? '戻す' : 'ゴミ箱へ'}</button>
           <button onclick={close}>閉じる</button>
         </div>
@@ -95,6 +97,7 @@
   {/if}
 </dialog>
 
+{#if editing}<PhotoEditor photoId={editing} onclose={() => (editing = null)} onsaved={async () => { if (open) { const p = await api.photo(open.id).catch(() => null); if (p) { open = p; const i = photos.findIndex((x) => x.id === p.id); if (i >= 0) photos[i] = p } } }} />{/if}
 {#if picker}<AlbumPicker photoIds={picker} onclose={() => (picker = null)} ondone={(m) => (note = m)} />{/if}
 
 <style>
@@ -109,6 +112,7 @@
     border: 2px solid rgb(0 0 0 / 45%); display: grid; place-items: center; font-size: .85rem; color: var(--accent); z-index: 1; }
   .picked .check { background: var(--accent); color: #fff; border-color: var(--accent); }
   .note { margin: 0; padding: .4rem 1rem 0; }
+  .small-chip { font-size: .7rem; padding: 0 .4rem; margin-left: .4rem; vertical-align: .1em; }
   .missing { display: grid; place-items: center; height: 100%; font-size: .8rem; }
   dialog { border: 0; padding: 0; background: var(--surface); color: var(--ink); border-radius: var(--radius); width: min(96vw, 1100px); max-height: 94vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
   dialog::backdrop { background: rgb(0 0 0 / 70%); }

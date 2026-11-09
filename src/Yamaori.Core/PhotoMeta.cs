@@ -5,9 +5,14 @@ using System.Text.RegularExpressions;
 namespace Yamaori.Core;
 
 /// <summary>写真から読んだこと。TakenAt は UTC。</summary>
+/// <summary>YamaoriId は Yamaori が写真に書いた ID（書いたあとで大きさが変わっても、同じ写真として扱うため）。Players は Yamaori が書いた「一緒にいた人」。</summary>
 public sealed record PhotoMeta(
     DateTime TakenAt, string TakenSource, int? Width, int? Height,
-    string? WorldId, string? WorldName, string? AuthorId, string? AuthorName);
+    string? WorldId, string? WorldName, string? AuthorId, string? AuthorName,
+    string? YamaoriId = null, IReadOnlyList<PhotoPerson>? Players = null);
+
+/// <summary>写真に写った・一緒にいた人（ID の分からない人は Id が null）。</summary>
+public sealed record PhotoPerson(string? Id, string Name);
 
 /// <summary>
 /// VRChat の写真のメタデータを読む。画像そのものは読まない（頭の 1 MB だけ見る）。
@@ -92,7 +97,20 @@ public static partial class PhotoMetaReader
             source = "file_time";
         }
 
-        return new PhotoMeta(taken, source, w, h, Tag("vrc:WorldID"), Tag("vrc:WorldDisplayName"), Tag("vrc:AuthorID"), Tag("xmp:Author"));
+        List<PhotoPerson>? players = null;
+        if (xmp != null && Regex.Match(xmp, @"<yamaori:Players>(.*?)</yamaori:Players>", RegexOptions.Singleline) is { Success: true } pm)
+        {
+            players = [];
+            foreach (Match li in Regex.Matches(pm.Groups[1].Value, @"<rdf:li>([^<]*)</rdf:li>"))
+            {
+                var v = System.Net.WebUtility.HtmlDecode(li.Groups[1].Value);
+                var bar = v.IndexOf('|', StringComparison.Ordinal);
+                players.Add(bar > 0 && v.StartsWith("usr_", StringComparison.Ordinal) ? new PhotoPerson(v[..bar], v[(bar + 1)..]) : new PhotoPerson(null, bar == 0 ? v[1..] : v));
+            }
+        }
+        var yid = Tag("yamaori:PhotoId");
+        return new PhotoMeta(taken, source, w, h, Tag("vrc:WorldID"), Tag("vrc:WorldDisplayName"), Tag("vrc:AuthorID"), Tag("xmp:Author"),
+            yid != null && Regex.IsMatch(yid, "^p_[0-9a-f]{20}$") ? yid : null, players);
     }
 
     static (int?, int?) PngSize(byte[] b, int n)

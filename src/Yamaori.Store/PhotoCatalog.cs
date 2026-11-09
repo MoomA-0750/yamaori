@@ -4,9 +4,10 @@ using Yamaori.Core;
 
 namespace Yamaori.Store;
 
+/// <summary>Edited は、手で直した情報があること（ワールドと撮った人は、直したものを出す）。</summary>
 public sealed record PhotoView(
     string Id, string FileName, long Size, DateTime TakenAt, string TakenSource, int? Width, int? Height,
-    string? WorldId, string? WorldName, string? AuthorId, string? AuthorName, bool Available);
+    string? WorldId, string? WorldName, string? AuthorId, string? AuthorName, bool Available, bool Edited = false);
 
 /// <summary>
 /// 写真の目録。見張っているフォルダを読み、写真ごとにメタデータと置き場所を持つ。
@@ -71,7 +72,8 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         PhotoMeta meta;
         using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
             meta = PhotoMetaReader.Read(fs, info.Name, info.LastWriteTimeUtc, _tz);
-        var id = StableId.Of("photo", info.Name, info.Length);
+        // Yamaori が情報を書いた写真は、書いた ID を使う（書いて大きさが変わっても、同じ写真のまま）
+        var id = meta.YamaoriId ?? StableId.Of("photo", info.Name, info.Length);
         using var tx = db.Connection.BeginTransaction();
         using (var cmd = db.Command("""
             INSERT INTO photos (id, file_name, size, taken_at, taken_source, width, height, world_id, world_name, author_id, author_name, indexed_at)
@@ -99,13 +101,19 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         return id;
     }
 
+    /// <summary>写真のワールド（手で直したものが先）。</summary>
+    public const string WorldOf = "COALESCE((SELECT e.world_id FROM photo_edits e WHERE e.photo_id = p.id), p.world_id)";
+
     const string Columns = """
-        p.id, p.file_name, p.size, p.taken_at, p.taken_source, p.width, p.height, p.world_id, p.world_name, p.author_id, p.author_name,
-        EXISTS (SELECT 1 FROM photo_locations l WHERE l.photo_id = p.id)
+        p.id, p.file_name, p.size, p.taken_at, p.taken_source, p.width, p.height,
+        COALESCE(e.world_id, p.world_id), COALESCE(e.world_name, p.world_name), COALESCE(e.author_id, p.author_id), COALESCE(e.author_name, p.author_name),
+        EXISTS (SELECT 1 FROM photo_locations l WHERE l.photo_id = p.id), e.photo_id IS NOT NULL
         """;
 
+    const string FromPhotos = "photos p LEFT JOIN photo_edits e ON e.photo_id = p.id";
+
     static PhotoView Read(SqliteDataReader r) => new(r.GetString(0), r.GetString(1), r.GetInt64(2), Database.ParseTime(r.GetString(3)), r.GetString(4),
-        r.IsDBNull(5) ? null : r.GetInt32(5), r.IsDBNull(6) ? null : r.GetInt32(6), Str(r, 7), Str(r, 8), Str(r, 9), Str(r, 10), r.GetInt64(11) != 0);
+        r.IsDBNull(5) ? null : r.GetInt32(5), r.IsDBNull(6) ? null : r.GetInt32(6), Str(r, 7), Str(r, 8), Str(r, 9), Str(r, 10), r.GetInt64(11) != 0, r.GetInt64(12) != 0);
 
     /// <summary>
     /// 撮ったときにその人が同じインスタンスにいた（人の ID か、名前だけの人は name:名前）。
@@ -115,6 +123,8 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         p.id IN (SELECT p2.id FROM encounters e JOIN visits v ON v.id = e.visit_id
                  JOIN photos p2 ON p2.taken_at >= e.joined_at AND p2.taken_at < COALESCE(e.left_at, v.left_at, '9999')
                  WHERE e.user_id = $person OR (e.user_id IS NULL AND 'name:' || e.name = $person))
+        OR p.id IN (SELECT pe.photo_id FROM photo_edits pe, json_each(pe.people) j
+                    WHERE COALESCE(json_extract(j.value, '$.id'), 'name:' || json_extract(j.value, '$.name')) = $person)
         """;
 
     public sealed record PhotoGroup(string Key, string? Name, int Count, string LatestPhotoId, DateTime LatestAt);
@@ -123,7 +133,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
 
     List<Shot> Shots()
     {
-        using var cmd = db.Command($"SELECT id, taken_at, world_id FROM photos p WHERE {NotTrashed} ORDER BY taken_at");
+        using var cmd = db.Command($"SELECT id, taken_at, {WorldOf} FROM photos p WHERE {NotTrashed} ORDER BY taken_at");
         using var r = cmd.ExecuteReader();
         var list = new List<Shot>();
         while (r.Read()) list.Add(new Shot(r.GetString(0), r.GetString(1), Str(r, 2)));
@@ -172,7 +182,10 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         using (var cmd = db.Command("SELECT id, name FROM worlds WHERE name IS NOT NULL"))
         using (var r = cmd.ExecuteReader())
             while (r.Read()) names[r.GetString(0)] = r.GetString(1);
-        using (var cmd = db.Command("SELECT world_id, world_name FROM photos WHERE world_id IS NOT NULL AND world_name IS NOT NULL GROUP BY world_id"))
+        using (var cmd = db.Command("""
+            SELECT world_id, world_name FROM photo_edits WHERE world_id IS NOT NULL AND world_name IS NOT NULL
+            UNION ALL SELECT world_id, world_name FROM photos WHERE world_id IS NOT NULL AND world_name IS NOT NULL
+            """))
         using (var r = cmd.ExecuteReader())
             while (r.Read()) names.TryAdd(r.GetString(0), r.GetString(1));
         return Group(pairs, k => names.GetValueOrDefault(k), limit);
@@ -197,6 +210,19 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
                 for (var i = LowerBound(shots, r.GetString(2)); i < shots.Count && string.CompareOrdinal(shots[i].Taken, to) < 0; i++)
                     pairs.Add((who, shots[i]));
             }
+        // 手で直した「一緒にいた人」
+        var byId = shots.ToDictionary(x => x.Id);
+        using (var cmd = db.Command("""
+            SELECT pe.photo_id, COALESCE(json_extract(j.value, '$.id'), 'name:' || json_extract(j.value, '$.name')), json_extract(j.value, '$.name')
+            FROM photo_edits pe, json_each(pe.people) j
+            """))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read())
+                if (byId.TryGetValue(r.GetString(0), out var shot) && !r.IsDBNull(1))
+                {
+                    pairs.Add((r.GetString(1), shot));
+                    if (!r.IsDBNull(2)) names.TryAdd(r.GetString(1), r.GetString(2));
+                }
         // 見出しの名前は、最後に見た名前
         using (var cmd = db.Command("SELECT user_id, name FROM people WHERE name IS NOT NULL"))
         using (var r = cmd.ExecuteReader())
@@ -221,18 +247,18 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
         if (personId != null) { where.Add(WithPerson); args.Add(("$person", personId)); }
         if (from is { } f) { where.Add("p.taken_at >= $from"); args.Add(("$from", Database.Time(f))); }
         if (to is { } t) { where.Add("p.taken_at < $to"); args.Add(("$to", Database.Time(t))); }
-        if (worldId != null) { where.Add("(p.world_id = $world OR (p.world_id IS NULL AND EXISTS (SELECT 1 FROM visits v WHERE v.world_id = $world AND p.taken_at >= v.joined_at AND p.taken_at < COALESCE(v.left_at, '9999'))))"); args.Add(("$world", worldId)); }
+        if (worldId != null) { where.Add("(COALESCE(e.world_id, p.world_id) = $world OR (COALESCE(e.world_id, p.world_id) IS NULL AND EXISTS (SELECT 1 FROM visits v WHERE v.world_id = $world AND p.taken_at >= v.joined_at AND p.taken_at < COALESCE(v.left_at, '9999'))))"); args.Add(("$world", worldId)); }
         if (visitId != null)
         {
             where.Add("EXISTS (SELECT 1 FROM visits v WHERE v.id = $visit AND p.taken_at >= v.joined_at AND p.taken_at < COALESCE(v.left_at, '9999'))");
             args.Add(("$visit", visitId));
         }
         var w = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
-        var total = Convert.ToInt32(db.Scalar($"SELECT COUNT(*) FROM photos p {w}", [.. args]), CultureInfo.InvariantCulture);
+        var total = Convert.ToInt32(db.Scalar($"SELECT COUNT(*) FROM {FromPhotos} {w}", [.. args]), CultureInfo.InvariantCulture);
         args.Add(("$limit", Math.Clamp(limit, 1, 500)));
         args.Add(("$offset", Math.Max(0, offset)));
         var order = visitId != null ? "ASC" : "DESC";
-        using var cmd = db.Command($"SELECT {Columns} FROM photos p {w} ORDER BY p.taken_at {order} LIMIT $limit OFFSET $offset", null, [.. args]);
+        using var cmd = db.Command($"SELECT {Columns} FROM {FromPhotos} {w} ORDER BY p.taken_at {order} LIMIT $limit OFFSET $offset", null, [.. args]);
         using var r = cmd.ExecuteReader();
         var items = new List<PhotoView>();
         while (r.Read()) items.Add(Read(r));
@@ -241,7 +267,7 @@ public sealed class PhotoCatalog(Database db, string? deviceId = null, TimeZoneI
 
     public PhotoView? Get(string id)
     {
-        using var cmd = db.Command($"SELECT {Columns} FROM photos p WHERE p.id = $id AND NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id AND t.purged_at IS NOT NULL)", null, ("$id", id));
+        using var cmd = db.Command($"SELECT {Columns} FROM {FromPhotos} WHERE p.id = $id AND NOT EXISTS (SELECT 1 FROM photo_trash t WHERE t.photo_id = p.id AND t.purged_at IS NOT NULL)", null, ("$id", id));
         using var r = cmd.ExecuteReader();
         return r.Read() ? Read(r) : null;
     }

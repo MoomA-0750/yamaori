@@ -2075,6 +2075,142 @@
         }
       }
     },
+    "/api/photos/{id}/info": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の情報（写真から読んだもの・手で直したもの・撮った時刻から当てたもの）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoInfo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/edit": {
+      "put": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "写真の情報を直す（ワールド・撮った人・一緒にいた人。Yamaori の中だけ。ファイルに書くのは /write）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoEditInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "直した情報を消す（写真から読んだものに戻る）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/write": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "今の情報を、写真のファイル（PNG）に VRChat と同じ形の XMP で書く（この PC と NAS の置き場所の全部。本人だけ）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/photos/{id}/albums": {
       "get": {
         "tags": [
@@ -3508,6 +3644,106 @@
           }
         }
       },
+      "PhotoEdit": {
+        "required": [
+          "worldId",
+          "worldName",
+          "authorId",
+          "authorName",
+          "people",
+          "editedAt",
+          "writtenAt"
+        ],
+        "type": "object",
+        "properties": {
+          "worldId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoPerson"
+            }
+          },
+          "editedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "writtenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PhotoEditInput": {
+        "required": [
+          "worldId",
+          "worldName",
+          "authorId",
+          "authorName",
+          "people"
+        ],
+        "type": "object",
+        "properties": {
+          "worldId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "people": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PhotoPerson"
+            }
+          }
+        }
+      },
       "PhotoGroup": {
         "required": [
           "key",
@@ -3537,6 +3773,140 @@
           "latestAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PhotoInfo": {
+        "required": [
+          "photo",
+          "file",
+          "edit",
+          "suggestion",
+          "canWrite"
+        ],
+        "type": "object",
+        "properties": {
+          "photo": {
+            "$ref": "#/components/schemas/PhotoView"
+          },
+          "file": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PhotoMeta"
+              }
+            ]
+          },
+          "edit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PhotoEdit"
+              }
+            ]
+          },
+          "suggestion": {
+            "$ref": "#/components/schemas/PhotoSuggestion"
+          },
+          "canWrite": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PhotoMeta": {
+        "required": [
+          "takenAt",
+          "takenSource",
+          "width",
+          "height",
+          "worldId",
+          "worldName",
+          "authorId",
+          "authorName"
+        ],
+        "type": "object",
+        "properties": {
+          "takenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "takenSource": {
+            "type": "string"
+          },
+          "width": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "height": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "worldId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "yamaoriId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "players": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PhotoPerson"
+            }
+          }
+        }
+      },
+      "PhotoPerson": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -3682,6 +4052,55 @@
           }
         }
       },
+      "PhotoSuggestion": {
+        "required": [
+          "visitId",
+          "worldId",
+          "worldName",
+          "authorId",
+          "authorName",
+          "people"
+        ],
+        "type": "object",
+        "properties": {
+          "visitId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "worldName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoPerson"
+            }
+          }
+        }
+      },
       "PhotoView": {
         "required": [
           "id",
@@ -3756,6 +4175,10 @@
           },
           "available": {
             "type": "boolean"
+          },
+          "edited": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -5010,6 +5433,25 @@
           "noteCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "WriteResult": {
+        "required": [
+          "files",
+          "skipped"
+        ],
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

@@ -105,6 +105,8 @@ public static class Auth
         if (AdminPaths.Any(a => path.StartsWithSegments(a, StringComparison.OrdinalIgnoreCase))) return "AdminOnly";
         // ゴミ箱を空にする（ファイルを本当に消す）のは本人だけ
         if (path.StartsWithSegments("/api/photos/trash/empty", StringComparison.OrdinalIgnoreCase)) return "AdminOnly";
+        // 写真のファイルに書く（NAS の写真を書き換える）のも本人だけ
+        if (path.StartsWithSegments("/api/photos", StringComparison.OrdinalIgnoreCase) && (path.Value ?? "").TrimEnd('/').EndsWith("/write", StringComparison.OrdinalIgnoreCase)) return "AdminOnly";
         // 人を忘れるのも本人だけ（忘れた人の一覧は、忘れたい相手の名前を並べたものなので、読むことも本人だけ）
         if (path.StartsWithSegments("/api/people", StringComparison.OrdinalIgnoreCase) && (path.Value ?? "").TrimEnd('/').EndsWith("/forget", StringComparison.OrdinalIgnoreCase)) return "AdminOnly";
         // 子の端末の口は、子の端末のトークンだけ（ほかのトークンが漏れても、子の記録を空で入れ替えて消させない）

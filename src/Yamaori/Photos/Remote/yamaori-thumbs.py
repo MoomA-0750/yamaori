@@ -2,20 +2,32 @@
 """Yamaori の写真の縮小を、写真のある機械（NAS など）の上で作る。
 
 写真のフォルダ（root）の下の写真を新しい順に読み、root/.yamaori/thumbs/<ID の頭 4 文字>/<ID>_<大きさ>.jpg を作る。
-ID は Yamaori と同じ決め方（"photo\\n<ファイル名>\\n<バイト数>" の SHA-256 の頭 10 バイト）。
+ID は Yamaori と同じ決め方（"photo\\n<ファイル名>\\n<バイト数>" の SHA-256 の頭 10 バイト。Yamaori が XMP に書いた yamaori:PhotoId があればそれ）。
 Yamaori はこの縮小を見つけると、写真を読まずにそれを使う。
 
 要るもの: Python 3 と Pillow（TrueNAS SCALE には最初から入っている）。
 使い方: python3 yamaori-thumbs.py --root /mnt/pool/photos/VRChat [--sizes 320] [--jobs 2]
 進み具合は root/.yamaori/thumbs-status.json に書く。同じ root で 2 つ同時には動かない。
 """
-import argparse, hashlib, json, os, sys, time
+import argparse, hashlib, json, os, re, sys, time
+
+YAMAORI_ID = re.compile(rb"<yamaori:PhotoId>(p_[0-9a-f]{20})</yamaori:PhotoId>")
 
 EXTS = (".png", ".jpg", ".jpeg", ".webp")
 SKIP_DIR = ".yamaori"
 
 
-def photo_id(name, size):
+def photo_id(name, size, path=None):
+    # Yamaori が情報を書いた写真は、書いた ID を使う（書いて大きさが変わっても同じ写真）
+    if path is not None:
+        try:
+            with open(path, "rb") as f:
+                head = f.read(1 << 20)
+            m = YAMAORI_ID.search(head)
+            if m:
+                return m.group(1).decode("ascii")
+        except OSError:
+            pass
     key = "photo\n%s\n%d" % (name, size)
     return "p_" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:20]
 
@@ -29,7 +41,7 @@ def make(args):
     from PIL import Image
     try:
         st = os.stat(path)
-        pid = photo_id(os.path.basename(path), st.st_size)
+        pid = photo_id(os.path.basename(path), st.st_size, path)
         todo = [s for s in sizes if not os.path.exists(out_path(root, pid, s))]
         if not todo:
             return "skipped"
