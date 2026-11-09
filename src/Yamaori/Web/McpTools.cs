@@ -66,6 +66,7 @@ public sealed class McpTools(Queries queries, YamaoriState state)
         [Description("付け先の ID（訪問の v_…、wrld_…、usr_…、日なら yyyy-MM-dd）")] string targetId,
         [Description("本文（Markdown）")] string body)
     {
+        if (body.Length > Api.MaxNote) return Out(new { error = $"メモは {Api.MaxNote} 文字まで" });
         if (!Queries.TargetTypes.Contains(targetType)) return Out(new { error = "targetType は visit・world・person・day" });
         if (!queries.TargetExists(targetType, targetId)) return Out(new { error = "付け先が見つからない" });
         return Out(queries.AddNote(targetType, targetId, body, state.DeviceId));
@@ -73,7 +74,8 @@ public sealed class McpTools(Queries queries, YamaoriState state)
 
     [McpServerTool(Name = "update_note"), Description("メモの本文を書き換える。")]
     public string UpdateNote([Description("メモの ID（n_…）")] string id, [Description("新しい本文（Markdown）")] string body) =>
-        Out(queries.UpdateNote(id, body) ?? (object)new { error = "見つからない" });
+        body.Length > Api.MaxNote ? Out(new { error = $"メモは {Api.MaxNote} 文字まで" })
+        : Out(queries.UpdateNote(id, body) ?? (object)new { error = "見つからない" });
 
     static DateOnly? ParseDate(string? s) =>
         s != null && DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;

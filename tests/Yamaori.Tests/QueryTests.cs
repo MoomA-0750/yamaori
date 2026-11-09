@@ -50,6 +50,17 @@ public sealed class QueryTests : IDisposable
     }
 
     [Fact]
+    public void AI_の口からも_長すぎるメモは書けない()
+    {
+        using var db = Open();
+        var q = new Queries(db, Tokyo);
+        var mcp = new Yamaori.Web.McpTools(q, new Yamaori.Web.YamaoriState { DeviceId = "d_test", DeviceName = "test", Listen = "local" });
+        var big = new string('a', Yamaori.Web.Api.MaxNote + 1);
+        Assert.Contains("error", mcp.AddNote("day", "2026-11-08", big));
+        Assert.Equal(0L, db.Scalar("SELECT COUNT(*) FROM notes"));
+    }
+
+    [Fact]
     public void メモを書いて直して消せ_付け先がなければ断る()
     {
         using var db = Open();
