@@ -44,6 +44,7 @@ public static class Server
         builder.Services.AddSingleton<Photos.RemoteThumbs>();
         builder.Services.AddHostedService<ThumbWorker>();
         builder.Services.AddSingleton<ImportJobs>();
+        builder.Services.AddSingleton<DeviceRoles>();
         builder.Services.AddHostedService<VrcxWorker>();
         builder.Services.AddSingleton(new Thumbnails(Path.Combine(options.DataDir, "thumbs"), options.EffectivePhotoDirs, options.ThumbSidecar));
         // 要求ごとに DB へつなぐ（見張りとは別の接続）

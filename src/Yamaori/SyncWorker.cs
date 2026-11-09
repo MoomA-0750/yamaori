@@ -11,7 +11,7 @@ namespace Yamaori;
 /// 子の端末で動く。決まった間隔で、この端末のログの記録とメモのうち変わったものを親へ送る。
 /// 親につながらない間は送らずに次の回に回す（送ったという印を付けないので、つながったときにまとめて送る）。
 /// </summary>
-public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState state, ILogger<SyncWorker> logger) : BackgroundService
+public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState state, DeviceRoles roles, ILogger<SyncWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -29,12 +29,14 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
         {
             try
             {
+                // グループのメンバーなら、まとめ役から自分の役を読む（まとめ役で変えた役が、次の回から効く）
+                if (o.GroupId != null) await FetchRolesAsync(http, o, stoppingToken).ConfigureAwait(false);
                 var r = await PushAsync(http, o, state, stoppingToken, v =>
                 {
                     if (warnedOldParent) return;
                     warnedOldParent = true;
                     logger.LogWarning("親の Yamaori（{Version}）がこの端末より古い。消したメモなど、新しい分は親を更新するまで送らない（親は子と同じか新しい版にする）", v);
-                }).ConfigureAwait(false);
+                }, sendLogs: roles.Has(GroupRoles.Logs)).ConfigureAwait(false);
                 if (r.Sources + r.Notes > 0) logger.LogInformation("親へ送った: 出どころ {Sources}・メモ {Notes}", r.Sources, r.Notes);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
@@ -51,13 +53,30 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
 
     public sealed record PushResult(int Sources, int Notes);
 
-    public static async Task<PushResult> PushAsync(HttpClient http, YamaoriOptions o, YamaoriState state, CancellationToken cancel, Action<string>? onOldParent = null)
+    async Task FetchRolesAsync(HttpClient http, YamaoriOptions o, CancellationToken cancel)
+    {
+        try
+        {
+            var g = await http.GetFromJsonAsync<GroupApi.GroupSync>("api/sync/group", Web, cancel).ConfigureAwait(false);
+            if (g == null) return;
+            using var db = Database.Open(o.DatabasePath);
+            new AuthStore(db).Set(GroupApi.RolesKey, string.Join(',', g.Roles));
+            roles.Invalidate();
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            logger.LogWarning("まとめ役に断られた（グループから外されたかもしれない）。設定の「グループ」で確かめる");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { /* 古いまとめ役（グループを知らない） */ }
+    }
+
+    public static async Task<PushResult> PushAsync(HttpClient http, YamaoriOptions o, YamaoriState state, CancellationToken cancel, Action<string>? onOldParent = null, bool sendLogs = true)
     {
         var parent = http.BaseAddress!.ToString();
         using var db = Database.Open(o.DatabasePath);
         var sync = new SyncStore(db);
         int sources = 0, notes = 0;
-        foreach (var source in sync.LocalSources(state.DeviceId))
+        foreach (var source in sendLogs ? sync.LocalSources(state.DeviceId) : [])
         {
             var payload = new SyncProjection(state.DeviceId, state.DeviceName, source, sync.Read(state.DeviceId, source));
             var hash = SyncStore.Hash(payload);

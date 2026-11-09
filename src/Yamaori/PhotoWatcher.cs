@@ -8,7 +8,7 @@ namespace Yamaori;
 /// 写真のフォルダを見張って目録に入れる。決まった間隔で全部を読み直し（変わっていないものは中を読まない）、
 /// この PC のフォルダは新しいファイルができたら少し待ってすぐ入れる（VRChat が書き終えるのを待つ）。
 /// </summary>
-public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState state, LiveHub hub, Thumbnails thumbs, ILogger<PhotoWatcher> logger) : BackgroundService
+public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState state, LiveHub hub, Thumbnails thumbs, DeviceRoles roles, ILogger<PhotoWatcher> logger) : BackgroundService
 {
     readonly SemaphoreSlim _wake = new(0);
 
@@ -39,6 +39,8 @@ public sealed class PhotoWatcher(IOptions<YamaoriOptions> options, YamaoriState 
             {
                 try
                 {
+                    // 「写真を扱う」の役がなければ、目録も送り出しもしない
+                    if (!roles.Has(Store.GroupRoles.Photos)) { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false); continue; }
                     ScanAll(o, dirs, stoppingToken);
                     if (o.PhotoUpload.Kind != "none" && DateTime.UtcNow - lastUpload >= TimeSpan.FromMinutes(o.PhotoUpload.IntervalMinutes))
                     {

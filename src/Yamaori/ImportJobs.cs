@@ -131,6 +131,31 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
         try { File.Delete(file); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
+    /// <summary>
+    /// グループのメンバーなら、取り込む DB をまとめ役へ送って、まとめ役で取り込んでもらう（記録はまとめ役が持つので）。
+    /// 送れたら null、だめなら理由。file は送り終えたら消す。
+    /// </summary>
+    public async Task<string?> ForwardAsync(string kind, string file, bool replace, string? account, CancellationToken cancel)
+    {
+        try
+        {
+            var o = Config();
+            if (o.ParentUrl == null || Photos.Secrets.Unprotect(o.ParentToken) is not { } token) return "まとめ役のアドレスかトークンがない（グループに入り直す）";
+            using var http = new HttpClient { BaseAddress = new Uri(o.ParentUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(30) };
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            await using var f = new FileStream(file, FileMode.Open, FileAccess.Read);
+            using var content = new StreamContent(f);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            var q = $"api/sync/import/{kind}?replace={(replace ? "true" : "false")}" + (account is { Length: > 0 } ? "&account=" + Uri.EscapeDataString(account) : "");
+            using var res = await http.PostAsync(q, content, cancel).ConfigureAwait(false);
+            if (res.IsSuccessStatusCode) return null;
+            var body = (await res.Content.ReadAsStringAsync(cancel).ConfigureAwait(false)).Trim();
+            return $"まとめ役が {(int)res.StatusCode} を返した{(res.StatusCode == System.Net.HttpStatusCode.Conflict ? "（ほかの取り込みが動いている）" : "")}: {(body.Length > 200 ? body[..200] : body)}";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException) { return $"まとめ役へ送れなかった: {ex.Message}"; }
+        finally { TryDelete(file); }
+    }
+
     /// <summary>前の取り込みの結果（時刻と言葉）。</summary>
     public static (DateTime? At, string? Message) Last(Database db, string kind)
     {
@@ -148,7 +173,7 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
 /// VRCX との連携: この PC の VRCX の DB が変わっていたら、決まった間隔で取り込む（VRCX は書き足していくので、続きが入る）。
 /// 前に取り込んだものと別の DB になったら、勝手に入れ替えずに止まって記録に書く（本人が画面で決める）。
 /// </summary>
-public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options, ILogger<VrcxWorker> logger) : BackgroundService
+public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options, DeviceRoles roles, ILogger<VrcxWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -160,7 +185,9 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
             {
                 var o = jobs.Config();
                 var path = o.EffectiveVrcxPath;
-                if (o.VrcxAuto && File.Exists(path) && DateTime.UtcNow - lastTry >= TimeSpan.FromMinutes(Math.Clamp(o.VrcxMinutes, 5, 1440)))
+                // グループの中では「VRCX と連携する」の役で、グループがなければ設定で動く
+                var enabled = roles.InGroup ? roles.Has(GroupRoles.Vrcx) : o.VrcxAuto;
+                if (enabled && File.Exists(path) && DateTime.UtcNow - lastTry >= TimeSpan.FromMinutes(Math.Clamp(o.VrcxMinutes, 5, 1440)))
                 {
                     using var db = Database.Open(options.Value.DatabasePath);
                     var store = new AuthStore(db);
@@ -168,6 +195,14 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
                     if (store.Get("vrcx_auto_mtime") != mtime && store.Get("vrcx_auto_blocked") != mtime)
                     {
                         lastTry = DateTime.UtcNow;
+                        if (roles.IsMember)
+                        {
+                            // メンバーは、まとめ役へ送って取り込んでもらう
+                            var problem = await jobs.ForwardAsync("vrcx", jobs.Snapshot(path), replace: false, null, stoppingToken).ConfigureAwait(false);
+                            if (problem == null) { store.Set("vrcx_auto_mtime", mtime); logger.LogInformation("VRCX の DB をまとめ役へ送った"); }
+                            else logger.LogWarning("VRCX の DB をまとめ役へ送れなかった（次の回にやり直す）: {Problem}", problem);
+                            continue;
+                        }
                         var s = jobs.RunNow("vrcx", jobs.Snapshot(path), replace: false);
                         if (s.Ok == true) store.Set("vrcx_auto_mtime", mtime);
                         else

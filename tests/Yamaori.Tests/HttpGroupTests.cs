@@ -47,6 +47,17 @@ public sealed class HttpGroupTests
         Assert.Equal(200, (await hub.SendAsync("PUT", "/api/settings/group/members/d_laptop", loopback: true, body: """{"roles":["logs","vrcx","hub"]}""")).Response.StatusCode);
         sync = await Json(await hub.SendAsync("GET", "/api/sync/group", headers: bearer));
         Assert.Equal(["logs", "vrcx"], sync.GetProperty("roles").EnumerateArray().Select(x => x.GetString()!).ToArray()); // まとめ役にはできない
+        // メンバーは VRCX の DB をまとめ役へ送れる（まとめ役で取り込む）
+        var junk = await hub.Server.SendAsync(c =>
+        {
+            c.Request.Method = "POST";
+            c.Request.Path = "/api/sync/import/vrcx";
+            c.Request.Host = new Microsoft.AspNetCore.Http.HostString("localhost", 47899);
+            c.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.1.50");
+            c.Request.Headers.Authorization = "Bearer " + token;
+            c.Request.Body = new MemoryStream([1, 2, 3]);
+        });
+        Assert.Equal(200, junk.Response.StatusCode);
         // メンバーのトークンは、記録を読む口には届かない
         Assert.Equal(403, (await hub.SendAsync("GET", "/api/days", headers: bearer)).Response.StatusCode);
 

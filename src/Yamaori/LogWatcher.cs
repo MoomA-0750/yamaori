@@ -11,7 +11,7 @@ namespace Yamaori;
 /// VRChat のログのフォルダを見張り、書き足された分を DB に入れる。
 /// いちばん新しいログは、VRChat が動いている間は「閉じていない」として読む（最後の訪問はまだ続いている）。
 /// </summary>
-public sealed class LogWatcher(IOptions<YamaoriOptions> options, ILogger<LogWatcher> logger) : BackgroundService
+public sealed class LogWatcher(IOptions<YamaoriOptions> options, ILogger<LogWatcher> logger, DeviceRoles roles) : BackgroundService
 {
     /// <summary>今新しく読んだ出来事（あとで SSE に流す）。</summary>
     public event Action<string, LogEvent>? Live;
@@ -28,6 +28,8 @@ public sealed class LogWatcher(IOptions<YamaoriOptions> options, ILogger<LogWatc
         {
             try
             {
+                // 「ログを集める」の役がなければ読まない（グループの中で、ほかの端末に任せた）
+                if (!roles.Has(Store.GroupRoles.Logs)) { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false); continue; }
                 foreach (var (file, r) in IngestAll(ingestor, archive, o.LogDir))
                 {
                     if (r.Changed && r.NewEvents.Count > 0) logger.LogInformation("{File}: {Count} 件", file, r.NewEvents.Count);
