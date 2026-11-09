@@ -85,6 +85,18 @@ public sealed class YamaoriOptions
     /// <summary>写真のある機械（NAS）の上で縮小を作る（SSH で入って yamaori-thumbs.py を動かす）。</summary>
     public RemoteThumbOptions RemoteThumbs { get; set; } = new();
 
+    /// <summary>VRCX の DB の場所。空なら、この PC の %AppData%\VRCX\VRCX.sqlite3。</summary>
+    public string? VrcxPath { get; set; }
+
+    public string EffectiveVrcxPath => string.IsNullOrWhiteSpace(VrcxPath)
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCX", "VRCX.sqlite3") : VrcxPath;
+
+    /// <summary>VRCX の DB を決まった間隔で取り込み続ける（VRCX が書き足していくので）。</summary>
+    public bool VrcxAuto { get; set; }
+
+    /// <summary>VRCX を取り込む間隔（分）。</summary>
+    public double VrcxMinutes { get; set; } = 60;
+
     /// <summary>毎日の DB の写しを何日分残すか。0 なら取らない。</summary>
     public int BackupKeep { get; set; } = 7;
 

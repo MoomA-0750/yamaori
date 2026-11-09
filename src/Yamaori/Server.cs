@@ -43,6 +43,8 @@ public static class Server
         builder.Services.AddSingleton<ThumbJob>();
         builder.Services.AddSingleton<Photos.RemoteThumbs>();
         builder.Services.AddHostedService<ThumbWorker>();
+        builder.Services.AddSingleton<ImportJobs>();
+        builder.Services.AddHostedService<VrcxWorker>();
         builder.Services.AddSingleton(new Thumbnails(Path.Combine(options.DataDir, "thumbs"), options.EffectivePhotoDirs, options.ThumbSidecar));
         // 要求ごとに DB へつなぐ（見張りとは別の接続）
         builder.Services.AddScoped(_ => Database.Open(options.DatabasePath));
@@ -80,6 +82,7 @@ public static class Server
         Auth.MapPhotoSettings(app);
         Auth.MapSyncSettings(app);
         ThumbSettings.Map(app);
+        ImportSettings.Map(app);
         Api.Map(app);
         app.MapMcp("/mcp");
         return app;
