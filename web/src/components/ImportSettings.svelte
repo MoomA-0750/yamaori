@@ -67,6 +67,16 @@
       <p class="status" class:bad={!view.job.ok} role="status">{view.job.ok ? '取り込みました' : '取り込めませんでした'}: {view.job.message}</p>
     {/if}
 
+    {#if member}
+      <div class="stack block">
+        <h3>この端末の記録をまとめ役へ移す</h3>
+        <p class="faint">グループに入る前からこの端末にあった記録を、まとめ役へ送ります。取り込んだ訪問（VRChatActivityTools・VRCX）、アルバム、写真の直し、ゴミ箱、お気に入り、忘れた人、フレンドの写し、メモが対象です。ログの記録はふだんどおり送られます。</p>
+        <p class="faint">まとめ役にあるものは消さず、足りないものだけ足します。何度送っても二重にはなりません。この端末の記録も消しません。</p>
+        <div><button class="primary" onclick={move} disabled={sending || view.job.running}>まとめ役へ移す</button></div>
+        {#if view.move.at}<p class="faint">前に送った: {dateTime(view.move.at)} — {view.move.message}</p>{/if}
+      </div>
+    {/if}
+
     <div class="stack block">
       <h3>VRChatActivityTools から移る</h3>
       <p class="faint">VRChatActivityTools の記録（<code>VRChatActivityLog.db</code>）を選ぶと、訪問・会った人・動画・通知を取り込みます。ログの記録がある期間とは重ねません。</p>
@@ -99,16 +109,6 @@
       </details>
       {#if view.vrcx.at}<p class="faint">前に取り込んだ: {dateTime(view.vrcx.at)} — {view.vrcx.message}</p>{/if}
     </div>
-
-    {#if member}
-      <div class="stack block">
-        <h3>この端末の記録をまとめ役へ移す</h3>
-        <p class="faint">グループに入る前からこの端末にあった記録を、まとめ役へ送ります。取り込んだ訪問（VRChatActivityTools・VRCX）、アルバム、写真の直し、ゴミ箱、お気に入り、忘れた人、フレンドの写し、メモが対象です。ログの記録はふだんどおり送られます。</p>
-        <p class="faint">まとめ役にあるものは消さず、足りないものだけ足します。何度送っても二重にはなりません。この端末の記録も消しません。</p>
-        <div><button class="primary" onclick={move} disabled={sending || view.job.running}>まとめ役へ移す</button></div>
-        {#if view.move.at}<p class="faint">前に送った: {dateTime(view.move.at)} — {view.move.message}</p>{/if}
-      </div>
-    {/if}
 
     <label class="check"><input type="checkbox" bind:checked={replace} /> 前に取り込んだものと別の DB なら、入れ替える（前の取り込みの分は消えます）</label>
     {#if view.job.needsReplace && !view.job.running}<p class="warn">前に取り込んだものと別の DB です。入れ替えてよければ、上の印を付けてもう一度取り込みます。</p>{/if}
