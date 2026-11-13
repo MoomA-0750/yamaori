@@ -45,6 +45,7 @@ services:
 
   yamaori:
     image: ghcr.io/mooma-0750/yamaori:latest
+    pull_policy: always                    # 起こし直すたびに新しい image を取りに行く（YAML を保存し直すか、アプリを止めて起こすと新しい版になる）
     restart: unless-stopped
     network_mode: service:tailscale        # tailscale と同じネットワークにいる（serve が 127.0.0.1:47800 へ渡せるように）
     depends_on:
