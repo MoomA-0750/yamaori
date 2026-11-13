@@ -46,11 +46,17 @@
     try {
       const r = await api.joinGroup(hubUrl.trim(), code.trim())
       msg = r.message
-      if (r.ok) { needRestart = r.restartRequired; await load() }
+      if (r.ok) await done(r.restartRequired)
     } catch (e) { msg = (e as Error).message }
   }
   async function leave() {
-    try { const r = await api.leaveGroup(); msg = r.message; needRestart = r.restartRequired; await load() } catch (e) { msg = (e as Error).message }
+    try { const r = await api.leaveGroup(); msg = r.message; await done(r.restartRequired) } catch (e) { msg = (e as Error).message }
+  }
+  // 入った・抜けたのは起こし直すと効くので、そのまま起こし直す（ボタンは、うまくいかなかったときのために残す）
+  async function done(restartRequired: boolean) {
+    needRestart = restartRequired
+    await load()
+    if (restartRequired) { msg = msg.replace(/。?起こし直すと[^。]*$/, '') + '。起こし直しています…'; onrestart() }
   }
   const hubUrlHint = $derived(location.origin)
 </script>
