@@ -12,6 +12,8 @@
   --yamaori-live-soft: var(--success-soft);
 }
 
+/* 素の要素の決まり。base の層に入れ、kasane の部品（k-btn・k-field など。kasane の層）がいつも勝つようにする */
+@layer base {
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -68,6 +70,7 @@ input[type="text"], input[type="password"], input[type="search"], input[type="nu
 }
 ::placeholder { color: var(--faint); }
 textarea { resize: vertical; line-height: var(--leading-relaxed); }
+}
 
 /* 入れ物。中で縁に沿うもの（ボタンなど）と同心になるよう、角丸は「中の角丸 ＋ 余白」 */
 .card {
@@ -119,7 +122,7 @@ textarea { resize: vertical; line-height: var(--leading-relaxed); }
 .prose h2 { font-size: var(--font-body); }
 .prose p, .prose ul, .prose ol, .prose blockquote, .prose pre { margin: 0.5em 0; }
 .prose a { color: var(--link); text-decoration: underline; }
-.prose blockquote { border-left: 3px solid var(--line-strong); padding-left: 0.8em; color: var(--muted); }
+.prose blockquote { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); corner-shape: var(--corner-shape); background: var(--surface-2); color: var(--muted); }
 .prose code { font-family: var(--family-mono); background: var(--code-bg); color: var(--code-fg); padding: 0.05em 0.35em; border-radius: var(--radius-sm); corner-shape: var(--corner-shape); font-size: 0.88em; }
 .prose pre { background: var(--surface-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); corner-shape: var(--corner-shape); overflow-x: auto; }
 .prose pre code { background: none; color: inherit; padding: 0; }

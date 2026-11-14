@@ -77,7 +77,7 @@
   .month { color: var(--muted); font-size: var(--font-small); margin: var(--space-1) 0 var(--space-2); }
   .days { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
   .day { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2) var(--space-4); flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
-  .day:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
+  .day:hover { border-color: color-mix(in srgb, var(--line-strong) 45%, transparent); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
   .date { font-weight: var(--weight-strong); }
   .nums { gap: var(--space-1) var(--space-4); font-variant-numeric: tabular-nums; }
   .empty { padding: var(--space-6); text-align: center; }

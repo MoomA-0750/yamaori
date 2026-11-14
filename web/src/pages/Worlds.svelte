@@ -72,7 +72,7 @@
   .tools select { width: auto; }
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
   .item { display: block; padding: var(--space-3) var(--space-4); }
-  .item:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
+  .item:hover { border-color: color-mix(in srgb, var(--line-strong) 45%, transparent); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
   .name { font-weight: var(--weight-strong); }
   .nums { gap: var(--space-1) var(--space-4); font-size: var(--font-label); font-variant-numeric: tabular-nums; }
   @media (max-width: 480px) { .tools { grid-template-columns: 1fr; } .tools select { width: 100%; } }
