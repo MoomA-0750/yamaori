@@ -7,6 +7,10 @@
 @import "kasane/components.css";
 
 :root {
+  /* 種の色。kasane の personal はこの色から地・面・字・線・影の色みと主の色を導く（元の Yamaori の橙） */
+  --seed: #b5562d;
+  /* 地・面・字・線の色相は、元の生成りの紙（黄みの色相）にする */
+  --seed-neutral: #c0983a;
   /* 今いる・動いている印 */
   --yamaori-live: var(--success);
   --yamaori-live-soft: var(--success-soft);
@@ -80,7 +84,7 @@ textarea { resize: vertical; line-height: var(--leading-relaxed); }
   border: var(--border-width) solid var(--line);
   border-radius: var(--radius-card);
   corner-shape: var(--corner-shape);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow);
 }
 
 .muted { color: var(--muted); }
