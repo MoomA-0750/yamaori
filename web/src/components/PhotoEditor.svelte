@@ -126,7 +126,7 @@
 </dialog>
 
 <style>
-  dialog { border: 0; padding: 0; background: var(--surface); color: var(--ink); border-radius: var(--radius); width: min(94vw, 40rem); max-height: 92vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
+  dialog { border: 0; padding: 0; background: var(--surface); color: var(--fg); border-radius: var(--radius); width: min(94vw, 40rem); max-height: 92vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
   dialog::backdrop { background: rgb(0 0 0 / 55%); }
   .pad { padding: 1rem 1.1rem; }
   h2 { margin: 0; font-size: 1.05rem; }
@@ -136,7 +136,7 @@
   .grid2 input { font-size: .9rem; }
   .people { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .35rem; }
   .people li { display: inline-flex; align-items: center; gap: .25rem; }
-  .x { border: 0; background: none; padding: 0 .15rem; min-height: 0; color: var(--ink-2); cursor: pointer; }
+  .x { border: 0; background: none; padding: 0 .15rem; min-height: 0; color: var(--muted); cursor: pointer; }
   form input { flex: 1; min-width: 0; }
   .write { border-top: 1px solid var(--line); padding-top: .75rem; }
   .warn { color: var(--danger, #b3261e); }

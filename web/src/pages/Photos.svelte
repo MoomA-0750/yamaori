@@ -250,11 +250,11 @@
 {#if picker}<AlbumPicker photoIds={picker} onclose={() => (picker = null)} ondone={(m) => { note = m; selecting = false; selected = [] }} />{/if}
 
 <style>
-  .month { color: var(--ink-2); font-size: .9rem; margin: .25rem 0 .5rem; }
+  .month { color: var(--muted); font-size: .9rem; margin: .25rem 0 .5rem; }
   .empty { padding: 1.5rem; text-align: center; }
   .empty p { margin: .25rem 0; }
   .tabs { display: flex; gap: .25rem; flex-wrap: wrap; }
-  .tabs a { padding: .35rem .85rem; border-radius: 999px; color: var(--ink-2); text-decoration: none; }
+  .tabs a { padding: .35rem .85rem; border-radius: 999px; color: var(--muted); text-decoration: none; }
   .tabs a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .filter { align-items: baseline; gap: .5rem; flex-wrap: wrap; }
   .groups { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: .75rem; }

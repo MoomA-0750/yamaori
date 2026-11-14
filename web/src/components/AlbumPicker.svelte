@@ -46,7 +46,7 @@
 </dialog>
 
 <style>
-  dialog { border: 0; padding: 0; background: var(--surface); color: var(--ink); border-radius: var(--radius); width: min(92vw, 28rem); box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
+  dialog { border: 0; padding: 0; background: var(--surface); color: var(--fg); border-radius: var(--radius); width: min(92vw, 28rem); box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
   dialog::backdrop { background: rgb(0 0 0 / 55%); }
   .pad { padding: 1rem 1.1rem; }
   h2 { margin: 0; font-size: 1.05rem; }

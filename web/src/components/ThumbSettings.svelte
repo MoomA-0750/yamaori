@@ -132,7 +132,7 @@
   .grid3 { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: .5rem; }
   .pair { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: .5rem; align-items: center; }
   .narrow { max-width: 12rem; }
-  .pub { font-size: .75rem; padding: .5rem; background: var(--bg-soft, rgba(0,0,0,.04)); border-radius: .5rem; }
+  .pub { font-size: .75rem; padding: .5rem; background: var(--surface-2); border-radius: .5rem; }
   .plain { list-style: none; margin: 0; padding: 0; }
   @media (max-width: 640px) {
     .grid3 { grid-template-columns: 1fr; gap: 1rem; }

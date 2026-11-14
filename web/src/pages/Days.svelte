@@ -74,19 +74,19 @@
 </div>
 
 <style>
-  .month { color: var(--ink-2); font-size: .9rem; margin: .25rem 0 .5rem; }
-  .days { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-  .day { display: flex; justify-content: space-between; align-items: center; gap: .5rem 1rem; flex-wrap: wrap; padding: .8rem 1rem; }
-  .day:hover { border-color: var(--accent); color: inherit; }
-  .date { font-weight: 600; }
-  .nums { gap: .35rem .9rem; font-variant-numeric: tabular-nums; }
-  .empty { padding: 1.5rem; text-align: center; }
-  .empty p { margin: .25rem 0; }
+  .month { color: var(--muted); font-size: var(--font-small); margin: var(--space-1) 0 var(--space-2); }
+  .days { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .day { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2) var(--space-4); flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+  .day:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
+  .date { font-weight: var(--weight-strong); }
+  .nums { gap: var(--space-1) var(--space-4); font-variant-numeric: tabular-nums; }
+  .empty { padding: var(--space-6); text-align: center; }
+  .empty p { margin: var(--space-1) 0; }
   .start { text-align: left; max-width: 40rem; margin: 0 auto; }
-  .start h2 { font-size: 1rem; margin-bottom: .3rem; }
-  .start ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: .4rem; }
+  .start h2 { font-size: var(--font-body); margin-bottom: var(--space-1); }
+  .start ol { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
   .empty { word-break: auto-phrase; text-wrap: pretty; }
-  .cmds { display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; margin-top: .3rem; }
-  .start code { white-space: nowrap; max-width: 100%; overflow-x: auto; display: inline-block; font-family: var(--mono); font-size: .82em; background: var(--surface-2); padding: .05em .35em; border-radius: 5px; overflow-wrap: anywhere; }
-  .start a { color: var(--accent); text-decoration: underline; }
+  .cmds { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); margin-top: var(--space-1); }
+  .start code { white-space: nowrap; max-width: 100%; overflow-x: auto; display: inline-block; font-family: var(--family-mono); font-size: 0.82em; background: var(--code-bg); padding: 0.05em 0.35em; border-radius: var(--radius-sm); corner-shape: var(--corner-shape); overflow-wrap: anywhere; }
+  .start a { color: var(--link); text-decoration: underline; }
 </style>

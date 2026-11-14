@@ -91,11 +91,11 @@
 </section>
 
 <style>
-  .notes { display: flex; flex-direction: column; gap: .75rem; }
-  .note { padding: .9rem 1rem .5rem; }
-  .meta { margin-top: .4rem; }
-  .meta button { min-height: 2rem; padding: .2rem .6rem; font-size: .85rem; }
-  .compose { display: flex; flex-direction: column; gap: .5rem; }
+  .notes { display: flex; flex-direction: column; gap: var(--space-3); }
+  .note { padding: var(--space-4); }
+  .meta { margin-top: var(--space-2); }
+  .meta button { min-height: var(--tap-sm); padding: 0 var(--space-3); font-size: var(--font-label); }
+  .compose { display: flex; flex-direction: column; gap: var(--space-2); }
   .end { justify-content: flex-end; }
   .hint { margin-right: auto; }
   .error { color: var(--danger); margin: 0; }

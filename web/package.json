@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "dompurify": "^3.4.17",
+    "kasane": "file:../../kasane",
     "marked": "^18.1.3"
   }
 }

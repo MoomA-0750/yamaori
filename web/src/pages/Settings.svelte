@@ -373,10 +373,10 @@
   .check { display: flex; gap: .5rem; align-items: center; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
   .warn { color: var(--danger); margin: 0; }
-  .ok { color: var(--live); margin: 0; }
+  .ok { color: var(--yamaori-live); margin: 0; }
   .error { color: var(--danger); }
   .danger-zone { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: .6rem .8rem; }
-  .danger-zone summary { cursor: pointer; color: var(--ink-2); }
+  .danger-zone summary { cursor: pointer; color: var(--muted); }
   .danger-zone p { margin: .5rem 0; }
   .scope { width: auto; }
   .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
@@ -389,6 +389,6 @@
   .secret { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .7rem .9rem; }
   .secret p { margin: 0 0 .3rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  code { font-family: var(--mono); font-size: .88em; }
+  code { font-family: var(--family-mono); font-size: .88em; }
   @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
 </style>

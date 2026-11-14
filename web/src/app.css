@@ -1,46 +1,15 @@
-/* 色と大きさの決まり。明るいときは紙とインク、暗いときは夜の紙。 */
-:root {
-  --bg: #f6f2ea;
-  --surface: #fffdf8;
-  --surface-2: #efe8db;
-  --ink: #2a2723;
-  --ink-2: #5f5a52;
-  --ink-3: #8c867c;
-  --line: #e2d9c8;
-  --accent: #b5562d;
-  --accent-soft: #f3dfd2;
-  --live: #2f8a5b;
-  --live-soft: #dcefe4;
-  --danger: #b3261e;
-  --danger-soft: #f9dedc;
-  --focus: #2f6fd1;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 1px 2px rgb(40 30 10 / 6%), 0 4px 14px rgb(40 30 10 / 5%);
-  --font: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Meiryo", sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  color-scheme: light;
-}
+/*
+ * 色・字・余白・角丸は kasane の personal テーマ（../../kasane、DESIGN.md）から取る。ここに色や数値を書かない。
+ * Yamaori にしかない意味の色は --yamaori-* で、共通の名前から作る。
+ */
+@import "kasane/tokens.css";
+@import "kasane/themes/personal.css";
+@import "kasane/components.css";
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #17161a;
-    --surface: #211f24;
-    --surface-2: #2b2830;
-    --ink: #ece7df;
-    --ink-2: #b9b2a6;
-    --ink-3: #8a8379;
-    --line: #36323a;
-    --accent: #e08a5f;
-    --accent-soft: #3d2a22;
-    --live: #5cc18c;
-    --live-soft: #1f3529;
-    --danger: #f2a49e;
-    --danger-soft: #45201d;
-    --focus: #7fb0ff;
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
-    color-scheme: dark;
-  }
+:root {
+  /* 今いる・動いている印 */
+  --yamaori-live: var(--success);
+  --yamaori-live-soft: var(--success-soft);
 }
 
 * { box-sizing: border-box; }
@@ -49,103 +18,109 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font);
-  font-size: 15px;
-  line-height: 1.6;
   font-feature-settings: "palt" 1;
 }
 
 a { color: inherit; text-decoration: none; }
 a:hover { color: var(--accent); }
 
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: var(--focus-offset); }
 
-h1, h2, h3 { line-height: 1.3; margin: 0; font-weight: 700; }
-h1 { font-size: 1.5rem; letter-spacing: .01em; }
-h2 { font-size: 1.05rem; }
-h3 { font-size: .95rem; }
+h1, h2, h3 { line-height: var(--leading-tight); margin: 0; font-weight: var(--weight-strong); }
+h1 { font-size: var(--font-heading); font-weight: var(--weight-bold); }
+h2 { font-size: var(--font-title); }
+h3 { font-size: var(--font-body); }
 
 button, input, textarea, select { font: inherit; color: inherit; }
 
+/* 素の button・入力欄は、kasane の k-btn・k-field と同じ形にする（画面の中で class を付けて回らないため） */
 button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
   cursor: pointer;
-  border: 1px solid var(--line);
+  border: var(--border-width) solid var(--line-strong);
   background: var(--surface);
-  border-radius: var(--radius-sm);
-  padding: .45rem .9rem;
-  min-height: 2.25rem;
-  transition: background-color .15s ease, border-color .15s ease, transform .1s ease;
+  border-radius: var(--radius-control);
+  corner-shape: var(--corner-shape);
+  padding: 0 var(--space-4);
+  min-height: var(--tap-sm);
+  font-size: var(--font-label);
+  font-weight: var(--weight-strong);
+  transition: background-color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
-button:hover { border-color: var(--ink-3); }
-button:active { transform: translateY(1px); }
-button:disabled { opacity: .5; cursor: default; transform: none; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.primary:hover { filter: brightness(1.05); }
+button:not(:disabled):hover { background: var(--hover); }
+button:not(:disabled):active { transform: scale(0.97); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--fill); border-color: transparent; color: var(--on-fill); }
+button.primary:not(:disabled):hover { background: color-mix(in srgb, var(--fill), var(--fg) 12%); }
 button.danger { color: var(--danger); }
 button.ghost { background: transparent; border-color: transparent; }
-button.ghost:hover { background: var(--surface-2); }
+button.ghost:not(:disabled):hover { background: var(--hover); }
 
 input[type="text"], input[type="password"], input[type="search"], input[type="number"], textarea, select {
   width: 100%;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: var(--radius-sm);
-  padding: .5rem .7rem;
-  min-height: 2.4rem;
+  border: var(--border-width) solid var(--line-strong);
+  background: var(--input);
+  border-radius: var(--radius-field);
+  corner-shape: var(--corner-shape);
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--tap-sm);
+  font-size: var(--font-small);
 }
-textarea { resize: vertical; line-height: 1.6; }
+::placeholder { color: var(--faint); }
+textarea { resize: vertical; line-height: var(--leading-relaxed); }
 
+/* 入れ物。中で縁に沿うもの（ボタンなど）と同心になるよう、角丸は「中の角丸 ＋ 余白」 */
 .card {
+  --nest-pad: var(--space-4);
+  --nest-radius: var(--radius-card);
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border: var(--border-width) solid var(--line);
+  border-radius: var(--radius-card);
+  corner-shape: var(--corner-shape);
+  box-shadow: var(--shadow-sm);
 }
 
-.muted { color: var(--ink-2); }
-.faint { color: var(--ink-3); font-size: .85rem; }
-.mono { font-family: var(--mono); font-size: .85em; }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); font-size: var(--font-label); }
+.mono { font-family: var(--family-mono); font-size: 0.85em; }
 .nowrap { white-space: nowrap; }
 .break { overflow-wrap: anywhere; }
 
+/* 小さな印。kasane の k-badge と同じ形 */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: .25rem;
-  padding: .05rem .55rem;
-  border-radius: 999px;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
   background: var(--surface-2);
-  color: var(--ink-2);
-  font-size: .8rem;
+  color: var(--muted);
+  font-size: var(--font-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-normal);
   white-space: nowrap;
 }
-.chip.accent { background: var(--accent-soft); color: var(--accent); }
-.chip.live { background: var(--live-soft); color: var(--live); }
+.chip.accent { background: var(--accent-soft); color: var(--accent-strong); }
+.chip.live { background: var(--yamaori-live-soft); color: var(--yamaori-live); }
 
-.stack { display: flex; flex-direction: column; gap: 1rem; }
-.row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.spread { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 
-.section-title { display: flex; align-items: baseline; gap: .5rem; margin: 0 0 .5rem; }
-.section-title .faint { font-weight: 400; }
+.section-title { display: flex; align-items: baseline; gap: var(--space-2); margin: 0 0 var(--space-2); }
+.section-title .faint { font-weight: var(--weight-normal); }
 
 /* Markdown の本文 */
 .prose { overflow-wrap: anywhere; }
 .prose > :first-child { margin-top: 0; }
 .prose > :last-child { margin-bottom: 0; }
-.prose h1, .prose h2, .prose h3 { margin: 1em 0 .4em; }
-.prose h1 { font-size: 1.2rem; }
-.prose h2 { font-size: 1.08rem; }
-.prose p, .prose ul, .prose ol, .prose blockquote, .prose pre { margin: .5em 0; }
-.prose a { color: var(--accent); text-decoration: underline; }
-.prose blockquote { border-left: 3px solid var(--line); padding-left: .8em; color: var(--ink-2); }
-.prose code { font-family: var(--mono); background: var(--surface-2); padding: .05em .35em; border-radius: 5px; font-size: .88em; }
-.prose pre { background: var(--surface-2); padding: .7em .9em; border-radius: var(--radius-sm); overflow-x: auto; }
-.prose pre code { background: none; padding: 0; }
-.prose img { max-width: 100%; border-radius: var(--radius-sm); }
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
+.prose h1, .prose h2, .prose h3 { margin: 1em 0 0.4em; }
+.prose h1 { font-size: var(--font-title); }
+.prose h2 { font-size: var(--font-body); }
+.prose p, .prose ul, .prose ol, .prose blockquote, .prose pre { margin: 0.5em 0; }
+.prose a { color: var(--link); text-decoration: underline; }
+.prose blockquote { border-left: 3px solid var(--line-strong); padding-left: 0.8em; color: var(--muted); }
+.prose code { font-family: var(--family-mono); background: var(--code-bg); color: var(--code-fg); padding: 0.05em 0.35em; border-radius: var(--radius-sm); corner-shape: var(--corner-shape); font-size: 0.88em; }
+.prose pre { background: var(--surface-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); corner-shape: var(--corner-shape); overflow-x: auto; }
+.prose pre code { background: none; color: inherit; padding: 0; }
+.prose img { max-width: 100%; border-radius: var(--radius-sm); corner-shape: var(--corner-shape); }

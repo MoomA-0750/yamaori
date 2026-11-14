@@ -42,8 +42,8 @@
 
 <style>
   .wrap { min-height: 70vh; display: grid; place-items: center; }
-  .box { width: min(100%, 24rem); padding: 1.5rem; gap: .9rem; }
+  .box { width: min(100%, 24rem); padding: var(--space-6); gap: var(--space-4); --nest-pad: var(--space-6); --nest-radius: calc(var(--radius-control) + var(--space-6)); border-radius: var(--nest-radius); corner-shape: var(--corner-shape); }
   .box p { margin: 0; }
-  .field { gap: .3rem; }
+  .field { gap: var(--space-1); }
   .error { color: var(--danger); }
 </style>

@@ -35,15 +35,15 @@
 </ol>
 
 <style>
-  .visits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-  .visit { display: grid; grid-template-columns: 7.5rem 1fr; gap: .75rem; padding: .75rem 1rem; transition: border-color .15s ease; }
-  .visit:hover { border-color: var(--accent); color: inherit; }
+  .visits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .visit { display: grid; grid-template-columns: 7.5rem 1fr; gap: var(--space-3); padding: var(--space-3) var(--space-4); transition: border-color var(--motion-fast) var(--ease-standard); }
+  .visit:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
   .when { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
-  .date { font-size: .8rem; color: var(--ink-2); }
-  .world { font-weight: 600; margin-bottom: .25rem; }
-  .chips { gap: .3rem; }
+  .date { font-size: var(--font-note); color: var(--muted); }
+  .world { font-weight: var(--weight-strong); margin-bottom: var(--space-1); }
+  .chips { gap: var(--space-1); }
   @media (max-width: 480px) {
-    .visit { grid-template-columns: 1fr; gap: .25rem; }
-    .when { flex-direction: row; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+    .visit { grid-template-columns: 1fr; gap: var(--space-1); }
+    .when { flex-direction: row; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
   }
 </style>

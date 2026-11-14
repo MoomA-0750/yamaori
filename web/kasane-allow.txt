@@ -1,0 +1,2 @@
+# kasane の検査（kasane/scripts/lint.mjs）で許すもの。理由を書く
+motion-literal  src/App.svelte  pulse 2s   # 「いま」の点の、ゆっくりした明滅。kasane の --motion-* は出入りの時間で、ずっと続く明滅の名前は無い

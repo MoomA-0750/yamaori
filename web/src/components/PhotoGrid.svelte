@@ -114,7 +114,7 @@
   .note { margin: 0; padding: .4rem 1rem 0; }
   .small-chip { font-size: .7rem; padding: 0 .4rem; margin-left: .4rem; vertical-align: .1em; }
   .missing { display: grid; place-items: center; height: 100%; font-size: .8rem; }
-  dialog { border: 0; padding: 0; background: var(--surface); color: var(--ink); border-radius: var(--radius); width: min(96vw, 1100px); max-height: 94vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
+  dialog { border: 0; padding: 0; background: var(--surface); color: var(--fg); border-radius: var(--radius); width: min(96vw, 1100px); max-height: 94vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
   dialog::backdrop { background: rgb(0 0 0 / 70%); }
   .viewer { display: flex; flex-direction: column; }
   .frame { background: #000; display: grid; place-items: center; min-height: 30vh; }
