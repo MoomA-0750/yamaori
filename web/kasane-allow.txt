@@ -1,7 +1,4 @@
 # kasane の検査（kasane/scripts/lint.mjs）で許すもの。理由を書く
-# 設定の「ほかの PC の VRCX の DB を選んで取り込む」は閉じた <details> の中。閉じている間は描かれないのに、
-# 検査が中のボタンを測り、縁からの位置を取り違える（開くと縁から 17px で同心。kasane の検査の誤検知として報告済み）
-concentric  *#/settings  .other-db
-# 写真を大きく見るときの周りの地。kasane に不透明の幕の名前が無い（--scrim は 60%、--scrim-strong は v1.x の予定）ので、
-# naming.md の勧めどおり --scrim から相対色で作る。濃さの「/ 1」を検査が直書きと数える
-color-literal  src/app.css  rgb(from var(--scrim) r g b / 1)
+# 「いま居る」の点の明滅の途中（keyframes の 50%）の薄さ。kasane に明滅の途中の値の名前が無い。
+# 使えないものの薄さ（--disabled-opacity）とは意味が違うので借りない
+opacity-literal  src/App.svelte  opacity: 0.35
