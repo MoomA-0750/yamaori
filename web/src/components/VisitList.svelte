@@ -42,7 +42,7 @@
   .date { font-size: var(--font-note); color: var(--muted); }
   .world { font-weight: var(--weight-strong); margin-bottom: var(--space-1); }
   .chips { gap: var(--space-1); }
-  @media (max-width: 480px) {
+  @media (max-width: 620px) {
     .visit { grid-template-columns: 1fr; gap: var(--space-1); }
     .when { flex-direction: row; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
   }

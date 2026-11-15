@@ -138,11 +138,11 @@
 {/if}
 
 <style>
-  .head { gap: .5rem; }
+  .head { gap: var(--space-2); }
   .when { margin: 0; font-variant-numeric: tabular-nums; }
-  .people, .list { list-style: none; margin: 0; padding: .25rem 0; }
-  .people li, .list li { padding: .45rem 1rem; border-top: 1px solid var(--line); display: flex; gap: .25rem .75rem; flex-wrap: wrap; align-items: baseline; }
+  .people, .list { list-style: none; margin: 0; padding: var(--space-1) 0; }
+  .people li, .list li { padding: var(--space-2) var(--space-4); border-top: var(--border-width) solid var(--line); display: flex; gap: var(--space-1) var(--space-3); flex-wrap: wrap; align-items: baseline; }
   .people li:first-child, .list li:first-child { border-top: none; }
   .people li { justify-content: space-between; }
-  .link { color: var(--accent); }
+  .link { color: var(--link); }
 </style>

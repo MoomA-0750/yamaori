@@ -99,5 +99,5 @@
   .end { justify-content: flex-end; }
   .hint { margin-right: auto; }
   .error { color: var(--danger); margin: 0; }
-  @media (max-width: 480px) { .hint { display: none; } }
+  @media (max-width: 620px) { .hint { display: none; } }
 </style>
