@@ -15,7 +15,7 @@
   --yamaori-live: var(--success);
   --yamaori-live-soft: var(--success-soft);
   /* 写真を大きく見るときの、写真の周りの地（明るい・暗いに関わらず黒。写真の上の幕 --scrim を不透明にしたもの） */
-  --yamaori-photo-mat: rgb(from var(--scrim) r g b);
+  --yamaori-photo-mat: rgb(from var(--scrim) r g b / 1);
 }
 
 /* 素の要素の決まり。base の層に入れ、kasane の部品（k-btn・k-field など。kasane の層）がいつも勝つようにする */

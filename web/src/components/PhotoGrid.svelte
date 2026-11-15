@@ -113,7 +113,7 @@
   .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cell:hover { border-color: var(--accent); }
   /* 写真の上の字。明るい・暗いに関わらず、暗い幕に白い字 */
-  .when { position: absolute; left: 0; right: 0; bottom: 0; padding: var(--space-4) var(--space-2) var(--space-1); font-size: var(--font-caption); color: var(--on-media); text-align: left;
+  .when { position: absolute; left: 0; right: 0; bottom: 0; padding: var(--space-4) var(--space-1) var(--space-1) var(--space-2); font-size: var(--font-caption); color: var(--on-media); text-align: left; white-space: nowrap; overflow: hidden;
     background: linear-gradient(transparent, var(--scrim)); font-variant-numeric: tabular-nums; }
   .picked { outline: calc(var(--focus-width) + var(--border-width)) solid var(--accent); outline-offset: calc((var(--focus-width) + var(--border-width)) * -1); }
   /* 選ぶときの丸。選んでいないときは幕の地に白い輪、選んだら主の色 */
