@@ -116,7 +116,7 @@
   .now:hover .world { color: var(--accent); }
   .now .label { color: var(--yamaori-live); font-weight: var(--weight-bold); }
   .now .world { font-weight: var(--weight-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--yamaori-live); align-self: center; flex: none; animation: pulse 2s ease-in-out infinite; }
+  .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--yamaori-live); align-self: center; flex: none; animation: pulse var(--motion-loop) ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
   main { max-width: 52rem; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-10); }
