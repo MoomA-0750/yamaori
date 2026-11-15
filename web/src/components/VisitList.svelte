@@ -36,7 +36,7 @@
 
 <style>
   .visits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-  .visit { display: grid; grid-template-columns: 7.5rem 1fr; gap: var(--space-3); padding: var(--space-3) var(--space-4); transition: border-color var(--motion-fast) var(--ease-standard); }
+  .visit { display: grid; grid-template-columns: 7.5rem 1fr; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-row); corner-shape: var(--corner-shape); transition: border-color var(--motion-fast) var(--ease-standard); }
   .visit:hover { border-color: color-mix(in srgb, var(--line-strong) 45%, transparent); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
   .when { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
   .date { font-size: var(--font-note); color: var(--muted); }
