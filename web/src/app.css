@@ -14,6 +14,8 @@
   /* 今いる・動いている印 */
   --yamaori-live: var(--success);
   --yamaori-live-soft: var(--success-soft);
+  /* 写真を大きく見るときの、写真の周りの地（明るい・暗いに関わらず黒。写真の上の幕 --scrim を不透明にしたもの） */
+  --yamaori-photo-mat: rgb(from var(--scrim) r g b);
 }
 
 /* 素の要素の決まり。base の層に入れ、kasane の部品（k-btn・k-field など。kasane の層）がいつも勝つようにする */
@@ -55,9 +57,9 @@ button {
 }
 button:not(:disabled):hover { background: var(--hover); }
 button:not(:disabled):active { transform: scale(0.97); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 button.primary { background: var(--fill); border-color: transparent; color: var(--on-fill); }
-button.primary:not(:disabled):hover { background: color-mix(in srgb, var(--fill), var(--fg) 12%); }
+button.primary:not(:disabled):hover { background: var(--fill-hover); }
 button.danger { color: var(--danger); }
 button.ghost { background: transparent; border-color: transparent; }
 button.ghost:not(:disabled):hover { background: var(--hover); }
@@ -84,10 +86,17 @@ textarea { resize: vertical; line-height: var(--leading-relaxed); }
   border: var(--border-width) solid var(--line);
   border-radius: var(--radius-card);
   corner-shape: var(--corner-shape);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
 }
+/* 中身を入れるカードの余白。中で縁に沿うもの（ボタン・.k-inner）と同心になるよう --nest-pad と同じ */
+.card.pad { padding: var(--nest-pad); }
+.card.pad.stack { gap: var(--space-3); }
+
+/* 字と入力欄を縦に並べる欄（<label class="stack field">字<input></label>） */
+.field { gap: var(--space-1); font-size: var(--font-small); }
 
 .muted { color: var(--muted); }
+.error { color: var(--danger); }
 .faint { color: var(--faint); font-size: var(--font-label); }
 .mono { font-family: var(--family-mono); font-size: 0.85em; }
 .nowrap { white-space: nowrap; }

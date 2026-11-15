@@ -116,13 +116,13 @@
   .now:hover .world { color: var(--accent); }
   .now .label { color: var(--yamaori-live); font-weight: var(--weight-bold); }
   .now .world { font-weight: var(--weight-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--yamaori-live); align-self: center; flex: none; animation: pulse var(--motion-loop) ease-in-out infinite; }
+  .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--yamaori-live); align-self: center; flex: none; animation: pulse var(--motion-loop) var(--ease-standard) infinite; }
   @keyframes pulse { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
   main { max-width: 52rem; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-10); }
   .center { text-align: center; padding: var(--space-10) 0; }
   .error { color: var(--danger); }
-  @media (max-width: 480px) {
+  @media (max-width: 620px) {
     .bar { flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
     .tabs { margin-left: 0; width: 100%; }
     .tabs a { flex: 1; text-align: center; }
