@@ -93,7 +93,8 @@ textarea { resize: vertical; line-height: var(--leading-relaxed); }
 .card.pad.stack { gap: var(--space-3); }
 
 /* 字と入力欄を縦に並べる欄（<label class="stack field">字<input></label>） */
-.field { gap: var(--space-1); font-size: var(--font-small); }
+.stack.field { gap: var(--space-1); }
+.field { font-size: var(--font-small); }
 
 .muted { color: var(--muted); }
 .error { color: var(--danger); }
