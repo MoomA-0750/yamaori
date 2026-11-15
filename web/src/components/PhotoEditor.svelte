@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from '../api'
+  import { settled } from '../dialog'
   import type { components } from '../schema'
   import { dateTime } from '../format'
   type S = components['schemas']
@@ -70,15 +71,15 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={onclose} aria-label="写真の情報を直す">
-  <div class="stack pad">
-    <h2>写真の情報</h2>
+<dialog class="k-dialog editor" bind:this={dialog} onclose={() => settled(dialog).then(onclose)} aria-label="写真の情報を直す">
+  <div class="stack">
+    <h2 class="k-dialog__title">写真の情報</h2>
     {#if !info}
       <p class="faint">{msg || '読んでいます…'}</p>
     {:else}
       <p class="faint">{dateTime(info.photo.takenAt)} · {info.photo.fileName} · {info.file?.worldId ? '写真のファイルにワールドの情報があります' : '写真のファイルにはワールドの情報がありません（下は直した・当てた情報）'}</p>
       {#if info.suggestion.worldId || info.suggestion.people.length}
-        <div class="hint row">
+        <div class="hint row k-inner">
           <span>撮った時刻にいたのは <b>{info.suggestion.worldName ?? info.suggestion.worldId ?? '（分からない）'}</b>{#if info.suggestion.people.length}、ほか {info.suggestion.people.length} 人{/if}</span>
           <button onclick={useSuggestion}>これを使う</button>
         </div>
@@ -115,32 +116,27 @@
             <div><button onclick={() => (confirmWrite = true)} disabled={busy}>写真のファイルにも書く…</button>{#if info.edit?.writtenAt}<span class="faint"> 前に書いた: {dateTime(info.edit.writtenAt)}</span>{/if}</div>
           {:else}
             <p class="warn">写真のファイル（この PC と NAS にあるもの全部）に、VRChat と同じ形の情報（XMP）を書き込みます。画像はそのままですが、ファイルは書き換わります。WebDAV・SFTP の送り先に送った写しは、次に送るときに書いたもので送り直します。</p>
-            <div class="row"><button class="danger-text" onclick={write} disabled={busy}>{busy ? '書いています…' : '書く'}</button><button onclick={() => (confirmWrite = false)}>やめる</button></div>
+            <div class="row"><button class="danger" onclick={write} disabled={busy}>{busy ? '書いています…' : '書く'}</button><button onclick={() => (confirmWrite = false)}>やめる</button></div>
           {/if}
         </div>
       {/if}
       {#if msg}<p class="muted" role="status">{msg}</p>{/if}
     {/if}
-    <div class="row end"><button onclick={() => dialog?.close()}>閉じる</button></div>
   </div>
+  <div class="k-dialog__actions"><button onclick={() => dialog?.close()}>閉じる</button></div>
 </dialog>
 
 <style>
-  dialog { border: 0; padding: 0; background: var(--surface); color: var(--fg); border-radius: var(--radius); width: min(94vw, 40rem); max-height: 92vh; box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
-  dialog::backdrop { background: rgb(0 0 0 / 55%); }
-  .pad { padding: 1rem 1.1rem; }
-  h2 { margin: 0; font-size: 1.05rem; }
+  .editor { width: min(40rem, calc(100vw - var(--space-8))); }
+  .k-dialog__title { margin: 0; }
   p { margin: 0; }
-  .hint { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .5rem .75rem; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
-  .grid2 { display: grid; grid-template-columns: 2fr 3fr; gap: .5rem .75rem; }
-  .grid2 input { font-size: .9rem; }
-  .people { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .35rem; }
-  .people li { display: inline-flex; align-items: center; gap: .25rem; }
-  .x { border: 0; background: none; padding: 0 .15rem; min-height: 0; color: var(--muted); cursor: pointer; }
+  .hint { background: var(--accent-soft); corner-shape: var(--corner-shape); padding: var(--space-2) var(--space-3); justify-content: space-between; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .grid2 { display: grid; grid-template-columns: 2fr 3fr; gap: var(--space-2) var(--space-3); }
+  .people { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+  .people li { display: inline-flex; align-items: center; gap: var(--space-1); }
+  .x { border: 0; background: none; padding: 0 var(--space-1); min-height: 0; color: var(--muted); cursor: pointer; }
   form input { flex: 1; min-width: 0; }
-  .write { border-top: 1px solid var(--line); padding-top: .75rem; }
-  .warn { color: var(--danger, #b3261e); }
-  .danger-text { color: var(--danger, #b3261e); }
-  .end { justify-content: flex-end; }
-  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  .write { border-top: var(--border-width) solid var(--line); padding-top: var(--space-3); }
+  .warn { color: var(--danger); }
+  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
 </style>

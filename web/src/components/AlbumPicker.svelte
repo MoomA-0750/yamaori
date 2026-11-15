@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from '../api'
+  import { settled } from '../dialog'
   import type { components } from '../schema'
 
   // 写真をアルバムに入れる。開くと、アルバムの一覧と、新しいアルバムの名前の欄が出る
@@ -24,9 +25,9 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={onclose} aria-label="アルバムに入れる">
-  <div class="stack pad">
-    <h2>{photoIds.length} 枚をアルバムに入れる</h2>
+<dialog class="k-dialog" bind:this={dialog} onclose={() => settled(dialog).then(onclose)} aria-label="アルバムに入れる">
+  <div class="stack">
+    <h2 class="k-dialog__title">{photoIds.length} 枚をアルバムに入れる</h2>
     {#if albums?.length}
       <ul class="list">
         {#each albums as a (a.id)}
@@ -41,17 +42,13 @@
       <button class="primary" type="submit" disabled={!name.trim()}>作って入れる</button>
     </form>
     {#if msg}<p class="error">{msg}</p>{/if}
-    <div class="row end"><button onclick={() => dialog?.close()}>やめる</button></div>
   </div>
+  <div class="k-dialog__actions"><button onclick={() => dialog?.close()}>やめる</button></div>
 </dialog>
 
 <style>
-  dialog { border: 0; padding: 0; background: var(--surface); color: var(--fg); border-radius: var(--radius); width: min(92vw, 28rem); box-shadow: 0 10px 40px rgb(0 0 0 / 40%); }
-  dialog::backdrop { background: rgb(0 0 0 / 55%); }
-  .pad { padding: 1rem 1.1rem; }
-  h2 { margin: 0; font-size: 1.05rem; }
-  .list { list-style: none; margin: 0; padding: 0; max-height: 45vh; overflow: auto; display: flex; flex-direction: column; gap: .25rem; }
-  .pick { width: 100%; display: flex; justify-content: space-between; gap: .75rem; text-align: left; }
+  .k-dialog__title { margin: 0; }
+  .list { list-style: none; margin: 0; padding: 0; max-height: 45vh; overflow: auto; display: flex; flex-direction: column; gap: var(--space-1); }
+  .pick { width: 100%; display: flex; justify-content: space-between; gap: var(--space-3); text-align: left; }
   form input { flex: 1; min-width: 0; }
-  .end { justify-content: flex-end; }
 </style>
