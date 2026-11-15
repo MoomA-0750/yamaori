@@ -172,11 +172,11 @@
       <h2>見せ方</h2>
       <fieldset class="stack choices">
         <legend class="sr">見せ方</legend>
-        <label class="choice"><input type="radio" bind:group={listen} value="local" />
+        <label class="choice"><input class="k-check" type="radio" bind:group={listen} value="local" />
           <span><b>この PC だけ</b><span class="faint">ほかの端末からは見えません（既定）</span></span></label>
-        <label class="choice"><input type="radio" bind:group={listen} value="lan" />
+        <label class="choice"><input class="k-check" type="radio" bind:group={listen} value="lan" />
           <span><b>家の中の端末からも</b><span class="faint">同じネットワークのスマホなどから http://この PC のアドレス:{port} で見ます。パスワードが要ります</span></span></label>
-        <label class="choice"><input type="radio" bind:group={listen} value="tailscale" />
+        <label class="choice"><input class="k-check" type="radio" bind:group={listen} value="tailscale" />
           <span><b>Tailscale から</b><span class="faint">この PC で <code>tailscale serve {port}</code> を動かし、下の Tailscale のアカウントだけを通します</span></span></label>
       </fieldset>
 
@@ -194,15 +194,15 @@
         <label class="stack field">この端末の名前<input type="text" bind:value={deviceName} /></label>
       </div>
 
-      <label class="check"><input type="checkbox" bind:checked={localRequiresLogin} disabled={!settings.passwordSet} />
+      <label class="k-option"><input class="k-check" type="checkbox" bind:checked={localRequiresLogin} disabled={!settings.passwordSet} />
         この PC から開くときもログインを求める</label>
 
-      <details class="danger-zone" open={openRemote}>
+      <details class="danger-zone k-inner" open={openRemote}>
         <summary>認証なしで外から見せる（勧めません）</summary>
         <p class="faint">自分で公開したアドレスから、だれでもログインなしで記録（会った人の名前を含む）を読めるようになります（書き換え・設定・止めることは、これまでどおりログインが要ります）。公開するときは、パスワードか Tailscale を使ってください。</p>
-        <label class="check"><input type="checkbox" bind:checked={openRemote} /> 認証なしで外から見せる</label>
+        <label class="k-option"><input class="k-check" type="checkbox" bind:checked={openRemote} /> 認証なしで外から見せる</label>
         {#if openRemote && !settings.allowUnauthenticatedRemote}
-          <label class="check"><input type="checkbox" bind:checked={confirmOpen} /> 記録がだれにでも見えることを分かった上で開く</label>
+          <label class="k-option"><input class="k-check" type="checkbox" bind:checked={confirmOpen} /> 記録がだれにでも見えることを分かった上で開く</label>
         {/if}
       </details>
 
@@ -235,17 +235,17 @@
             </div>
           {/if}
           {#if kind === 'sftp'}
-            <label class="check"><input type="checkbox" bind:checked={forgetHostKey} /> 送り先の鍵を覚え直す（NAS の鍵を作り直したとき。保存すると、次につないだときの鍵を覚える）</label>
+            <label class="k-option"><input class="k-check" type="checkbox" bind:checked={forgetHostKey} /> 送り先の鍵を覚え直す（NAS の鍵を作り直したとき。保存すると、次につないだときの鍵を覚える）</label>
           {/if}
           <div class="row"><button onclick={testTarget}>試しにつなぐ</button><span class="faint">{testMsg}</span></div>
           <fieldset class="stack choices">
             <legend class="faint">送ったあと、この PC の写真を</legend>
-            <label class="choice"><input type="radio" bind:group={retention} value="keep" /><span>全部残す（既定）</span></label>
-            <label class="choice"><input type="radio" bind:group={retention} value="days" /><span class="inline">撮ってから <input class="days" type="number" min="1" bind:value={retentionDays} /> 日たったら消す</span></label>
-            <label class="choice"><input type="radio" bind:group={retention} value="after_upload" /><span>送ったら消す</span></label>
+            <label class="choice"><input class="k-check" type="radio" bind:group={retention} value="keep" /><span>全部残す（既定）</span></label>
+            <label class="choice"><input class="k-check" type="radio" bind:group={retention} value="days" /><span class="inline">撮ってから <input class="days" type="number" min="1" bind:value={retentionDays} /> 日たったら消す</span></label>
+            <label class="choice"><input class="k-check" type="radio" bind:group={retention} value="after_upload" /><span>送ったら消す</span></label>
           </fieldset>
           {#if retention !== 'keep'}
-            <label class="check"><input type="checkbox" bind:checked={confirmDelete} /> 送り先に中身まで同じものが届いたと確かめた写真だけを、この PC から消すことを分かった上で決める</label>
+            <label class="k-option"><input class="k-check" type="checkbox" bind:checked={confirmDelete} /> 送り先に中身まで同じものが届いたと確かめた写真だけを、この PC から消すことを分かった上で決める</label>
           {/if}
           <p class="faint">送り先には「年-月/ファイル名」で置きます。10 分ごとに送ります。消す前に縮小を作るので、消したあとも Yamaori で見られます。</p>
         {/if}
@@ -263,9 +263,9 @@
         <h2>ほかの端末と（前の形）</h2>
         <fieldset class="stack choices">
           <legend class="sr">この端末の役割</legend>
-          <label class="choice"><input type="radio" bind:group={role} value="standalone" />
+          <label class="choice"><input class="k-check" type="radio" bind:group={role} value="standalone" />
             <span><b>ひとりで（親にもなれる）</b><span class="faint">記録をこの端末に持ちます。ほかの端末（子）からの記録も受け取れます</span></span></label>
-          <label class="choice"><input type="radio" bind:group={role} value="child" />
+          <label class="choice"><input class="k-check" type="radio" bind:group={role} value="child" />
             <span><b>子</b><span class="faint">この端末でも記録し、親の端末へ 10 分ごとに送ります（ノートなど）。親につながらない間は、つながったときにまとめて送ります</span></span></label>
         </fieldset>
         {#if role === 'child'}
@@ -323,7 +323,7 @@
         <button onclick={createToken} disabled={!tokenName.trim()}>作る</button>
       </div>
       {#if newSecret}
-        <div class="secret">
+        <div class="secret k-inner">
           <p>このトークンは今しか表示しません。控えてください。</p>
           <code class="break">{newSecret}</code>
         </div>
@@ -364,31 +364,28 @@
 </div>
 
 <style>
-  .pad { padding: 1.1rem 1.2rem; gap: .8rem; }
-  .choices { border: 0; padding: 0; margin: 0; gap: .5rem; }
-  .choice { display: flex; gap: .6rem; align-items: flex-start; cursor: pointer; }
-  .choice input { margin-top: .35rem; }
+  .choices { border: 0; padding: 0; margin: 0; gap: var(--space-2); }
+  .choice { display: flex; gap: var(--space-3); align-items: flex-start; cursor: pointer; }
+  /* ラジオを1行目の字の高さの中ほどに */
+  .choice input { margin-top: var(--space-1); }
   .choice > span { display: flex; flex-direction: column; }
-  .field { gap: .25rem; font-size: .9rem; }
-  .check { display: flex; gap: .5rem; align-items: center; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
   .warn { color: var(--danger); margin: 0; }
   .ok { color: var(--yamaori-live); margin: 0; }
-  .error { color: var(--danger); }
-  .danger-zone { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: .6rem .8rem; }
+  .danger-zone { border: var(--border-width) dashed var(--line); corner-shape: var(--corner-shape); padding: var(--space-2) var(--space-3); }
   .danger-zone summary { cursor: pointer; color: var(--muted); }
-  .danger-zone p { margin: .5rem 0; }
+  .danger-zone p { margin: var(--space-2) 0; }
   .scope { width: auto; }
-  .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+  .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
   .grow { flex: 1; min-width: 10rem; width: auto; }
   .choice > span.inline { display: inline; }
   /* 入力欄を含む行は、ラジオボタンを入力欄の高さの中ほどに揃える */
   .choice:has(> span.inline) { align-items: center; }
   .choice:has(> span.inline) input { margin-top: 0; }
-  .days { width: 4.5rem; display: inline-block; min-height: 2rem; padding: .2rem .4rem; }
-  .secret { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .7rem .9rem; }
-  .secret p { margin: 0 0 .3rem; }
+  .days { width: 4.5rem; display: inline-block; min-height: 2rem; padding: var(--space-1) var(--space-2); }
+  .secret { background: var(--accent-soft); corner-shape: var(--corner-shape); padding: var(--space-3); }
+  .secret p { margin: 0 0 var(--space-1); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  code { font-family: var(--family-mono); font-size: .88em; }
-  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+  code { font-family: var(--family-mono); font-size: 0.88em; }
+  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
 </style>
