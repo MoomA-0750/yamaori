@@ -309,7 +309,7 @@
         <ul class="tokens">
           {#each tokens as t (t.id)}
             <li class="spread"><span><b>{t.name}</b> <span class="chip">{scopeLabels[t.scope ?? 'full'] ?? t.scope}</span> <span class="faint">作成 {dateTime(t.createdAt)}{t.lastUsedAt ? ` · 最後に使った ${dateTime(t.lastUsedAt)}` : ''}</span></span>
-              <button class="ghost danger" onclick={() => deleteToken(t.id)}>消す</button></li>
+              <button class="danger" onclick={() => deleteToken(t.id)}>消す</button></li>
           {/each}
         </ul>
       {/if}
@@ -336,8 +336,6 @@
         {#each devices as d (d.id)}
           <li>{d.name} {#if d.isSelf}<span class="chip">この端末</span>{/if} <span class="faint">訪問 {d.visitCount}</span></li>
         {/each}
-      </ul>
-      <ul class="plain">
         {#each accounts as a (a.id)}
           <li>{a.name ?? a.id} <span class="faint">訪問 {a.visitCount}{a.names.length > 1 ? ` · 前の名前 ${a.names.slice(0, -1).map((n) => n.name).join('、')}` : ''}</span></li>
         {/each}
@@ -377,6 +375,8 @@
   .danger-zone p { margin: var(--space-2) 0; }
   .scope { width: auto; }
   .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  /* 狭い幅で折り返しても、行の操作は右に揃える */
+  .tokens button { margin-inline-start: auto; }
   .grow { flex: 1; min-width: 10rem; width: auto; }
   .choice > span.inline { display: inline; }
   /* 入力欄を含む行は、ラジオボタンを入力欄の高さの中ほどに揃える */
