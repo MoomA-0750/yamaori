@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using Yamaori.Store;
 
@@ -169,5 +170,46 @@ public sealed class HttpGroupTests
         Assert.Equal(400, (await hub.SendAsync("POST", "/api/settings/import/move", loopback: true)).Response.StatusCode);
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         try { Directory.Delete(dir, true); } catch (IOException) { }
+    }
+
+    [Fact]
+    public async Task まとめ役は上限を超える移す写しを本文を読まずに断る()
+    {
+        await using var hub = new HttpHost();
+        Assert.Equal(200, (await hub.SendAsync("POST", "/api/settings/group/create", loopback: true, body: """{"name":"家"}""")).Response.StatusCode);
+        var code = (await Json(await hub.SendAsync("POST", "/api/settings/group/invite", loopback: true))).GetProperty("code").GetString()!;
+        var token = (await Json(await hub.SendAsync("POST", "/api/group/accept", body: JsonSerializer.Serialize(new { code, deviceId = "d_laptop", deviceName = "laptop" })))).GetProperty("token").GetString()!;
+
+        Task<Microsoft.AspNetCore.Http.HttpContext> Send(string kind, long length) => hub.Server.SendAsync(c =>
+        {
+            c.Request.Method = "POST";
+            c.Request.Path = "/api/sync/import/" + kind;
+            c.Request.Host = new Microsoft.AspNetCore.Http.HostString("localhost", 47899);
+            c.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.1.50");
+            c.Request.Headers.Authorization = "Bearer " + token;
+            c.Request.ContentLength = length;
+            c.Request.Body = new MemoryStream(new byte[16]);
+        });
+
+        // 移す写しは 1 GiB まで（VAT・VRCX の 8 GiB より小さい）
+        Assert.Equal(1L << 30, ImportJobs.MaxUploadOf("move"));
+        Assert.Equal(8L << 30, ImportJobs.MaxUploadOf("vat"));
+        var big = await Send("move", ImportJobs.MaxMoveUpload + 1);
+        Assert.Equal(413, big.Response.StatusCode);
+        // 取り込みの枠は取らない（ほかの取り込みを止めない）
+        var job = (await Json(await hub.SendAsync("GET", "/api/settings/import/", loopback: true))).GetProperty("job");
+        Assert.False(job.GetProperty("running").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, job.GetProperty("finishedAt").ValueKind);
+    }
+
+    [Fact]
+    public async Task 受け取りながら上限を超えたら打ち切って書きかけを消す()
+    {
+        await using var hub = new HttpHost();
+        var jobs = hub.App.Services.GetRequiredService<ImportJobs>();
+        var body = new MemoryStream(new byte[3 << 20]);
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(() => jobs.SaveUploadAsync(body, CancellationToken.None, 1 << 20));
+        Assert.Contains("上限 1 MiB", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(Directory.Exists(jobs.TempDir) ? Directory.GetFiles(jobs.TempDir) : []);
     }
 }

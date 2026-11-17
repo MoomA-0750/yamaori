@@ -37,10 +37,22 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
     public const long MaxUpload = 8L << 30;
 
     /// <summary>
+    /// まとめ役へ移す写し（端末の Yamaori の DB）の上限。何年分の記録でも数百 MB に収まるので、VAT・VRCX より小さくして、
+    /// おかしな写しでまとめ役のディスクを埋めたり、足し込みで長く手一杯にしたりしないようにする。
+    /// </summary>
+    public const long MaxMoveUpload = 1L << 30;
+
+    /// <summary>取り込みの種類ごとの、送れる大きさの上限。</summary>
+    public static long MaxUploadOf(string kind) => kind == "move" ? MaxMoveUpload : MaxUpload;
+
+    /// <summary>上限を人が読める形にする（1 GiB・8 GiB）。</summary>
+    public static string Size(long bytes) => bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.#} GiB" : $"{bytes / (double)(1L << 20):0.#} MiB";
+
+    /// <summary>
     /// 送られてきた本文を、取り込み用の一時ファイルに書く。先に <see cref="TryReserve"/> で取り込みの枠を取っておく
     /// （取り込みが動いている間に、大きな本文を何本も受け取ってディスクを埋めないため）。途中で切れたら、書きかけは消す。
     /// </summary>
-    public async Task<string> SaveUploadAsync(Stream body, CancellationToken cancel)
+    public async Task<string> SaveUploadAsync(Stream body, CancellationToken cancel, long max = MaxUpload)
     {
         Directory.CreateDirectory(TempDir);
         var path = Path.Combine(TempDir, $"upload-{Guid.NewGuid():N}.db");
@@ -53,7 +65,7 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
             while ((n = await body.ReadAsync(buffer, cancel).ConfigureAwait(false)) > 0)
             {
                 total += n;
-                if (total > MaxUpload) throw new InvalidDataException("大きすぎる");
+                if (total > max) throw new InvalidDataException($"大きすぎる（上限 {Size(max)}）");
                 await f.WriteAsync(buffer.AsMemory(0, n), cancel).ConfigureAwait(false);
             }
             return path;

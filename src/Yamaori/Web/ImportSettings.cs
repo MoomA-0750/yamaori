@@ -21,7 +21,7 @@ public static class ImportSettings
     {
         if (!jobs.TryReserve(kind)) return new ImportStarted(false, "ほかの取り込みが動いている");
         string file;
-        try { file = await jobs.SaveUploadAsync(req.Body, cancel); }
+        try { file = await jobs.SaveUploadAsync(req.Body, cancel, ImportJobs.MaxUploadOf(kind)); }
         catch (Exception ex) when (ex is IOException or InvalidDataException or OperationCanceledException or Microsoft.AspNetCore.Http.BadHttpRequestException)
         {
             jobs.Release($"受け取れなかった: {ex.Message}");
@@ -64,6 +64,11 @@ public static class ImportSettings
                 return TypedResults.Problem("この端末には「VRCX と連携する」の役がない（まとめ役の画面で付ける）", statusCode: StatusCodes.Status403Forbidden);
             // 前の取り込みとの入れ替えは、まとめ役の画面で本人が決める
             if (replace == true) return TypedResults.BadRequest("前の取り込みとの入れ替えは、まとめ役の画面で行う");
+            // 種類ごとの上限（移す写しは 1 GiB）。大きさが分かれば本文を読む前に断り、分からなくても受け取りながら数えて打ち切る
+            var max = ImportJobs.MaxUploadOf(kind);
+            if (ctx.Request.ContentLength > max)
+                return TypedResults.Problem($"大きすぎる（{ImportJobs.Size(ctx.Request.ContentLength.Value)}。上限 {ImportJobs.Size(max)}）", statusCode: StatusCodes.Status413PayloadTooLarge);
+            if (ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit) limit.MaxRequestBodySize = max;
             var r = await ReceiveAndStart(ctx.Request, jobs, kind, false, account, device, cancel);
             return r.Started ? TypedResults.Ok(r) : TypedResults.Conflict(r.Message);
         }).WithMetadata(new RequestSizeLimitAttribute(MaxUpload))
@@ -108,6 +113,12 @@ public static class ImportSettings
             string snapshot;
             try { snapshot = jobs.Snapshot(jobs.Config().DatabasePath); }
             catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException) { return TypedResults.BadRequest($"この端末の DB を写せない: {ex.Message}"); }
+            // まとめ役が受け取れる大きさを超えるなら、送らずにここで断る
+            if (new FileInfo(snapshot).Length is var size && size > ImportJobs.MaxMoveUpload)
+            {
+                try { File.Delete(snapshot); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                return TypedResults.BadRequest($"この端末の記録の写しが {ImportJobs.Size(size)} あり、まとめ役へ移せる上限（{ImportJobs.Size(ImportJobs.MaxMoveUpload)}）を超えている");
+            }
             var r = await Forward(jobs, "move", snapshot, false, null, cancel);
             if (r.Started) new AuthStore(db).Set("import_last:move", System.Text.Json.JsonSerializer.Serialize(new { at = DateTime.UtcNow, message = "まとめ役へ送った（移した結果は、まとめ役の画面の「取り込み」で見る）" }, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
             return TypedResults.Ok(r);
