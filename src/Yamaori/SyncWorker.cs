@@ -120,6 +120,18 @@ public sealed class SyncWorker(IOptions<YamaoriOptions> options, YamaoriState st
                 notes += deletions.Count;
             }
         }
+        if (protocol >= 3)
+        {
+            // 自分のアカウントの名前（VAT の取り込みで見分けたものなど）。変わったときだけ送る
+            var names = sync.AccountNames();
+            var hash = SyncStore.Hash(names);
+            if (names.Count > 0 && sync.PushedHash(parent, SyncStore.AccountNamesKey) != hash)
+            {
+                using var res = await http.PostAsJsonAsync("api/sync/account-names", names, Web, cancel).ConfigureAwait(false);
+                await EnsureAsync(res, cancel).ConfigureAwait(false);
+                sync.MarkPushed(parent, SyncStore.AccountNamesKey, hash);
+            }
+        }
         return new PushResult(sources, notes);
     }
 

@@ -12,6 +12,9 @@ public sealed record SyncProjection(string DeviceId, string DeviceName, string S
 /// <summary>子で消したメモ（親でも消す）。</summary>
 public sealed record SyncNoteDeletion(string Id, string? DeviceId, DateTime DeletedAt);
 
+/// <summary>子で分かった自分のアカウントの名前（VAT の取り込みで見分けたものなど。ログのない昔のアカウントの名前を親でも出す）。</summary>
+public sealed record SyncAccountName(string AccountId, string Name);
+
 /// <summary>子から親へ送るメモ。</summary>
 public sealed record SyncNote(string Id, string TargetType, string TargetId, string Body, string? DeviceId, DateTime CreatedAt, DateTime UpdatedAt);
 
@@ -106,6 +109,32 @@ public sealed class SyncStore(Database db)
     }
 
     public const string DeletionsKey = "note_deletions";
+
+    /// <summary>送ったアカウントの名前の印（sync_state の出どころの欄に使う）。</summary>
+    public const string AccountNamesKey = "account_names";
+
+    /// <summary>この端末が持っている、自分のアカウントの名前（設定の account_name:usr_…）。</summary>
+    public IReadOnlyList<SyncAccountName> AccountNames() =>
+        Rows("SELECT substr(key, 14), value FROM settings WHERE key GLOB 'account_name:usr_*' ORDER BY key",
+            r => new SyncAccountName(r.GetString(0), r.GetString(1)));
+
+    /// <summary>
+    /// 子から受け取ったアカウントの名前を、親がまだ知らないものだけ入れる（親で分かっている名前は変えない）。入れた数を返す。
+    /// </summary>
+    public int ApplyAccountNames(IEnumerable<SyncAccountName> names)
+    {
+        var n = 0;
+        foreach (var a in names)
+        {
+            if (!a.AccountId.StartsWith("usr_", StringComparison.Ordinal) || a.AccountId.Length > 64) continue;
+            var name = a.Name.Trim();
+            if (name.Length is 0 or > 100) continue;
+            using var cmd = db.Command("INSERT INTO settings (key, value) VALUES ($k, $v) ON CONFLICT (key) DO NOTHING", null,
+                ("$k", "account_name:" + a.AccountId), ("$v", name));
+            n += cmd.ExecuteNonQuery();
+        }
+        return n;
+    }
 
     public string DeletionsMark(string parent, IReadOnlyList<SyncNoteDeletion> pushed)
     {

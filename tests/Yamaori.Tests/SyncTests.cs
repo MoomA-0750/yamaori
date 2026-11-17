@@ -43,6 +43,25 @@ public sealed class SyncTests : IDisposable
     }
 
     [Fact]
+    public void 子で分かったアカウントの名前を_親が知らないものだけ入れる()
+    {
+        using var child = Child(out _);
+        using var parent = Database.Open(Path.Combine(_dir, "parent-names.sqlite3"));
+        new AuthStore(child).Set("account_name:usr_old", "昔の名前");
+        new AuthStore(child).Set("account_name:usr_known", "子の名前");
+        new AuthStore(parent).Set("account_name:usr_known", "親の名前");
+        var names = new SyncStore(child).AccountNames();
+        Assert.Equal(2, names.Count);
+        // ID の形が違うもの・空の名前は入れない
+        Assert.Equal(1, new SyncStore(parent).ApplyAccountNames([.. names, new SyncAccountName("bad", "x"), new SyncAccountName("usr_empty", " ")]));
+        Assert.Equal("昔の名前", new AuthStore(parent).Get("account_name:usr_old"));
+        Assert.Equal("親の名前", new AuthStore(parent).Get("account_name:usr_known"));
+        Assert.Null(new AuthStore(parent).Get("account_name:usr_empty"));
+        // もう一度送っても変わらない
+        Assert.Equal(0, new SyncStore(parent).ApplyAccountNames(names));
+    }
+
+    [Fact]
     public void 変わっていなければ同じハッシュで_送らずに済む()
     {
         using var child = Child(out var dev);

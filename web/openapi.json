@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:47851/"
+      "url": "http://127.0.0.1:47911/"
     }
   ],
   "paths": {
@@ -2182,6 +2182,39 @@
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/SyncNoteDeletion"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncNotesResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sync/account-names": {
+      "post": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "子の端末から、自分のアカウントの名前（VAT の取り込みで見分けたものなど）を受け取る（親が知らないものだけ入れる）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SyncAccountName"
                 }
               }
             }
@@ -5736,6 +5769,21 @@
             "type": "integer",
             "format": "int32",
             "default": 0
+          }
+        }
+      },
+      "SyncAccountName": {
+        "required": [
+          "accountId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },

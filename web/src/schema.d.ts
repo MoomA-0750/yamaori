@@ -2732,6 +2732,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/account-names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 子の端末から、自分のアカウントの名前（VAT の取り込みで見分けたものなど）を受け取る（親が知らないものだけ入れる） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SyncAccountName"][];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SyncNotesResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/worlds/{id}/details": {
         parameters: {
             query?: never;
@@ -4440,6 +4480,10 @@ export interface components {
              * @default 0
              */
             syncProtocol: number;
+        };
+        SyncAccountName: {
+            accountId: string;
+            name: string;
         };
         SyncNote: {
             id: string;

@@ -57,6 +57,12 @@
   }
 </script>
 
+<!-- 取り込みの結果（「訪問 12・会った人 34・…」）は、項目ごとに並べて折り返す -->
+{#snippet counts(text: string)}
+  {@const parts = text.split('・')}
+  {#if parts.length > 2}<ul class="counts">{#each parts as part, i (i)}<li>{part}</li>{/each}</ul>{:else}<p>{text}</p>{/if}
+{/snippet}
+
 {#if view}
   <section class="card pad stack">
     <h2>取り込み</h2>
@@ -64,7 +70,9 @@
     {#if view.job.running}
       <p class="status k-inner" role="status">{view.job.kind === 'vat' ? 'VRChatActivityTools' : view.job.kind === 'move' ? 'メンバーの端末から移す記録' : 'VRCX'} を取り込んでいます…（何年分もあると数分かかります）</p>
     {:else if view.job.finishedAt}
-      <p class="status k-inner" class:bad={!view.job.ok} role="status">{view.job.ok ? '取り込みました' : '取り込めませんでした'}: {view.job.message}</p>
+      <div class="status k-inner stack" class:bad={!view.job.ok} role="status">
+        {#if view.job.ok}<p>取り込みました</p>{@render counts(view.job.message ?? '')}{:else}<p>取り込めませんでした: {view.job.message}</p>{/if}
+      </div>
     {/if}
 
     {#if member}
@@ -73,7 +81,7 @@
         <p class="faint">グループに入る前からこの端末にあった記録を、まとめ役へ送ります。取り込んだ訪問（VRChatActivityTools・VRCX）、アルバム、写真の直し、ゴミ箱、お気に入り、忘れた人、フレンドの写し、メモが対象です。ログの記録はふだんどおり送られます。</p>
         <p class="faint">まとめ役にあるものは消さず、足りないものだけ足します。移せるのは一度だけです（もう一度移すときは、まとめ役の画面でこの端末をグループから外し、入り直します）。この端末の記録は消しません。</p>
         <div><button class="primary" onclick={move} disabled={sending || view.job.running}>まとめ役へ移す</button></div>
-        {#if view.move.at}<p class="faint">前に送った: {dateTime(view.move.at)} — {view.move.message}</p>{/if}
+        {#if view.move.at}<div class="faint last"><p>前に送った: {dateTime(view.move.at)}</p>{@render counts(view.move.message ?? '')}</div>{/if}
       </div>
     {/if}
 
@@ -83,7 +91,7 @@
       <label class="pickfile"><input type="file" bind:files={vatFile} accept=".db,.sqlite,.sqlite3" /><span class="k-btn">ファイルを選ぶ</span><span class="faint break">{vatFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
       <label class="stack field narrow">自分のアカウントの ID（分かれば、usr_…）<input type="text" bind:value={account} placeholder="usr_…" /></label>
       <div><button class="primary" onclick={() => send('vat', vatFile)} disabled={!vatFile?.length || sending || view.job.running}>取り込む</button></div>
-      {#if view.vat.at}<p class="faint">前に取り込んだ: {dateTime(view.vat.at)} — {view.vat.message}</p>{/if}
+      {#if view.vat.at}<div class="faint last"><p>前に取り込んだ: {dateTime(view.vat.at)}</p>{@render counts(view.vat.message ?? '')}</div>{/if}
     </div>
 
     <div class="stack block">
@@ -107,7 +115,7 @@
           <div><button onclick={() => send('vrcx', vrcxFile)} disabled={!vrcxFile?.length || sending || view.job.running}>取り込む</button></div>
         </div>
       </details>
-      {#if view.vrcx.at}<p class="faint">前に取り込んだ: {dateTime(view.vrcx.at)} — {view.vrcx.message}</p>{/if}
+      {#if view.vrcx.at}<div class="faint last"><p>前に取り込んだ: {dateTime(view.vrcx.at)}</p>{@render counts(view.vrcx.message ?? '')}</div>{/if}
     </div>
 
     <label class="k-option"><input class="k-check" type="checkbox" bind:checked={replace} /> 前に取り込んだものと別の DB なら、入れ替える（前の取り込みの分は消えます）</label>
@@ -123,6 +131,8 @@
   .status { background: var(--accent-soft); corner-shape: var(--corner-shape); padding: var(--space-2) var(--space-3); }
   .status.bad, .warn { color: var(--danger); }
   .narrow { max-width: 24rem; }
+  .counts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+  .last { display: flex; flex-direction: column; gap: var(--space-1); }
   .pickfile { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; cursor: pointer; }
   .pickfile input { position: absolute; width: 1px; height: 1px; opacity: 0; }
   .pickfile:focus-within .k-btn { outline: var(--focus-width) solid var(--focus); outline-offset: var(--focus-offset); }

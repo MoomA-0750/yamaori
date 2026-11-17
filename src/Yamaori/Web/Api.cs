@@ -141,6 +141,14 @@ public static class Api
             })
             .WithSummary("子の端末から、子で消したメモを受け取って消す（消したあとに親で直したものは残す）");
 
+        api.MapPost("/sync/account-names", Results<Ok<SyncNotesResult>, ProblemHttpResult> (HttpContext ctx, Database db, IReadOnlyList<SyncAccountName> names) =>
+            {
+                if (!SyncDevice(ctx, db, [], out _))
+                    return TypedResults.Problem("このトークンは、まだ端末に結び付いていない", statusCode: StatusCodes.Status403Forbidden);
+                return TypedResults.Ok(new SyncNotesResult(new SyncStore(db).ApplyAccountNames(names.Take(1_000))));
+            })
+            .WithSummary("子の端末から、自分のアカウントの名前（VAT の取り込みで見分けたものなど）を受け取る（親が知らないものだけ入れる）");
+
         // ---- 拡張機能から
 
         api.MapPut("/worlds/{id}/details", Results<NoContent, BadRequest<string>> (Database db, string id, WorldDetailsInput input) =>
@@ -287,9 +295,9 @@ public static class Api
 
     /// <summary>
     /// 親と子のやり取りの版。足すだけの変更でも上げる（子は、親がこの版より古ければ、新しい送り方を使わずに知らせる）。
-    /// 1: 記録とメモ、2: 消したメモ
+    /// 1: 記録とメモ、2: 消したメモ、3: 自分のアカウントの名前
     /// </summary>
-    public const int SyncProtocol = 2;
+    public const int SyncProtocol = 3;
 
     /// <summary>
     /// 子の端末のトークンなら、そのトークンが結び付いた端末（まだなら、送ってきた端末に結び付ける）。結び付かなければ false。
