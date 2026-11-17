@@ -377,6 +377,8 @@
   .tokens, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
   /* 狭い幅で折り返しても、行の操作は右に揃える */
   .tokens button { margin-inline-start: auto; }
+  /* 一覧のあとに入力欄が続くときは、行の間より広く空けて区切る（狭い幅で「消す」が折り返しても詰まらない） */
+  .tokens:not(:last-child) { margin-bottom: var(--space-2); }
   .grow { flex: 1; min-width: 10rem; width: auto; }
   .choice > span.inline { display: inline; }
   /* 入力欄を含む行は、ラジオボタンを入力欄の高さの中ほどに揃える */
