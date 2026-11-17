@@ -59,7 +59,7 @@
     </header>
     {#if data.info.description || data.info.authorName || data.info.thumbnailUrl || data.info.favorites.length || data.info.categories.length}
       <section class="info card" class:with-thumb={!!data.info.thumbnailUrl && !thumbFailed}>
-        {#if data.info.thumbnailUrl && !thumbFailed}<img class="thumb" src={data.info.thumbnailUrl} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={() => (thumbFailed = true)} />{/if}
+        {#if data.info.thumbnailUrl && !thumbFailed}<img class="thumb k-inner" src={data.info.thumbnailUrl} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={() => (thumbFailed = true)} />{/if}
         <div class="stack text">
           {#if data.info.authorName}<div class="muted">作者 {data.info.authorName}</div>{/if}
           {#if data.info.favorites.length}<div class="row">{#each data.info.favorites as f (f)}<span class="chip accent">★ {listLabel(f)}</span>{/each}</div>{/if}
@@ -95,14 +95,14 @@
 {/if}
 
 <style>
-  .info { display: grid; grid-template-columns: 1fr; gap: 1rem; padding: .9rem 1rem; align-items: start; }
+  .info { display: grid; grid-template-columns: 1fr; gap: var(--space-4); padding: var(--nest-pad); align-items: start; }
   .info.with-thumb { grid-template-columns: 12rem 1fr; }
-  .info .thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-2); }
-  .info .text { gap: .4rem; }
+  .info .thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; corner-shape: var(--corner-shape); background: var(--surface-2); }
+  .info .text { gap: var(--space-2); }
   .desc { margin: 0; white-space: pre-line; }
-  @media (max-width: 480px) { .info.with-thumb { grid-template-columns: 1fr; } }
-  .more { margin-top: .75rem; }
-  .head { gap: .35rem; }
+  @media (max-width: 620px) { .info.with-thumb { grid-template-columns: 1fr; } }
+  .more { margin-top: var(--space-3); }
+  .head { gap: var(--space-2); }
   .head p { margin: 0; }
-  .more-link { display: inline-block; margin-top: .5rem; }
+  .more-link { display: inline-block; margin-top: var(--space-2); }
 </style>

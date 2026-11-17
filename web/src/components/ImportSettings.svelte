@@ -62,9 +62,9 @@
     <h2>取り込み</h2>
     {#if member}<p class="faint">この端末はグループのメンバーなので、取り込む DB はまとめ役へ送って、まとめ役で取り込みます。</p>{/if}
     {#if view.job.running}
-      <p class="status" role="status">{view.job.kind === 'vat' ? 'VRChatActivityTools' : view.job.kind === 'move' ? 'メンバーの端末から移す記録' : 'VRCX'} を取り込んでいます…（何年分もあると数分かかります）</p>
+      <p class="status k-inner" role="status">{view.job.kind === 'vat' ? 'VRChatActivityTools' : view.job.kind === 'move' ? 'メンバーの端末から移す記録' : 'VRCX'} を取り込んでいます…（何年分もあると数分かかります）</p>
     {:else if view.job.finishedAt}
-      <p class="status" class:bad={!view.job.ok} role="status">{view.job.ok ? '取り込みました' : '取り込めませんでした'}: {view.job.message}</p>
+      <p class="status k-inner" class:bad={!view.job.ok} role="status">{view.job.ok ? '取り込みました' : '取り込めませんでした'}: {view.job.message}</p>
     {/if}
 
     {#if member}
@@ -80,7 +80,7 @@
     <div class="stack block">
       <h3>VRChatActivityTools から移る</h3>
       <p class="faint">VRChatActivityTools の記録（<code>VRChatActivityLog.db</code>）を選ぶと、訪問・会った人・動画・通知を取り込みます。ログの記録がある期間とは重ねません。</p>
-      <label class="pickfile"><input type="file" bind:files={vatFile} accept=".db,.sqlite,.sqlite3" /><span class="btn">ファイルを選ぶ</span><span class="faint break">{vatFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
+      <label class="pickfile"><input type="file" bind:files={vatFile} accept=".db,.sqlite,.sqlite3" /><span class="k-btn">ファイルを選ぶ</span><span class="faint break">{vatFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
       <label class="stack field narrow">自分のアカウントの ID（分かれば、usr_…）<input type="text" bind:value={account} placeholder="usr_…" /></label>
       <div><button class="primary" onclick={() => send('vat', vatFile)} disabled={!vatFile?.length || sending || view.job.running}>取り込む</button></div>
       {#if view.vat.at}<p class="faint">前に取り込んだ: {dateTime(view.vat.at)} — {view.vat.message}</p>{/if}
@@ -93,7 +93,7 @@
       <div class="row">
         <button onclick={local} disabled={!view.vrcxLocal.exists || view.job.running}>この端末の VRCX を今取り込む</button>
       </div>
-      {#if !member}<label class="check"><input type="checkbox" bind:checked={vrcxAuto} /> 決まった間隔で取り込み続ける（VRCX が書き足した分が入ります）</label>{/if}
+      {#if !member}<label class="k-option"><input class="k-check" type="checkbox" bind:checked={vrcxAuto} /> 決まった間隔で取り込み続ける（VRCX が書き足した分が入ります）</label>{/if}
       <div class="grid2">
         <label class="stack field">間隔（分）<input type="number" min="5" max="1440" bind:value={vrcxMinutes} /></label>
         <label class="stack field">VRCX の DB の場所（空なら標準の場所）<input type="text" bind:value={vrcxPath} placeholder={view.vrcxLocal.path} /></label>
@@ -102,31 +102,30 @@
       <p class="faint">グループに入っているときは、まとめ役の画面で「VRCX と連携する」の役を付けた端末が取り込み続けます。</p>
       <details>
         <summary class="faint">ほかの PC の VRCX の DB を選んで取り込む</summary>
-        <div class="stack">
-          <label class="pickfile"><input type="file" bind:files={vrcxFile} accept=".sqlite3,.sqlite,.db" /><span class="btn">ファイルを選ぶ</span><span class="faint break">{vrcxFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
+        <div class="stack other-db">
+          <label class="pickfile"><input type="file" bind:files={vrcxFile} accept=".sqlite3,.sqlite,.db" /><span class="k-btn">ファイルを選ぶ</span><span class="faint break">{vrcxFile?.[0]?.name ?? 'まだ選んでいません'}</span></label>
           <div><button onclick={() => send('vrcx', vrcxFile)} disabled={!vrcxFile?.length || sending || view.job.running}>取り込む</button></div>
         </div>
       </details>
       {#if view.vrcx.at}<p class="faint">前に取り込んだ: {dateTime(view.vrcx.at)} — {view.vrcx.message}</p>{/if}
     </div>
 
-    <label class="check"><input type="checkbox" bind:checked={replace} /> 前に取り込んだものと別の DB なら、入れ替える（前の取り込みの分は消えます）</label>
+    <label class="k-option"><input class="k-check" type="checkbox" bind:checked={replace} /> 前に取り込んだものと別の DB なら、入れ替える（前の取り込みの分は消えます）</label>
     {#if view.job.needsReplace && !view.job.running}<p class="warn">前に取り込んだものと別の DB です。入れ替えてよければ、上の印を付けてもう一度取り込みます。</p>{/if}
     {#if msg}<p class="muted" role="status">{msg}</p>{/if}
   </section>
 {/if}
 
 <style>
-  h3 { margin: 0; font-size: 1rem; }
+  h3 { margin: 0; }
   p { margin: 0; }
-  .block { border-top: 1px solid var(--line); padding-top: .75rem; }
-  .status { background: var(--accent-soft); border-radius: var(--radius-sm); padding: .5rem .75rem; }
-  .status.bad, .warn { color: var(--danger, #b3261e); }
+  .block { border-top: var(--border-width) solid var(--line); padding-top: var(--space-3); }
+  .status { background: var(--accent-soft); corner-shape: var(--corner-shape); padding: var(--space-2) var(--space-3); }
+  .status.bad, .warn { color: var(--danger); }
   .narrow { max-width: 24rem; }
-  .pickfile { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; cursor: pointer; }
+  .pickfile { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; cursor: pointer; }
   .pickfile input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-  .pickfile .btn { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .45rem .9rem; background: var(--surface); }
-  .pickfile:focus-within .btn { outline: 2px solid var(--accent); }
-  .grid2 { display: grid; grid-template-columns: 8rem 1fr; gap: .5rem .75rem; }
-  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  .pickfile:focus-within .k-btn { outline: var(--focus-width) solid var(--focus); outline-offset: var(--focus-offset); }
+  .grid2 { display: grid; grid-template-columns: 8rem 1fr; gap: var(--space-2) var(--space-3); }
+  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
 </style>

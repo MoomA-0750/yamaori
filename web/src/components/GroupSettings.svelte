@@ -68,7 +68,7 @@
       <p class="muted"><b>{view.group.name}</b> のまとめ役です。記録は全部この端末に集まり、ほかの端末は役に従って集めて送ります。</p>
       <ul class="members">
         {#each view.group.members as m (m.deviceId)}
-          <li class="member">
+          <li class="member k-inner">
             <div class="who">
               <b class="break">{m.name}</b>
               {#if m.roles.includes('hub')}<span class="chip accent">まとめ役</span>{/if}
@@ -77,9 +77,9 @@
             </div>
             <div class="roles">
               {#each editable as r (r)}
-                <label class="check"><input type="checkbox" checked={m.roles.includes(r)} onchange={() => toggle(m, r)} /> {roleLabels[r]}</label>
+                <label class="k-option"><input class="k-check" type="checkbox" checked={m.roles.includes(r)} onchange={() => toggle(m, r)} /> {roleLabels[r]}</label>
               {/each}
-              {#if !m.roles.includes('hub')}<button class="danger-text" onclick={() => remove(m)}>外す</button>{/if}
+              {#if !m.roles.includes('hub')}<button class="danger" onclick={() => remove(m)}>外す</button>{/if}
             </div>
           </li>
         {/each}
@@ -87,7 +87,7 @@
       <div class="stack">
         <div><button onclick={makeInvite}>招待の合言葉を作る</button></div>
         {#if invite}
-          <div class="invite">
+          <div class="invite k-inner">
             <span class="faint">入れたい端末の Yamaori の設定で、まとめ役のアドレスとこの合言葉を入れます（一度きり・{dateTime(invite.expiresAt)} まで）</span>
             <code class="code">{invite.code}</code>
             <span class="faint">まとめ役のアドレス: <code>{hubUrlHint}</code>（Tailscale なら、ほかの端末の「探す」で出ます）</span>
@@ -100,7 +100,7 @@
       <p class="faint">この端末の役: {view.member.roles.length ? view.member.roles.map((r) => roleLabels[r] ?? r).join('・') : 'なし'}（まとめ役の画面で変えます）</p>
       <p class="faint">グループに入る前からこの端末にあった記録（取り込んだ訪問・アルバム・写真の直しなど）は、下の「取り込み」の「まとめ役へ移す」で移せます。</p>
       {#if !view.member.tokenReadable}<p class="warn">まとめ役のトークンを読めません。抜けてから、もう一度入ってください。</p>{/if}
-      <div><button class="danger-text" onclick={leave}>グループから抜ける</button></div>
+      <div><button class="danger" onclick={leave}>グループから抜ける</button></div>
     {:else}
       {#if view.mode === 'child'}<p class="faint">今は前の形（子の端末）で送っています。グループに入り直すと、役を決められます。</p>{/if}
       <div class="two">
@@ -143,19 +143,19 @@
 {/if}
 
 <style>
-  h3 { margin: 0; font-size: 1rem; }
+  h3 { margin: 0; }
   p { margin: 0; }
-  .members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-  .member { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .6rem .75rem; display: flex; flex-direction: column; gap: .4rem; }
-  .who { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
-  .roles { display: flex; gap: .35rem 1rem; flex-wrap: wrap; align-items: center; }
-  .invite { display: flex; flex-direction: column; gap: .35rem; background: var(--accent-soft); border-radius: var(--radius-sm); padding: .75rem; }
-  .invite .faint { color: var(--ink-2); }
-  .code { font-size: 1.5rem; letter-spacing: .15em; font-weight: 700; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-  .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }
-  .pick { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; text-align: left; }
+  .members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .member { border: var(--border-width) solid var(--line); corner-shape: var(--corner-shape); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); }
+  .who { display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
+  .roles { display: flex; gap: 0 var(--space-4); flex-wrap: wrap; align-items: center; }
+  .invite { display: flex; flex-direction: column; gap: var(--space-2); background: var(--accent-soft); corner-shape: var(--corner-shape); padding: var(--space-3); }
+  .invite .faint { color: var(--muted); }
+  .code { font-size: var(--font-heading); letter-spacing: 0.15em; font-weight: var(--weight-bold); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+  .pick { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left; }
   form input { flex: 1; min-width: 0; }
-  .warn, .danger-text { color: var(--danger, #b3261e); }
-  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  .warn { color: var(--danger); }
+  @media (max-width: 620px) { .two { grid-template-columns: 1fr; } }
 </style>

@@ -61,14 +61,14 @@
 </div>
 
 <style>
-  .small { font-size: .7rem; padding: 0 .45rem; vertical-align: .1em; margin-left: .35rem; }
-  .tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; }
+  .small { font-size: var(--font-micro); padding: 0 var(--space-2); vertical-align: 0.1em; margin-left: var(--space-1); }
+  .tools { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-2); }
   .note { margin: 0; }
   .tools select { width: auto; }
-  .list { list-style: none; margin: 0; padding: .25rem 0; }
-  .list li { border-top: 1px solid var(--line); }
+  .list { list-style: none; margin: 0; padding: var(--space-1) 0; }
+  .list li { border-top: var(--border-width) solid var(--line); }
   .list li:first-child { border-top: none; }
-  .item { display: flex; justify-content: space-between; align-items: baseline; gap: .25rem 1rem; flex-wrap: wrap; padding: .55rem 1rem; }
-  .nums { gap: .25rem .9rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
-  @media (max-width: 480px) { .tools { grid-template-columns: 1fr; } .tools select { width: 100%; } }
+  .item { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-1) var(--space-4); flex-wrap: wrap; padding: var(--space-2) var(--space-4); }
+  .nums { gap: var(--space-1) var(--space-4); font-size: var(--font-label); font-variant-numeric: tabular-nums; }
+  @media (max-width: 620px) { .tools { grid-template-columns: 1fr; } .tools select { width: 100%; } }
 </style>

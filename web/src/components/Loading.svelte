@@ -9,6 +9,6 @@
 {/if}
 
 <style>
-  .msg { padding: 2rem 0; text-align: center; }
+  .msg { padding: var(--space-8) 0; text-align: center; }
   .error { color: var(--danger); }
 </style>

@@ -100,7 +100,7 @@
     <div class="stack key">
       {#if view.remote.publicKey}
         <span class="faint">この公開鍵を、NAS のユーザーの SSH 公開鍵に登録します（TrueNAS なら「資格情報 → ユーザー → 編集 → SSH 公開鍵」）。</span>
-        <code class="mono break pub">{view.remote.publicKey}</code>
+        <code class="mono break pub k-inner">{view.remote.publicKey}</code>
         <div class="row"><button onclick={copyKey}>コピー</button><button onclick={newKey}>鍵を作り直す</button></div>
       {:else}
         <div class="row"><button onclick={newKey}>NAS に入る鍵を作る</button></div>
@@ -128,16 +128,16 @@
 {/if}
 
 <style>
-  h3 { margin: .5rem 0 0; font-size: 1rem; }
-  .grid3 { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: .5rem; }
-  .pair { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: .5rem; align-items: center; }
+  h3 { margin: var(--space-2) 0 0; }
+  .grid3 { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: var(--space-2); }
+  .pair { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: var(--space-2); align-items: center; }
   .narrow { max-width: 12rem; }
-  .pub { font-size: .75rem; padding: .5rem; background: var(--bg-soft, rgba(0,0,0,.04)); border-radius: .5rem; }
+  .pub { font-size: var(--font-caption); padding: var(--space-2); background: var(--surface-2); corner-shape: var(--corner-shape); }
   .plain { list-style: none; margin: 0; padding: 0; }
-  @media (max-width: 640px) {
-    .grid3 { grid-template-columns: 1fr; gap: 1rem; }
-    .pair { grid-template-columns: 1fr; gap: .35rem; padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
-    .pair .arrow { transform: rotate(90deg); justify-self: start; padding-left: .5rem; }
+  @media (max-width: 620px) {
+    .grid3 { grid-template-columns: 1fr; gap: var(--space-4); }
+    .pair { grid-template-columns: 1fr; gap: var(--space-1); padding-bottom: var(--space-3); border-bottom: var(--border-width) solid var(--line); }
+    .pair .arrow { transform: rotate(90deg); justify-self: start; padding-left: var(--space-2); }
     .pair button { justify-self: start; }
   }
 </style>

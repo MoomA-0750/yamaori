@@ -68,12 +68,12 @@
 </div>
 
 <style>
-  .tools { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem; }
+  .tools { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-2); }
   .tools select { width: auto; }
-  .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-  .item { display: block; padding: .75rem 1rem; }
-  .item:hover { border-color: var(--accent); color: inherit; }
-  .name { font-weight: 600; }
-  .nums { gap: .25rem .9rem; font-size: .85rem; font-variant-numeric: tabular-nums; }
-  @media (max-width: 480px) { .tools { grid-template-columns: 1fr; } .tools select { width: 100%; } }
+  .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .item { display: block; padding: var(--space-3) var(--space-4); }
+  .item:hover { border-color: color-mix(in srgb, var(--line-strong) 45%, transparent); background: color-mix(in srgb, var(--surface), var(--fg) 3%); color: inherit; }
+  .name { font-weight: var(--weight-strong); }
+  .nums { gap: var(--space-1) var(--space-4); font-size: var(--font-label); font-variant-numeric: tabular-nums; }
+  @media (max-width: 620px) { .tools { grid-template-columns: 1fr; } .tools select { width: 100%; } }
 </style>

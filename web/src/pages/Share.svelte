@@ -61,7 +61,7 @@
 
 <style>
   .wrap { min-height: 50vh; display: grid; place-items: center; }
-  .box { width: min(100%, 26rem); padding: 1.4rem; gap: .6rem; }
+  /* 角丸は中のボタンと同心（「ボタンの角丸 ＋ 余白」）。ログインの枠と同じ */
+  .box { width: min(100%, 26rem); padding: var(--space-6); gap: var(--space-3); --nest-pad: var(--space-6); --nest-radius: calc(var(--radius-control) + var(--space-6)); border-radius: var(--nest-radius); corner-shape: var(--corner-shape); }
   .box p { margin: 0; }
-  .error { color: var(--danger); }
 </style>

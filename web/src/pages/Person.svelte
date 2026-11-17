@@ -144,15 +144,13 @@
 {/if}
 
 <style>
-  .more { margin-top: .75rem; }
-  .forget { margin-top: 1rem; }
+  .more { margin-top: var(--space-3); }
+  .forget { margin-top: var(--space-4); }
   .forget p { margin: 0; }
-  .pad { padding: 1rem 1.2rem; }
-  .error { color: var(--danger); }
-  .head { gap: .35rem; }
+  .head { gap: var(--space-2); }
   .head p { margin: 0; }
-  .names { list-style: none; margin: 0; padding: .25rem 0; }
-  .names li { padding: .4rem 1rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: .5rem 1rem; flex-wrap: wrap; }
+  .names { list-style: none; margin: 0; padding: var(--space-1) 0; }
+  .names li { padding: var(--space-2) var(--space-4); border-top: var(--border-width) solid var(--line); display: flex; justify-content: space-between; gap: var(--space-2) var(--space-4); flex-wrap: wrap; }
   .names li:first-child { border-top: none; }
-  .more-link { display: inline-block; margin-top: .5rem; }
+  .more-link { display: inline-block; margin-top: var(--space-2); }
 </style>

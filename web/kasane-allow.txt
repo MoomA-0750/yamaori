@@ -1,0 +1,4 @@
+# kasane の検査（kasane/scripts/lint.mjs）で許すもの。理由を書く
+# 「いま居る」の点の明滅の途中（keyframes の 50%）の薄さ。kasane に明滅の途中の値の名前が無い。
+# 使えないものの薄さ（--disabled-opacity）とは意味が違うので借りない
+opacity-literal  src/App.svelte  opacity: 0.35

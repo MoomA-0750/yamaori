@@ -188,7 +188,7 @@
           <input type="text" bind:value={renaming} aria-label="アルバムの名前" maxlength="200" />
           {#if renaming.trim() && renaming.trim() !== albumInfo.name}<button type="submit">名前を変える</button>{/if}
         </form>
-        <button class="danger-text" onclick={deleteAlbum}>アルバムを消す（写真は残す）</button>
+        <button class="danger" onclick={deleteAlbum}>アルバムを消す（写真は残す）</button>
       </div>
     {/if}
     {#if trash}
@@ -250,24 +250,25 @@
 {#if picker}<AlbumPicker photoIds={picker} onclose={() => (picker = null)} ondone={(m) => { note = m; selecting = false; selected = [] }} />{/if}
 
 <style>
-  .month { color: var(--ink-2); font-size: .9rem; margin: .25rem 0 .5rem; }
-  .empty { padding: 1.5rem; text-align: center; }
-  .empty p { margin: .25rem 0; }
-  .tabs { display: flex; gap: .25rem; flex-wrap: wrap; }
-  .tabs a { padding: .35rem .85rem; border-radius: 999px; color: var(--ink-2); text-decoration: none; }
-  .tabs a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-  .filter { align-items: baseline; gap: .5rem; flex-wrap: wrap; }
-  .groups { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: .75rem; }
+  .month { color: var(--muted); font-size: var(--font-small); margin: var(--space-1) 0 var(--space-2); }
+  .empty { padding: var(--space-6); text-align: center; }
+  .empty p { margin: var(--space-1) 0; }
+  /* 分け方の切り替え。ページの上の画面の切り替え（App.svelte の .tabs）と同じ形 */
+  .tabs { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+  .tabs a { padding: var(--space-2) var(--space-3); border-radius: var(--radius-full); color: var(--muted); text-decoration: none; white-space: nowrap; }
+  .tabs a:hover { background: var(--hover); color: var(--fg); }
+  .tabs a.on { background: var(--accent-soft); color: var(--accent-strong); font-weight: var(--weight-strong); }
+  .filter { align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+  .groups { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: var(--space-3); }
   .group { display: flex; flex-direction: column; overflow: hidden; padding: 0; text-decoration: none; color: inherit; height: 100%; }
+  .group:hover { border-color: color-mix(in srgb, var(--line-strong) 45%, transparent); color: inherit; }
   .group img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--line); display: block; }
-  .label { display: flex; flex-direction: column; gap: .1rem; padding: .5rem .65rem .6rem; }
-  .name { font-weight: 600; font-size: .9rem; line-height: 1.35; }
-  .nocover { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: var(--surface-2); font-size: .8rem; }
-  .danger-text { color: var(--danger, #b3261e); }
-  .count { margin-left: .35rem; font-size: .75rem; }
-  .tools { gap: .5rem; flex-wrap: wrap; align-items: center; }
-  .rename input { min-width: 0; width: 16rem; max-width: 60vw; font-weight: 600; }
-  .warn { color: var(--danger, #b3261e); margin: 0; }
-  .pad { padding: 1rem; }
+  .label { display: flex; flex-direction: column; gap: 0; padding: var(--space-2) var(--space-3); }
+  .name { font-weight: var(--weight-strong); font-size: var(--font-small); line-height: var(--leading-tight); }
+  .nocover { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: var(--surface-2); font-size: var(--font-note); }
+  .count { margin-left: var(--space-1); font-size: var(--font-caption); }
+  .tools { gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+  .rename input { min-width: 0; width: 16rem; max-width: 60vw; font-weight: var(--weight-strong); }
+  .warn { color: var(--danger); margin: 0; }
   .pad p { margin: 0; }
 </style>
