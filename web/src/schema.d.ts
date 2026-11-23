@@ -19,6 +19,7 @@ export interface paths {
                 query?: {
                     replace?: boolean;
                     account?: string;
+                    fp?: string;
                 };
                 header?: never;
                 path: {
@@ -57,6 +58,49 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/import/vrcx/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** メンバーの端末が送った VRCX の、まとめ役での取り込みの結果（その端末の分だけ） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MemberResult"];
+                    };
+                };
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4182,6 +4226,14 @@ export interface components {
         };
         LoginInput: {
             password: string;
+        };
+        MemberResult: {
+            /** Format: date-time */
+            at: string;
+            ok: boolean;
+            needsReplace: boolean;
+            message: string;
+            fingerprint: null | string;
         };
         MemberState: {
             groupId: string;

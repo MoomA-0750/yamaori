@@ -7,7 +7,9 @@ public static class ImportGuard
     /// 取り込む DB が、前に取り込んだものと同じものか（の続き）を確かめる。
     /// 取り込みは出どころ（vat・vrcx）ごとに入れ替えるので、別の DB を取り込むと前の取り込みが消える。違えば、replace のときだけ進める。
     /// </summary>
-    public static void CheckOrigin(Database db, string source, string origin, bool replace)
+    /// <param name="same">前と今の origin が同じ DB の続きか（既定は文字が同じとき）。</param>
+    /// <param name="alsoSources">この取り込みが入れるほかの出どころのメモ（VRChat のノートなど）。</param>
+    public static void CheckOrigin(Database db, string source, string origin, bool replace, Func<string, string, bool>? same = null, params string[] alsoSources)
     {
         var store = new AuthStore(db);
         var key = "import_origin:" + source;
@@ -16,8 +18,9 @@ public static class ImportGuard
         var has = db.Scalar("""
             SELECT 1 WHERE EXISTS (SELECT 1 FROM visits WHERE source = $s) OR EXISTS (SELECT 1 FROM events WHERE source = $s)
                 OR EXISTS (SELECT 1 FROM notes WHERE source = $s) OR EXISTS (SELECT 1 FROM world_favorites WHERE source = $s)
-            """, ("$s", source)) != null;
-        if (before != null && before != origin && has && !replace)
+            """, ("$s", source)) != null
+            || alsoSources.Any(a => db.Scalar("SELECT 1 FROM notes WHERE source = $s LIMIT 1", ("$s", a)) != null);
+        if (before != null && before != origin && !(same?.Invoke(before, origin) ?? false) && has && !replace)
             throw new InvalidOperationException(
                 $"前に取り込んだものと別の DB に見える（前: {before}、今: {origin}）。取り込むと前の {source} の記録と入れ替わる。入れ替えてよければ --replace を付ける");
     }

@@ -38,6 +38,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "fp",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -70,6 +77,29 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/sync/import/vrcx/result": {
+      "get": {
+        "tags": [
+          "Yamaori"
+        ],
+        "summary": "メンバーの端末が送った VRCX の、まとめ役での取り込みの結果（その端末の分だけ）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResult"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -4453,6 +4483,37 @@
         "properties": {
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "MemberResult": {
+        "required": [
+          "at",
+          "ok",
+          "needsReplace",
+          "message",
+          "fingerprint"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "needsReplace": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

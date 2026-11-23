@@ -42,6 +42,8 @@ public sealed class HttpGroupTests
 
         // メンバーのトークンで役を読む
         (string, string)[] bearer = [("Authorization", "Bearer " + token)];
+        // VRCX の役が無ければ、取り込みの結果も読めない
+        Assert.Equal(403, (await hub.SendAsync("GET", "/api/sync/import/vrcx/result", headers: bearer)).Response.StatusCode);
         var sync = await Json(await hub.SendAsync("GET", "/api/sync/group", headers: bearer));
         Assert.Equal(["logs", "photos"], sync.GetProperty("roles").EnumerateArray().Select(x => x.GetString()!).ToArray());
         // まとめ役で役を変える
@@ -53,17 +55,26 @@ public sealed class HttpGroupTests
         {
             c.Request.Method = "POST";
             c.Request.Path = "/api/sync/import/vrcx";
+            c.Request.QueryString = new Microsoft.AspNetCore.Http.QueryString("?fp=abc123");
             c.Request.Host = new Microsoft.AspNetCore.Http.HostString("localhost", 47899);
             c.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.1.50");
             c.Request.Headers.Authorization = "Bearer " + token;
             c.Request.Body = new MemoryStream([1, 2, 3]);
         });
         Assert.Equal(200, junk.Response.StatusCode);
+        // まとめ役での取り込みの結果（壊れた DB なので失敗）を、送った端末が指紋つきで読める
+        var jobs = hub.Server.Services.GetRequiredService<Yamaori.ImportJobs>();
+        for (var i = 0; i < 100 && jobs.Current.Running; i++) await Task.Delay(50);
+        var result = await Json(await hub.SendAsync("GET", "/api/sync/import/vrcx/result", headers: bearer));
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Equal("abc123", result.GetProperty("fingerprint").GetString());
+        Assert.Equal(400, (await hub.SendAsync("POST", "/api/sync/import/vrcx?fp=not-hex", body: "{}", headers: bearer)).Response.StatusCode);
         // 入れ替えはメンバーからはできない。グループのメンバーでないトークンからも受け取らない
         Assert.Equal(400, (await hub.SendAsync("POST", "/api/sync/import/vrcx?replace=true", body: "{}", headers: bearer)).Response.StatusCode);
         string stray;
         using (var db = hub.OpenDb()) stray = new AuthStore(db).CreateToken("stray", TokenScopes.Sync).Secret;
         Assert.Equal(403, (await hub.SendAsync("POST", "/api/sync/import/vat", body: "{}", headers: [("Authorization", "Bearer " + stray)])).Response.StatusCode);
+        Assert.Equal(403, (await hub.SendAsync("GET", "/api/sync/import/vrcx/result", headers: [("Authorization", "Bearer " + stray)])).Response.StatusCode);
         // もう入っている端末は、別の合言葉でも入り直せない（前のトークンを奪わせない）
         var again = (await Json(await hub.SendAsync("POST", "/api/settings/group/invite", loopback: true))).GetProperty("code").GetString()!;
         Assert.Equal(403, (await hub.SendAsync("POST", "/api/group/accept", body: JsonSerializer.Serialize(new { code = again, deviceId = "d_laptop", deviceName = "x" }))).Response.StatusCode);

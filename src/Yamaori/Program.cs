@@ -14,6 +14,7 @@ using Yamaori.Store;
 // yamaori export --out <dir> 日記を日ごとの Markdown に書き出す
 // yamaori import-vat --file <VRChatActivityLog.db>  VRChatActivityTools の記録を取り込む
 // yamaori import-vrcx [--file <VRCX.sqlite3>]        VRCX の記録を取り込む
+// yamaori vrcx-snapshot --out <file>                VRCX の DB から取り込む表だけを写す（まとめ役へ送るものと同じ）
 // yamaori set-password                               パスワードを決める（標準入力から）
 // yamaori backup [--out <ファイル>]                  DB の写しを作る（動いている間でもよい）
 // yamaori resync                                     子の端末: 次の回に、記録とメモを全部親へ送り直す
@@ -123,11 +124,29 @@ switch (command)
         var file = cl["file"] ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCX", "VRCX.sqlite3");
         if (!File.Exists(file)) { Console.Error.WriteLine($"VRCX の DB が見つからない: {file}（--file で渡す）"); return 2; }
         using var db = Database.Open(options.DatabasePath);
+        // VRCX が使っている DB を直に長く読まないよう、取り込む表だけを写してから読む
+        var copy = Path.Combine(Directory.CreateTempSubdirectory("yamaori-vrcx-").FullName, "vrcx.db");
         VrcxImport.Result r;
-        try { r = new VrcxImport(db, db.SelfDevice(options.DeviceName)).Import(file, replace: rest.Contains("--replace")); }
+        try
+        {
+            VrcxSnapshot.Narrow(file, copy);
+            r = new VrcxImport(db, db.SelfDevice(options.DeviceName)).Import(copy, replace: rest.Contains("--replace"));
+        }
         catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 3; }
-        Console.WriteLine($"訪問 {r.Visits}・会った人 {r.Encounters}・出来事 {r.Events}（うちフレンドの記録 {r.FriendEvents}）・ワールドの情報 {r.Worlds}・お気に入り {r.Favorites}・メモ {r.Notes}・ログと重なって飛ばした訪問 {r.Skipped}");
-        Console.WriteLine($"アカウント: {string.Join("、", r.Accounts)}");
+        finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(Path.GetDirectoryName(copy)!, recursive: true); }
+        Console.WriteLine(ImportJobs.VrcxMessage(r));
+        Console.WriteLine($"アカウント: {r.Accounts.Count} 件");
+        return 0;
+    }
+    case "vrcx-snapshot":
+    {
+        // yamaori vrcx-snapshot --out <file> [--file <VRCX.sqlite3>]  VRCX の DB から、取り込む表だけを写す（まとめ役へ送るものと同じ。確かめるため）
+        var cl = new ConfigurationBuilder().AddCommandLine(rest).Build();
+        var file = cl["file"] ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCX", "VRCX.sqlite3");
+        if (!File.Exists(file)) { Console.Error.WriteLine($"VRCX の DB が見つからない: {file}（--file で渡す）"); return 2; }
+        if (cl["out"] is not { Length: > 0 } outPath) { Console.Error.WriteLine("--out に写す先を渡す"); return 2; }
+        var fp = VrcxSnapshot.Narrow(file, outPath);
+        Console.WriteLine($"写した: {new FileInfo(outPath).Length} バイト（元 {new FileInfo(file).Length} バイト）・指紋 {fp}");
         return 0;
     }
     case "set-password":
@@ -165,7 +184,7 @@ switch (command)
         return 0;
     }
     default:
-        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・backup・resync・import-vat・import-vrcx・set-password）");
+        Console.Error.WriteLine($"知らないコマンド: {command}（run・ingest・summary・rebuild・reparse・export・backup・resync・import-vat・import-vrcx・vrcx-snapshot・set-password）");
         return 2;
 }
 

@@ -119,13 +119,25 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
     }
 
     /// <summary>
+    /// VRCX の DB から、取り込む表だけを写す（cookies・ログイン情報・フィードは写さない）。写しの道と、中身の指紋を返す。
+    /// </summary>
+    public (string File, string Fingerprint) VrcxCopy(string source)
+    {
+        Directory.CreateDirectory(TempDir);
+        var path = Path.Combine(TempDir, $"vrcx-{Guid.NewGuid():N}.db");
+        try { return (path, VrcxSnapshot.Narrow(source, path)); }
+        catch { TryDelete(path); throw; }
+    }
+
+    /// <summary>
     /// 取り込みを始める。枠をまだ取っていなければ取る（取れなければ false）。file は取り込み終わったら消す一時ファイル。
     /// deviceId は、その記録を集めた端末（メンバーから送られたらその端末。ログとの重なりもその端末のログで見る）。
     /// </summary>
-    public bool Start(string kind, string file, bool replace, string? accountId = null, string? deviceId = null, bool reserved = false)
+    /// <param name="fingerprint">メンバーが送ってきた VRCX の写しの指紋（結果に添えて返す）。</param>
+    public bool Start(string kind, string file, bool replace, string? accountId = null, string? deviceId = null, bool reserved = false, string? fingerprint = null)
     {
         if (!reserved && !TryReserve(kind)) { TryDelete(file); return false; }
-        _ = Task.Run(() => Run(kind, file, replace, accountId, deviceId));
+        _ = Task.Run(() => Run(kind, file, replace, accountId, deviceId, fingerprint));
         return true;
     }
 
@@ -133,11 +145,11 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
     public ImportStatus? RunNow(string kind, string file, bool replace)
     {
         if (!TryReserve(kind)) { TryDelete(file); return null; }
-        Run(kind, file, replace, null, null);
+        Run(kind, file, replace, null, null, null);
         return Current;
     }
 
-    void Run(string kind, string file, bool replace, string? accountId, string? deviceId)
+    void Run(string kind, string file, bool replace, string? accountId, string? deviceId, string? fingerprint)
     {
         bool ok = false, needsReplace = false;
         string message;
@@ -162,7 +174,7 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
             {
                 var r = new VrcxImport(db, deviceId ?? state.DeviceId).Import(file, replace);
                 result = r;
-                message = $"訪問 {r.Visits}・会った人 {r.Encounters}・出来事 {r.Events}（うちフレンドの記録 {r.FriendEvents}）・ワールドの情報 {r.Worlds}・お気に入り {r.Favorites}・メモ {r.Notes}・ログと重なって飛ばした訪問 {r.Skipped}";
+                message = VrcxMessage(r);
             }
             ok = true;
             new AuthStore(db).Set("import_last:" + kind, JsonSerializer.Serialize(new { at = DateTime.UtcNow, message, result }, Json));
@@ -186,7 +198,52 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
             SqliteConnection.ClearAllPools();
             TryDelete(file);
         }
+        // メンバーから届いた VRCX なら、その端末が読みに来られるよう、端末ごとに結果を残す
+        if (kind == "vrcx" && deviceId != null) RememberMemberResult(deviceId, new MemberResult(DateTime.UtcNow, ok, needsReplace, message, fingerprint));
         lock (_gate) _status = _status with { Running = false, FinishedAt = DateTime.UtcNow, Ok = ok, Message = message, NeedsReplace = needsReplace };
+    }
+
+    public static string VrcxMessage(VrcxImport.Result r) =>
+        $"訪問 {r.Visits}・会った人 {r.Encounters}・出来事 {r.Events}（うちフレンドの記録 {r.FriendEvents}）・ワールドの情報 {r.Worlds}・お気に入り {r.Favorites}・メモ {r.Notes}・VRChat のノート {r.VrchatNotes}・ログと重なって飛ばした訪問 {r.Skipped}";
+
+    /// <summary>メンバーから届いた VRCX の取り込みの結果（まとめ役が持ち、メンバーが読みに来る）。</summary>
+    public sealed record MemberResult(DateTime At, bool Ok, bool NeedsReplace, string Message, string? Fingerprint);
+
+    void RememberMemberResult(string deviceId, MemberResult r)
+    {
+        try
+        {
+            using var db = Database.Open(options.Value.DatabasePath);
+            new AuthStore(db).Set("import_last:vrcx:" + deviceId, JsonSerializer.Serialize(r, Json));
+        }
+        catch (Exception ex) when (ex is SqliteException or IOException) { logger.LogWarning("取り込みの結果を残せなかった: {Message}", ex.Message); }
+    }
+
+    public static MemberResult? MemberResultOf(Database db, string deviceId)
+    {
+        if (new AuthStore(db).Get("import_last:vrcx:" + deviceId) is not { } json) return null;
+        try { return JsonSerializer.Deserialize<MemberResult>(json, Json); }
+        catch (JsonException) { return null; }
+    }
+
+    /// <summary>
+    /// メンバーで、まとめ役での VRCX の取り込みの結果を読む。まだ無いか、まとめ役が古くて読めなければ null と理由。
+    /// </summary>
+    public async Task<(MemberResult? Result, string? Problem)> FetchMemberResultAsync(CancellationToken cancel)
+    {
+        try
+        {
+            var o = Config();
+            if (o.ParentUrl == null || Photos.Secrets.Unprotect(o.ParentToken) is not { } token) return (null, "まとめ役のアドレスかトークンがない");
+            using var http = new HttpClient { BaseAddress = new Uri(o.ParentUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(1) };
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            using var res = await http.GetAsync("api/sync/import/vrcx/result", cancel).ConfigureAwait(false);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return (null, "まとめ役の版が古く、取り込みの結果は分からない");
+            if (res.StatusCode == System.Net.HttpStatusCode.NoContent) return (null, null);
+            if (!res.IsSuccessStatusCode) return (null, $"まとめ役が {(int)res.StatusCode} を返した");
+            return (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<MemberResult>(res.Content, Json, cancel).ConfigureAwait(false), null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException) { return (null, $"まとめ役から結果を読めなかった: {ex.Message}"); }
     }
 
     static void TryDelete(string file)
@@ -198,7 +255,7 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
     /// グループのメンバーなら、取り込む DB をまとめ役へ送って、まとめ役で取り込んでもらう（記録はまとめ役が持つので）。
     /// 送れたら null、だめなら理由。file は送り終えたら消す。
     /// </summary>
-    public async Task<string?> ForwardAsync(string kind, string file, bool replace, string? account, CancellationToken cancel)
+    public async Task<string?> ForwardAsync(string kind, string file, bool replace, string? account, CancellationToken cancel, string? fingerprint = null)
     {
         try
         {
@@ -209,7 +266,8 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
             await using var f = new FileStream(file, FileMode.Open, FileAccess.Read);
             using var content = new StreamContent(f);
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-            var q = $"api/sync/import/{kind}?replace={(replace ? "true" : "false")}" + (account is { Length: > 0 } ? "&account=" + Uri.EscapeDataString(account) : "");
+            var q = $"api/sync/import/{kind}?replace={(replace ? "true" : "false")}" + (account is { Length: > 0 } ? "&account=" + Uri.EscapeDataString(account) : "")
+                + (fingerprint is { Length: > 0 } ? "&fp=" + Uri.EscapeDataString(fingerprint) : "");
             using var res = await http.PostAsync(q, content, cancel).ConfigureAwait(false);
             if (res.IsSuccessStatusCode) return null;
             var body = (await res.Content.ReadAsStringAsync(cancel).ConfigureAwait(false)).Trim();
@@ -234,14 +292,20 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
 
 /// <summary>
 /// VRCX との連携: この PC の VRCX の DB が変わっていたら、決まった間隔で取り込む（VRCX は書き足していくので、続きが入る）。
+/// VRCX はフィードなどで常に DB を書くので、ファイルの時刻が変わったら、取り込む中身の指紋を比べて、変わったときだけ写して送る。
+/// 写しは取り込む表だけ（cookies・ログイン情報・フィードは写さない）。
 /// 前に取り込んだものと別の DB になったら、勝手に入れ替えずに止まって記録に書く（本人が画面で決める）。
+/// メンバーは、送った次の回に、まとめ役での取り込みの結果を読んで、手元の「前の結果」に書く。
 /// </summary>
 public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options, DeviceRoles roles, ILogger<VrcxWorker> logger) : BackgroundService
 {
+    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try { await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
         var lastTry = DateTime.MinValue;
+        var waitingResult = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -250,30 +314,42 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
                 var path = o.EffectiveVrcxPath;
                 // グループの中では「VRCX と連携する」の役で、グループがなければ設定で動く
                 var enabled = roles.InGroup ? roles.Has(GroupRoles.Vrcx) : o.VrcxAuto;
+                if (enabled && roles.IsMember && waitingResult) waitingResult = !await ReadResultAsync(stoppingToken).ConfigureAwait(false);
                 if (enabled && File.Exists(path) && DateTime.UtcNow - lastTry >= TimeSpan.FromMinutes(Math.Clamp(o.VrcxMinutes, 5, 1440)))
                 {
                     using var db = Database.Open(options.Value.DatabasePath);
                     var store = new AuthStore(db);
                     var mtime = Database.Time(File.GetLastWriteTimeUtc(path));
-                    if (store.Get("vrcx_auto_mtime") != mtime && store.Get("vrcx_auto_blocked") != mtime)
+                    if (store.Get("vrcx_auto_mtime") != mtime)
                     {
                         lastTry = DateTime.UtcNow;
+                        // 取り込む中身が前と同じなら（フィードだけ変わったなど）、写さず送らない
+                        var fp = VrcxSnapshot.Fingerprint(path);
+                        if (fp == store.Get("vrcx_auto_fp") || fp == store.Get("vrcx_auto_blocked")) { store.Set("vrcx_auto_mtime", mtime); continue; }
+                        var (file, copied) = jobs.VrcxCopy(path);
                         if (roles.IsMember)
                         {
                             // メンバーは、まとめ役へ送って取り込んでもらう
-                            var problem = await jobs.ForwardAsync("vrcx", jobs.Snapshot(path), replace: false, null, stoppingToken).ConfigureAwait(false);
-                            if (problem == null) { store.Set("vrcx_auto_mtime", mtime); logger.LogInformation("VRCX の DB をまとめ役へ送った"); }
+                            var problem = await jobs.ForwardAsync("vrcx", file, replace: false, null, stoppingToken, copied).ConfigureAwait(false);
+                            if (problem == null)
+                            {
+                                store.Set("vrcx_auto_mtime", mtime);
+                                store.Set("vrcx_auto_fp", copied);
+                                waitingResult = true;
+                                logger.LogInformation("VRCX の取り込む表をまとめ役へ送った");
+                            }
                             else if (problem.Contains("ほかの取り込みが動いている", StringComparison.Ordinal)) lastTry = DateTime.MinValue;
                             else logger.LogWarning("VRCX の DB をまとめ役へ送れなかった（次の回にやり直す）: {Problem}", problem);
                             continue;
                         }
-                        var s = jobs.RunNow("vrcx", jobs.Snapshot(path), replace: false);
+                        var s = jobs.RunNow("vrcx", file, replace: false);
                         if (s == null) { lastTry = DateTime.MinValue; continue; } // ほかの取り込みが動いていた。次の回に試す
-                        if (s.Ok == true) store.Set("vrcx_auto_mtime", mtime);
+                        store.Set("vrcx_auto_mtime", mtime);
+                        if (s.Ok == true) store.Set("vrcx_auto_fp", copied);
                         else
                         {
-                            // 同じ中身でもう一度試さない（DB が変わったら、また試す）
-                            store.Set("vrcx_auto_blocked", mtime);
+                            // 同じ中身でもう一度試さない（中身が変わったら、また試す）
+                            store.Set("vrcx_auto_blocked", copied);
                             logger.LogWarning("VRCX を自動で取り込めなかった（設定の「取り込み」で確かめる）: {Message}", s.Message);
                         }
                     }
@@ -285,5 +361,31 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
             }
             try { await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
         }
+    }
+
+    /// <summary>まとめ役での取り込みの結果を読んで、手元の「前の結果」に書く。読めた（または待っても分からない）なら true。</summary>
+    async Task<bool> ReadResultAsync(CancellationToken cancel)
+    {
+        var (r, problem) = await jobs.FetchMemberResultAsync(cancel).ConfigureAwait(false);
+        using var db = Database.Open(options.Value.DatabasePath);
+        var store = new AuthStore(db);
+        var sent = store.Get("vrcx_auto_fp");
+        if (r == null)
+        {
+            if (problem == null) return false; // まだ取り込んでいない
+            store.Set("import_last:vrcx", JsonSerializer.Serialize(new { at = DateTime.UtcNow, message = "まとめ役へ送った（" + problem + "）" }, Json));
+            return true;
+        }
+        if (r.Fingerprint != null && r.Fingerprint != sent) return false; // 前に送った分の結果。今の分はまだ
+        var message = r.Ok ? "まとめ役で取り込んだ: " + r.Message : "まとめ役で取り込めなかった: " + r.Message;
+        store.Set("import_last:vrcx", JsonSerializer.Serialize(new { at = r.At, message, ok = r.Ok, needsReplace = r.NeedsReplace }, Json));
+        if (!r.Ok)
+        {
+            // 同じ中身を送り直さない（VRCX の中身が変わったら、また送る）。別の DB なら、まとめ役の画面で入れ替えを決めてもらう
+            store.Set("vrcx_auto_blocked", sent);
+            store.Set("vrcx_auto_fp", null);
+            logger.LogWarning("まとめ役で VRCX を取り込めなかった: {Message}", r.Message);
+        }
+        return true;
     }
 }

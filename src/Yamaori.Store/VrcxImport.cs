@@ -13,15 +13,19 @@ namespace Yamaori.Store;
 /// <item>フレンドの増減と名前・ランクの変化（&lt;userId&gt;_friend_log_history）→ 出来事 friend。ログでは取れないもの</item>
 /// <item>ローカルのお気に入りのワールド（favorite_world）と、その詳しい情報（cache_world）→ worlds・world_favorites</item>
 /// <item>ワールドのメモ（world_memos）と人のメモ（memos）→ Yamaori のメモ（出どころ vrcx。取り込み直すと書き換わる）</item>
+/// <item>VRChat のノート（&lt;userId&gt;_notes）→ 人のメモ（出どころ vrchat-note。VRCX のメモとは別の行で、どちらも正にしない）</item>
+/// <item>通知は古い表（_notifications）と新しい表（_notifications_v2）の両方から。同じ ID は 1 つにする</item>
 /// </list>
 /// 同じ端末のログの記録がある期間の訪問は飛ばす（ログを正とする）。表の名前の頭の &lt;userId&gt; は、ユーザー ID から - と _ を除いた形。
 /// </summary>
 public sealed class VrcxImport(Database db, string deviceId)
 {
     public const string Source = "vrcx";
+    /// <summary>VRChat のノート（VRCX が写して持つ）から入れたメモの出どころ。</summary>
+    public const string NoteSource = "vrchat-note";
     static readonly TimeSpan MaxGap = TimeSpan.FromHours(3);
 
-    public sealed record Result(int Visits, int Encounters, int Events, int FriendEvents, int Worlds, int Favorites, int Notes, int Skipped, IReadOnlyList<string> Accounts);
+    public sealed record Result(int Visits, int Encounters, int Events, int FriendEvents, int Worlds, int Favorites, int Notes, int Skipped, IReadOnlyList<string> Accounts, int VrchatNotes = 0);
 
     /// <param name="replace">前に取り込んだものと別の DB でも、入れ替えて取り込む。</param>
     public Result Import(string vrcxPath, bool replace = false)
@@ -32,15 +36,15 @@ public sealed class VrcxImport(Database db, string deviceId)
         // アカウントごとの表の頭（usr_1e59… → usr1e59…）
         var prefixes = tables.Where(t => t.EndsWith("_friend_log_history", StringComparison.Ordinal)).Select(t => t[..^"_friend_log_history".Length]).ToList();
         var userIds = AllUserIds(c, tables);
-        string? AccountOf(string prefix) => userIds.FirstOrDefault(id => Normalize(id) == prefix);
-        var accounts = prefixes.Select(AccountOf).OfType<string>().ToList();
+        string? AccountOf(string prefix) => FromPrefix(prefix) ?? userIds.FirstOrDefault(id => Normalize(id) == prefix);
+        var accounts = prefixes.Select(AccountOf).OfType<string>().Distinct(StringComparer.Ordinal).ToList();
         var selfIds = accounts.ToHashSet(StringComparer.Ordinal);
         var account = accounts.Count == 1 ? accounts[0] : null;
 
         // DB の見分け: アカウントと、いちばん古い訪問（VRCX は書き足していくので、続きの DB でも同じ）
         var oldest = tables.Contains("gamelog_location") ? Rows(c, "SELECT MIN(created_at) FROM gamelog_location", r => Str(r, 0)).FirstOrDefault() : null;
         var origin = $"{string.Join(",", accounts.Order(StringComparer.Ordinal))}@{oldest}";
-        ImportGuard.CheckOrigin(db, Source, origin, replace);
+        ImportGuard.CheckOrigin(db, Source, origin, replace, SameDb, NoteSource);
         var covered = ImportGuard.LogCoveredRanges(db, deviceId);
         var vatVisits = ImportGuard.VisitsOf(db, VatImport.Source);
         var visits = new List<Visit>();
@@ -137,6 +141,16 @@ public sealed class VrcxImport(Database db, string deviceId)
                     if (r.WorldName != null) data["world_name"] = r.WorldName;
                     events.Add(new ActivityEvent(StableId.Of("activity", "notification", "received", r.Id), Source, null, at, "notification", r.Sender, r.Name, data, acc));
                 }
+            if (tables.Contains(prefix + "_notifications_v2"))
+                foreach (var r in Rows(c, $"SELECT id, created_at, type, sender_user_id, sender_username, message, title, link FROM \"{prefix}_notifications_v2\"",
+                    r => (Id: Str(r, 0), At: Utc(r.GetString(1)), Type: Str(r, 2), Sender: Str(r, 3), Name: Str(r, 4), Message: Str(r, 5), Title: Str(r, 6), Link: Str(r, 7))))
+                {
+                    if (r.Id == null || r.At is not { } at || r.Type == null) continue;
+                    var data = new Dictionary<string, string?> { ["direction"] = "received", ["type"] = r.Type, ["notification_id"] = r.Id, ["message"] = r.Message };
+                    if (r.Title != null) data["title"] = r.Title;
+                    if (r.Link != null) data["link"] = r.Link;
+                    events.Add(new ActivityEvent(StableId.Of("activity", "notification", "received", r.Id), Source, null, at, "notification", r.Sender, r.Name, data, acc));
+                }
             if (tables.Contains(prefix + "_friend_log_history"))
                 foreach (var r in Rows(c, $"SELECT id, created_at, type, user_id, display_name, previous_display_name, trust_level, previous_trust_level FROM \"{prefix}_friend_log_history\"",
                     r => (Id: r.GetInt64(0), At: Utc(r.GetString(1)), Type: Str(r, 2), User: Str(r, 3), Name: Str(r, 4), Prev: Str(r, 5), Trust: Str(r, 6), PrevTrust: Str(r, 7))))
@@ -151,15 +165,19 @@ public sealed class VrcxImport(Database db, string deviceId)
                 }
         }
 
+        // 古い通知の表と新しい表に同じ通知があれば 1 つにする
+        events = events.DistinctBy(e => e.Id).ToList();
+
         using var tx = db.Connection.BeginTransaction();
         ProjectionWriter.Replace(db, Source, new Projection(deviceId, null, visits, encounters, events), tx);
         ImportGuard.RememberOrigin(db, Source, origin, tx);
         var worlds = ImportWorlds(c, tables, tx);
         var favorites = ImportFavorites(c, tables, tx);
         var notes = ImportMemos(c, tables, tx);
+        var vrchatNotes = ImportVrchatNotes(c, tables, prefixes, tx);
         ImportCurrentFriends(c, tables, prefixes, AccountOf, File.GetLastWriteTimeUtc(vrcxPath), tx);
         tx.Commit();
-        return new Result(visits.Count, encounters.Count, events.Count, friendEvents, worlds, favorites, notes, skipped, accounts);
+        return new Result(visits.Count, encounters.Count, events.Count, friendEvents, worlds, favorites, notes, skipped, accounts, vrchatNotes);
     }
 
     /// <summary>
@@ -253,10 +271,63 @@ public sealed class VrcxImport(Database db, string deviceId)
         return n;
     }
 
+    /// <summary>
+    /// VRChat のノート（VRCX が &lt;userId&gt;_notes に写して持つ）を、人のメモとして入れる。VRCX のメモ（memos）とは別の行。
+    /// ノートはアカウントごとなので、表の頭を ID に入れる。Yamaori で直したメモ（出どころ NULL）は上書きしない。
+    /// </summary>
+    int ImportVrchatNotes(SqliteConnection c, HashSet<string> tables, List<string> prefixes, SqliteTransaction tx)
+    {
+        var n = 0;
+        foreach (var prefix in prefixes)
+        {
+            if (!tables.Contains(prefix + "_notes")) continue;
+            var rows = Rows(c, $"SELECT user_id, note, created_at FROM \"{prefix}_notes\"", r => (Id: Str(r, 0), Note: Str(r, 1), At: Str(r, 2)))
+                .Where(r => r.Id != null && r.Id.StartsWith("usr_", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(r.Note))
+                .GroupBy(r => r.Id!, StringComparer.Ordinal).Select(g => g.OrderByDescending(r => r.At, StringComparer.Ordinal).First());
+            foreach (var r in rows)
+            {
+                var time = r.At is { } a && Utc(a) is { } t ? Database.Time(t) : Database.Time(DateTime.UtcNow);
+                using var cmd = db.Command("""
+                    INSERT INTO notes (id, target_type, target_id, body, device_id, created_at, updated_at, source) VALUES ($id, 'person', $i, $b, NULL, $at, $at, $src)
+                    ON CONFLICT (id) DO UPDATE SET body = $b, updated_at = $at WHERE notes.source = $src
+                    """, tx, ("$id", StableId.Of("note", Source, "vrchat-note", prefix, r.Id!)), ("$i", r.Id), ("$b", r.Note), ("$at", time), ("$src", NoteSource));
+                n += cmd.ExecuteNonQuery();
+            }
+        }
+        return n;
+    }
+
+    /// <summary>
+    /// 同じ VRCX の DB の続きか（origin は「アカウント,…@いちばん古い訪問」）。入れたばかりの VRCX では、アカウントや訪問が後から分かるので、
+    /// 前の値が空だった所は、埋まっても同じ DB とみなす。
+    /// </summary>
+    public static bool SameDb(string before, string now)
+    {
+        static (string Accounts, string Oldest) Split(string o) => o.LastIndexOf('@') is var i and >= 0 ? (o[..i], o[(i + 1)..]) : (o, "");
+        var (ba, bo) = Split(before);
+        var (na, no) = Split(now);
+        return (ba.Length == 0 || ba == na) && (bo.Length == 0 || bo == no);
+    }
+
+    /// <summary>表の頭（usr + ハイフンを除いた 32 桁の 16 進数）から、ユーザー ID（usr_8-4-4-4-12）を組み立て直す。今の形の ID なら必ず戻せる。</summary>
+    public static string? FromPrefix(string prefix)
+    {
+        if (prefix.Length != 35 || !prefix.StartsWith("usr", StringComparison.Ordinal)) return null;
+        var hex = prefix[3..];
+        if (!hex.All(char.IsAsciiHexDigitLower)) return null;
+        return $"usr_{hex[..8]}-{hex[8..12]}-{hex[12..16]}-{hex[16..20]}-{hex[20..]}";
+    }
+
     /// <summary>VRCX の DB に出てくるユーザー ID（アカウントの表の頭と引き合わせるため）。</summary>
     static HashSet<string> AllUserIds(SqliteConnection c, HashSet<string> tables)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        // 古い形の ID（表の頭から戻せない）でも、VRCX の設定の鍵と、最後にログインしたアカウントから分かる
+        if (tables.Contains("configs"))
+        {
+            foreach (var key in Strings(c, "SELECT key FROM configs WHERE key LIKE 'config:friendloginit_usr_%'")) ids.Add(key["config:friendloginit_".Length..]);
+            foreach (var id in Strings(c, "SELECT value FROM configs WHERE key = 'config:lastuserloggedin' AND value LIKE 'usr_%'")) ids.Add(id);
+        }
         if (tables.Contains("gamelog_join_leave"))
             foreach (var id in Strings(c, "SELECT DISTINCT user_id FROM gamelog_join_leave WHERE user_id LIKE 'usr_%'")) ids.Add(id);
         foreach (var t in tables.Where(t => t.EndsWith("_notifications", StringComparison.Ordinal)))
