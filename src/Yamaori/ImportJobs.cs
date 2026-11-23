@@ -305,7 +305,6 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
     {
         try { await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
         var lastTry = DateTime.MinValue;
-        var waitingResult = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -314,7 +313,9 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
                 var path = o.EffectiveVrcxPath;
                 // グループの中では「VRCX と連携する」の役で、グループがなければ設定で動く
                 var enabled = roles.InGroup ? roles.Has(GroupRoles.Vrcx) : o.VrcxAuto;
-                if (enabled && roles.IsMember && waitingResult) waitingResult = !await ReadResultAsync(stoppingToken).ConfigureAwait(false);
+                // 送った分の結果をまだ読んでいなければ読む（起こし直しても続きから読めるよう、待っている印は DB に持つ）
+                if (enabled && roles.IsMember && Waiting())
+                    if (await ReadResultAsync(stoppingToken).ConfigureAwait(false)) SetWaiting(false);
                 if (enabled && File.Exists(path) && DateTime.UtcNow - lastTry >= TimeSpan.FromMinutes(Math.Clamp(o.VrcxMinutes, 5, 1440)))
                 {
                     using var db = Database.Open(options.Value.DatabasePath);
@@ -335,7 +336,7 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
                             {
                                 store.Set("vrcx_auto_mtime", mtime);
                                 store.Set("vrcx_auto_fp", copied);
-                                waitingResult = true;
+                                SetWaiting(true);
                                 logger.LogInformation("VRCX の取り込む表をまとめ役へ送った");
                             }
                             else if (problem.Contains("ほかの取り込みが動いている", StringComparison.Ordinal)) lastTry = DateTime.MinValue;
@@ -361,6 +362,18 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
             }
             try { await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken).ConfigureAwait(false); } catch (OperationCanceledException) { break; }
         }
+    }
+
+    bool Waiting()
+    {
+        using var db = Database.Open(options.Value.DatabasePath);
+        return new AuthStore(db).Get("vrcx_wait_result") != null;
+    }
+
+    void SetWaiting(bool on)
+    {
+        using var db = Database.Open(options.Value.DatabasePath);
+        new AuthStore(db).Set("vrcx_wait_result", on ? "1" : null);
     }
 
     /// <summary>まとめ役での取り込みの結果を読んで、手元の「前の結果」に書く。読めた（または待っても分からない）なら true。</summary>
