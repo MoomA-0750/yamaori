@@ -82,6 +82,9 @@ public static class ImportGuard
         var n = Exec($"DELETE FROM visits WHERE id IN ({Inside})");
         Exec($"DELETE FROM events WHERE {Imported} AND kind = 'video' AND at >= $f AND at <= $t");
         const string Spanning = $"{Imported} AND joined_at < $f AND left_at > $f AND (account_id IS NULL OR $a IS NULL OR account_id = $a)";
+        // 切ったあとの訪問に入らない（ログの始まりより後の）会った人・出来事は消し、残る会った人は始まりで切る
+        Exec($"DELETE FROM encounters WHERE joined_at >= $f AND visit_id IN (SELECT id FROM visits WHERE {Spanning})");
+        Exec($"DELETE FROM events WHERE at >= $f AND visit_id IN (SELECT id FROM visits WHERE {Spanning})");
         Exec($"UPDATE encounters SET left_at = $f WHERE left_at > $f AND visit_id IN (SELECT id FROM visits WHERE {Spanning})");
         n += Exec($"UPDATE visits SET left_at = $f WHERE {Spanning}");
         return n;

@@ -133,6 +133,7 @@ switch (command)
             r = new VrcxImport(db, db.SelfDevice(options.DeviceName)).Import(copy, replace: rest.Contains("--replace"));
         }
         catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 3; }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) { Console.Error.WriteLine($"VRCX の DB を読めない: {ex.Message}"); return 4; }
         finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(Path.GetDirectoryName(copy)!, recursive: true); }
         Console.WriteLine(ImportJobs.VrcxMessage(r));
         Console.WriteLine($"アカウント: {r.Accounts.Count} 件");
@@ -145,6 +146,7 @@ switch (command)
         var file = cl["file"] ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VRCX", "VRCX.sqlite3");
         if (!File.Exists(file)) { Console.Error.WriteLine($"VRCX の DB が見つからない: {file}（--file で渡す）"); return 2; }
         if (cl["out"] is not { Length: > 0 } outPath) { Console.Error.WriteLine("--out に写す先を渡す"); return 2; }
+        if (File.Exists(outPath)) { Console.Error.WriteLine($"写す先にもうファイルがある（上書きしない）: {outPath}"); return 2; }
         var fp = VrcxSnapshot.Narrow(file, outPath);
         Console.WriteLine($"写した: {new FileInfo(outPath).Length} バイト（元 {new FileInfo(file).Length} バイト）・指紋 {fp}");
         return 0;

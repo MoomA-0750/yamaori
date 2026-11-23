@@ -229,21 +229,22 @@ public sealed class ImportJobs(IOptions<YamaoriOptions> options, YamaoriState st
     /// <summary>
     /// メンバーで、まとめ役での VRCX の取り込みの結果を読む。まだ無いか、まとめ役が古くて読めなければ null と理由。
     /// </summary>
-    public async Task<(MemberResult? Result, string? Problem)> FetchMemberResultAsync(CancellationToken cancel)
+    /// <returns>Final は、待っても分からない（まとめ役が古い・読む権限が無い）とき true。一時的に読めないときは false（次の回に読み直す）。</returns>
+    public async Task<(MemberResult? Result, string? Problem, bool Final)> FetchMemberResultAsync(CancellationToken cancel)
     {
         try
         {
             var o = Config();
-            if (o.ParentUrl == null || Photos.Secrets.Unprotect(o.ParentToken) is not { } token) return (null, "まとめ役のアドレスかトークンがない");
+            if (o.ParentUrl == null || Photos.Secrets.Unprotect(o.ParentToken) is not { } token) return (null, "まとめ役のアドレスかトークンがない", true);
             using var http = new HttpClient { BaseAddress = new Uri(o.ParentUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(1) };
             http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             using var res = await http.GetAsync("api/sync/import/vrcx/result", cancel).ConfigureAwait(false);
-            if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return (null, "まとめ役の版が古く、取り込みの結果は分からない");
-            if (res.StatusCode == System.Net.HttpStatusCode.NoContent) return (null, null);
-            if (!res.IsSuccessStatusCode) return (null, $"まとめ役が {(int)res.StatusCode} を返した");
-            return (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<MemberResult>(res.Content, Json, cancel).ConfigureAwait(false), null);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return (null, "まとめ役の版が古く、取り込みの結果は分からない", true);
+            if (res.StatusCode == System.Net.HttpStatusCode.NoContent) return (null, null, false);
+            if (!res.IsSuccessStatusCode) return (null, $"まとめ役が {(int)res.StatusCode} を返した", res.StatusCode == System.Net.HttpStatusCode.Forbidden);
+            return (await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<MemberResult>(res.Content, Json, cancel).ConfigureAwait(false), null, true);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException) { return (null, $"まとめ役から結果を読めなかった: {ex.Message}"); }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException) { return (null, $"まとめ役から結果を読めなかった: {ex.Message}", false); }
     }
 
     static void TryDelete(string file)
@@ -379,17 +380,18 @@ public sealed class VrcxWorker(ImportJobs jobs, IOptions<YamaoriOptions> options
     /// <summary>まとめ役での取り込みの結果を読んで、手元の「前の結果」に書く。読めた（または待っても分からない）なら true。</summary>
     async Task<bool> ReadResultAsync(CancellationToken cancel)
     {
-        var (r, problem) = await jobs.FetchMemberResultAsync(cancel).ConfigureAwait(false);
+        var (r, problem, final) = await jobs.FetchMemberResultAsync(cancel).ConfigureAwait(false);
         using var db = Database.Open(options.Value.DatabasePath);
         var store = new AuthStore(db);
         var sent = store.Get("vrcx_auto_fp");
         if (r == null)
         {
             if (problem == null) return false; // まだ取り込んでいない
+            if (!final) { logger.LogInformation("まとめ役での VRCX の取り込みの結果を、次の回に読み直す: {Problem}", problem); return false; }
             store.Set("import_last:vrcx", JsonSerializer.Serialize(new { at = DateTime.UtcNow, message = "まとめ役へ送った（" + problem + "）" }, Json));
             return true;
         }
-        if (r.Fingerprint != null && r.Fingerprint != sent) return false; // 前に送った分の結果。今の分はまだ
+        if (r.Fingerprint != sent) return false; // 前に送った分（古い版のころの、指紋の無いものも）の結果。今の分はまだ
         var message = r.Ok ? "まとめ役で取り込んだ: " + r.Message : "まとめ役で取り込めなかった: " + r.Message;
         store.Set("import_last:vrcx", JsonSerializer.Serialize(new { at = r.At, message, ok = r.Ok, needsReplace = r.NeedsReplace }, Json));
         if (!r.Ok)

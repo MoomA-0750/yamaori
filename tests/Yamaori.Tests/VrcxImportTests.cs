@@ -196,9 +196,17 @@ public sealed class VrcxImportTests : IDisposable
             tx.Commit();
         }
         // 12:10〜12:20 のログ: World A（12:00〜12:30）はログの始まりで切る
+        // 切ったあとの訪問より後に入った会った人は消す（入った時刻 > 出た時刻 の行を残さない）
+        using (var cmd = db.Command("""
+            INSERT INTO encounters (id, source, device_id, visit_id, user_id, name, joined_at, left_at)
+            SELECT 'e_late', 'vrcx', 'd_test', id, 'usr_carol', 'Carol', '2024-05-01T12:15:00Z', '2024-05-01T12:25:00Z' FROM visits WHERE world_id = 'wrld_a'
+            """)) cmd.ExecuteNonQuery();
         Log("a.txt", new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), new DateTime(2024, 5, 1, 12, 20, 0, DateTimeKind.Utc));
         var q = new Queries(db, TimeZoneInfo.Utc);
         Assert.Equal(new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), q.Visits().Items.Single(v => v.WorldId == "wrld_a").LeftAt);
+        Assert.Equal(0L, Count(db, "SELECT COUNT(*) FROM encounters WHERE id = 'e_late'"));
+        Assert.Equal(0L, Count(db, "SELECT COUNT(*) FROM encounters e JOIN visits v ON v.id = e.visit_id WHERE v.world_id = 'wrld_a' AND e.left_at < e.joined_at"));
+        Assert.Equal("2024-05-01T12:10:00Z", db.Scalar("SELECT left_at FROM encounters WHERE user_id = 'usr_alice'")); // 12:00:03〜12:10:00 はそのまま
         Assert.Equal(1L, Count(db, "SELECT COUNT(*) FROM events WHERE kind = 'video'")); // 12:05 の動画は期間の外
         // 12:30〜13:00 のログ: その間に入った World B と、そこで会った人を外す
         Log("b.txt", new DateTime(2024, 5, 1, 12, 30, 0, DateTimeKind.Utc), new DateTime(2024, 5, 1, 13, 0, 0, DateTimeKind.Utc));
