@@ -181,6 +181,43 @@ public sealed class VrcxImportTests : IDisposable
         Assert.Equal(new DateTime(2024, 5, 1, 12, 30, 0, DateTimeKind.Utc), a.LeftAt);
     }
 
+    [Fact]
+    public void 取り込みのあとにログが届いても_同じ時間を二重に持たない()
+    {
+        var vrcx = Vrcx();
+        using var db = Database.Open(Path.Combine(_dir, "y.sqlite3"));
+        new VrcxImport(db, "d_test").Import(vrcx);
+        Assert.Equal(2L, Count(db, "SELECT COUNT(*) FROM visits WHERE source = 'vrcx'"));
+        void Log(string file, DateTime from, DateTime? to)
+        {
+            using var tx = db.Connection.BeginTransaction();
+            ProjectionWriter.Replace(db, "log:d_test/" + file, new Yamaori.Core.Projection("d_test",
+                new Yamaori.Core.LogSession("d_test", file, from, to, "quit", null, null, null, null), [], [], []), tx);
+            tx.Commit();
+        }
+        // 12:10〜12:20 のログ: World A（12:00〜12:30）はログの始まりで切る
+        Log("a.txt", new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), new DateTime(2024, 5, 1, 12, 20, 0, DateTimeKind.Utc));
+        var q = new Queries(db, TimeZoneInfo.Utc);
+        Assert.Equal(new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), q.Visits().Items.Single(v => v.WorldId == "wrld_a").LeftAt);
+        Assert.Equal(1L, Count(db, "SELECT COUNT(*) FROM events WHERE kind = 'video'")); // 12:05 の動画は期間の外
+        // 12:30〜13:00 のログ: その間に入った World B と、そこで会った人を外す
+        Log("b.txt", new DateTime(2024, 5, 1, 12, 30, 0, DateTimeKind.Utc), new DateTime(2024, 5, 1, 13, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(["wrld_a"], q.Visits().Items.Select(v => v.WorldId).ToList());
+        Assert.Equal(0L, Count(db, "SELECT COUNT(*) FROM encounters WHERE user_id = 'usr_bob'"));
+        // 取り込み直しても同じになる（取り込みの決まりと同じ）
+        var r = new VrcxImport(db, "d_test").Import(vrcx);
+        Assert.Equal(1, r.Visits);
+        Assert.Equal(new DateTime(2024, 5, 1, 12, 10, 0, DateTimeKind.Utc), q.Visits().Items.Single(v => v.WorldId == "wrld_a").LeftAt);
+        // 別の端末のログでは外さない
+        using (var tx = db.Connection.BeginTransaction())
+        {
+            ProjectionWriter.Replace(db, "log:d_other/c.txt", new Yamaori.Core.Projection("d_other",
+                new Yamaori.Core.LogSession("d_other", "c.txt", new DateTime(2024, 5, 1, 11, 0, 0, DateTimeKind.Utc), new DateTime(2024, 5, 1, 14, 0, 0, DateTimeKind.Utc), "quit", null, null, null, null), [], [], []), tx);
+            tx.Commit();
+        }
+        Assert.Single(q.Visits().Items);
+    }
+
     static long Count(Database db, string sql) => (long)db.Scalar(sql)!;
 
     public void Dispose()

@@ -59,6 +59,34 @@ public static class ImportGuard
         return left;
     }
 
+    /// <summary>
+    /// ログの期間（VRChat を起こしていた間）が分かったときに、先に入っていた取り込み（VAT・VRCX）の記録を、取り込みと同じ決まりで直す。
+    /// 取り込みは中身が変わったときだけやり直すので、取り込みのあとにログが届く（メンバーの同期が遅れた、など）と、同じ時間を二重に持つため。
+    /// <list type="bullet">
+    /// <item>その期間に入った訪問と、その訪問の会った人・出来事、その期間の動画を消す（取り込みでも飛ばすもの）</item>
+    /// <item>期間の前に入って期間にかかる訪問は、期間の始まりで切る（<see cref="ClipToCovered"/> と同じ。アカウントが分かっていて違えば切らない）</item>
+    /// </list>
+    /// </summary>
+    public static int TrimImportedToLog(Database db, string deviceId, DateTime from, DateTime to, string? account, Microsoft.Data.Sqlite.SqliteTransaction tx)
+    {
+        (string, object?)[] args = [("$d", deviceId), ("$f", Database.Time(from)), ("$t", Database.Time(to)), ("$a", account)];
+        const string Imported = "source IN ('vat', 'vrcx') AND device_id = $d";
+        int Exec(string sql)
+        {
+            using var cmd = db.Command(sql, tx, args);
+            return cmd.ExecuteNonQuery();
+        }
+        const string Inside = $"SELECT id FROM visits WHERE {Imported} AND joined_at >= $f AND joined_at <= $t";
+        Exec($"DELETE FROM encounters WHERE visit_id IN ({Inside})");
+        Exec($"DELETE FROM events WHERE visit_id IN ({Inside})");
+        var n = Exec($"DELETE FROM visits WHERE id IN ({Inside})");
+        Exec($"DELETE FROM events WHERE {Imported} AND kind = 'video' AND at >= $f AND at <= $t");
+        const string Spanning = $"{Imported} AND joined_at < $f AND left_at > $f AND (account_id IS NULL OR $a IS NULL OR account_id = $a)";
+        Exec($"UPDATE encounters SET left_at = $f WHERE left_at > $f AND visit_id IN (SELECT id FROM visits WHERE {Spanning})");
+        n += Exec($"UPDATE visits SET left_at = $f WHERE {Spanning}");
+        return n;
+    }
+
     /// <summary>この端末のログの記録がある期間と、そのログのアカウント。</summary>
     public static List<(DateTime From, DateTime To, string? Account)> LogCoveredRanges(Database db, string deviceId)
     {

@@ -28,6 +28,9 @@ public static class ProjectionWriter
             """,
             ("$dev", s.DeviceId), ("$f", s.LogFile), ("$st", Database.Time(s.StartedAt)), ("$en", Database.Time(s.EndedAt)), ("$r", s.EndReason),
             ("$sid", s.SelfId), ("$sn", s.SelfName), ("$vr", s.Vr is { } vr ? (vr ? 1 : 0) : null), ("$hmd", s.Hmd));
+        // ログの期間に先に入っていた取り込み（VAT・VRCX）の訪問を外す（ログを正とする。取り込みのあとにログが届いても二重にしない）
+        if (p.Session is { StartedAt: { } from } ls)
+            ImportGuard.TrimImportedToLog(db, p.DeviceId, from, ls.EndedAt ?? DateTime.UtcNow, ls.SelfId, tx);
 
         foreach (var v in p.Visits)
         {
