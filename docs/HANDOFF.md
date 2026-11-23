@@ -9,13 +9,14 @@ VRChat の記録を残す Yamaori を、TrueNAS を「まとめ役」（記録�
 ## 今の作業（2026-11-23）: VRCX との連携を深める — 実装と tofu での確認まで済み、本番へは未反映
 
 - 調べた結果・決めたこと（D17）・やらないことは `docs/vrcx-integration.md`
-- 実装は f06444b（試験 196 本通る）。変えたのは VrcxSnapshot.cs（新）・VrcxImport.cs・ImportGuard.cs・ImportJobs.cs（VrcxWorker）・ImportSettings.cs・Program.cs（`vrcx-snapshot`）
+- 実装は f06444b・c20d4e5・85f08a4。変えたのは VrcxSnapshot.cs（新）・VrcxImport.cs・ImportGuard.cs・ImportJobs.cs（VrcxWorker）・ImportSettings.cs・Program.cs（`vrcx-snapshot`）
 - tofu の実 VRCX（2026.11.14、DB 版 18、入れたばかり）で確かめたこと（tofu の中に別のデータフォルダでまとめ役とメンバーを立てた。入っている 0.1.10 と本番のまとめ役には触れていない。試しのフォルダは消した）
   - 写しは 516 KB → 111 KB。cookies・ログイン情報・フィードは入らない（元の DB にある `savedcredentials` の文字が写しに無い）
   - 一人で取り込み: アカウント 1・フレンドの一覧 40・VRChat のノート 9。2 回目でも増えない
   - グループ: メンバーが送る → まとめ役が取り込む → メンバーが結果を読み「まとめ役で取り込んだ」と残す。指紋は一人のときと同じ
   - VRCX がフィードで DB を書いても、指紋が同じなので送らない
   - 手元で、古いまとめ役（e2e521b）の取り込みが新しい写しを読めることも確かめた（作り物の見本で）
+- 2026-11-23 17:38 に本人が tofu で一度遊んだあとの実データでも確かめた（`docs/vrcx-integration.md` の最後）。VRCX のあとにログが届くと二重になる問題を見つけて直した（c20d4e5）。起こし直すと結果を読まない穴も直した（85f08a4）。試験 197 本通る。試しのフォルダは消した
 - まだしていない
   - 本番のまとめ役（TrueNAS）と tofu の Yamaori の更新（本人の判断待ち。下）
   - 画面でノートの出どころの札を出す（任意）
