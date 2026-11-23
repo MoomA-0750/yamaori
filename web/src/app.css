@@ -57,13 +57,18 @@ button {
   transition: background-color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
 button:not(:disabled):hover { background: var(--hover); }
-button:not(:disabled):active { transform: scale(0.97); }
+button:not(:disabled):active { transform: scale(var(--press-scale, 0.97)); }
 button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 button.primary { background: var(--fill); border-color: transparent; color: var(--on-fill); }
 button.primary:not(:disabled):hover { background: var(--fill-hover); }
 button.danger { color: var(--danger); }
 button.ghost { background: transparent; border-color: transparent; }
 button.ghost:not(:disabled):hover { background: var(--hover); }
+/* 動きを減らす設定では縮めず（kasane の --press-scale が 1）、押した印を地に字の色を重ねて返す（kasane の .k-btn と同じ決まり）。
+   種類ごとの :hover の background の一括指定に消されないよう、:root を付けて種類の規則より後に置く */
+@media (prefers-reduced-motion: reduce) {
+  :root button:not(:disabled):active { background-image: linear-gradient(color-mix(in srgb, currentColor 16%, transparent) 0 0); }
+}
 
 input[type="text"], input[type="password"], input[type="search"], input[type="number"], textarea, select {
   width: 100%;
