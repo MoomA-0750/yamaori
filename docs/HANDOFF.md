@@ -1,12 +1,20 @@
 # 引き継ぎ（今の状態）
 
-最終更新: 2026-11-23
+最終更新: 2026-11-23（夜）
 
 ## 目的
 
 VRChat の記録を残す Yamaori を、TrueNAS を「まとめ役」（記録を全部持ち WebUI を配る）、Windows の to-fu を「メンバー」（記録を送る）にした端末のグループで使えるようにする。
 
-## 今の作業（2026-11-23）: VRCX との連携を深める — 実装と tofu での確認まで済み、本番へは未反映
+## 今の作業（2026-11-23）: VRCX との連携を深める — tofu は反映済み、本番のまとめ役は main の push の了承待ち
+
+- 反映（本人の了承あり）
+  - kasane-trial を 7dac569 まで push 済み（別のセッションが main に push した 6df5646 = kasane 1.3.1 の CSS を merge してある）。change-reviewer の指摘 5 件は 4d432ac で直した
+  - tofu を 0.1.11 にした（18:32）。18:35 に絞った写しを本番のまとめ役へ送り、結果は「まとめ役の版が古く、分からない」（想定どおり）。ログイン情報入りの丸ごとの写しを送るのは止まった
+  - tofu の戻し方: `%USERPROFILE%\yamaori-rollback\Yamaori-Setup-0.1.10.exe` を入れ直す（DB の表の版は変えていないので DB はそのまま）
+  - 本番のまとめ役: image は main への push でだけ作られる。了承は「kasane-trial の push」だったので、main への push は止められた。本人に `kasane-trial:main` の push の了承をもらう → CI の image → 本人が TrueNAS のアプリを起こし直す → 配っている js の名前と、tofu の import_last:vrcx が「まとめ役で取り込んだ」になるかで確かめる
+  - 本番の戻し方: TrueNAS のアプリの image を前の digest に戻して起こし直す（DB の表の版は同じ）
+
 
 - 調べた結果・決めたこと（D17）・やらないことは `docs/vrcx-integration.md`
 - 実装は f06444b・c20d4e5・85f08a4。変えたのは VrcxSnapshot.cs（新）・VrcxImport.cs・ImportGuard.cs・ImportJobs.cs（VrcxWorker）・ImportSettings.cs・Program.cs（`vrcx-snapshot`）
