@@ -91,9 +91,9 @@ VRChat の記録を残す Yamaori を、TrueNAS を「まとめ役」（記録�
 - to-fu の DB を読むだけなら `C:\Users\MoomA\AppData\Local\Android\Sdk\platform-tools\sqlite3.exe -readonly %LOCALAPPDATA%\Yamaori\yamaori.sqlite3`
 
 ## 詳しい資料
-- `docs/vrcx-integration.md`: VRCX 連携の調べた結果・決めたこと・実データでの確認
 
-- `docs/plan.md`: 全体の形、段階、決めたこと D1〜D16、レビューの経緯
+- `docs/vrcx-integration.md`: VRCX 連携の調べた結果・決めたこと・実データでの確認
+- `docs/plan.md`: 全体の形、段階、決めたこと D1〜D17、レビューの経緯
 - `docs/reviews/`: 外からのレビュー
 - `CHANGELOG.md`: 使う人に関わる変更
 - `deploy/truenas/yamaori.yaml`: TrueNAS のアプリの定義
