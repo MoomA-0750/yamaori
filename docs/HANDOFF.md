@@ -9,7 +9,9 @@ VRChat の記録を残す Yamaori を、TrueNAS を「まとめ役」（記録�
 ## 今の作業（2026-11-23〜）: VRCX との連携を深める
 
 - 本人が tofu に VRCX を入れた。調べた結果・決めたこと・順番は `docs/vrcx-integration.md`
-- 段階: 1 調べる（済）→ 2 設計（済）→ 3 実装と手元の試験 → 4 tofu の実 VRCX で E2E → 5 報告
+- 段階: 1 調べる（済）→ 2 設計（済）→ 3 実装と手元の試験（済、f06444b。試験 196 本通る）→ 4 tofu の実 VRCX で E2E（途中）→ 5 報告
+- tofu の試し: `%TEMP%\yamaori-e2e\` に win-x64 の試しの版（yamaori-e2e\Yamaori.exe）と、別のデータフォルダ solo・hub（47912）・member（47913）。入っている Yamaori 0.1.10 と本番のまとめ役には触れていない。終わったら hub・member のプロセスを止めてフォルダごと消す
+- Yamaori.exe は窓のアプリなので、コマンドとして使うときは `Start-Process -Wait -RedirectStandardOutput` で待つ。台本は tofu にファイルで書いて `powershell -File` で動かす（引用の入れ子が崩れるため）
 - まとめ役（TrueNAS）の本番へは反映しない。手元と tofu（別のデータフォルダで一人で動かす）までで確かめ、報告してから
 - tofu の Yamaori 0.1.10 は 2026-11-23 15:22 に VRCX の DB を丸ごと（cookies・ログイン情報入り）まとめ役へ送っている。確認一覧に記録済み
 
